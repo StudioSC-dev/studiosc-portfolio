@@ -6,6 +6,7 @@ import ContactEmail from "@/lib/email";
 
 const contactFormSchema = z.object({
   name: z.string().min(2),
+  email: z.email({ message: "Invalid email address" }),
   company: z.string().min(2),
   service: z.enum(["full-stack", "qa", "full-cycle", "employment"]),
   projectGoals: z.string().min(10),
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
     const emailHtml = await render(
       ContactEmail({
         name: validatedData.name,
+        email: validatedData.email,
         company: validatedData.company,
         service: serviceLabels[validatedData.service],
         projectGoals: validatedData.projectGoals,
@@ -47,8 +49,9 @@ export async function POST(request: Request) {
     );
 
     const { data, error } = await resend.emails.send({
-      from: "StudioSC Contact <onboarding@resend.dev>",
+      from: "StudioSC <hello@studiosc.dev>",
       to: ["hello@studiosc.dev"],
+      replyTo: [validatedData.email],
       subject: `New Contact Form Submission from ${validatedData.name}`,
       html: emailHtml,
     });

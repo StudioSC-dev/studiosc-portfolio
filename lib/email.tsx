@@ -11,6 +11,7 @@ import {
 
 interface ContactEmailProps {
   name: string;
+  email: string;
   company: string;
   service: string;
   projectGoals: string;
@@ -20,6 +21,7 @@ interface ContactEmailProps {
 
 export default function ContactEmail({
   name,
+  email,
   company,
   service,
   projectGoals,
@@ -39,6 +41,10 @@ export default function ContactEmail({
           <Section style={section}>
             <Text style={label}>Name:</Text>
             <Text style={value}>{name}</Text>
+          </Section>
+          <Section style={section}>
+            <Text style={label}>Email:</Text>
+            <Text style={value}>{email}</Text>
           </Section>
           <Section style={section}>
             <Text style={label}>Company:</Text>

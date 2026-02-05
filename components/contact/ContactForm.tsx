@@ -10,6 +10,7 @@ import { LinkedInIcon } from "@/components/ui/LinkedInIcon";
 
 const contactFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.email({ message: "Please enter a valid email address" }),
   company: z.string().min(2, "Company name must be at least 2 characters"),
   service: z.enum(["full-stack", "qa", "full-cycle", "employment"]),
   projectGoals: z
@@ -135,24 +136,45 @@ export default function ContactForm() {
 
         <div>
           <label
-            htmlFor="company"
+            htmlFor="email"
             className="block text-sm font-medium text-gray-700 dark:text-gray-300"
           >
-            Company <span className="text-red-500">*</span>
+            Email <span className="text-red-500">*</span>
           </label>
           <input
-            type="text"
-            id="company"
-            {...register("company")}
+            type="email"
+            id="email"
+            {...register("email")}
             className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-500 dark:focus:ring-gray-500"
-            placeholder="Your company"
+            placeholder="your.email@example.com"
           />
-          {errors.company && (
+          {errors.email && (
             <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-              {errors.company.message}
+              {errors.email.message}
             </p>
           )}
         </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="company"
+          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
+          Company <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          id="company"
+          {...register("company")}
+          className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:border-gray-900 focus:ring-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:focus:border-gray-500 dark:focus:ring-gray-500"
+          placeholder="Your company"
+        />
+        {errors.company && (
+          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+            {errors.company.message}
+          </p>
+        )}
       </div>
 
       <div>
