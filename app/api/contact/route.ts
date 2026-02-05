@@ -4,8 +4,6 @@ import { z } from "zod";
 import { render } from "@react-email/render";
 import ContactEmail from "@/lib/email";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const contactFormSchema = z.object({
   name: z.string().min(2),
   company: z.string().min(2),
@@ -27,6 +25,8 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const serviceLabels: Record<string, string> = {
       "full-stack": "Full-Stack Development (The Build)",
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid form data", details: error.errors },
+        { error: "Invalid form data", details: error.issues },
         { status: 400 }
       );
     }

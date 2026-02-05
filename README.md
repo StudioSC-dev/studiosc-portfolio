@@ -47,9 +47,9 @@ cp .env.example .env.local
 
 Edit `.env.local` and add your:
 
-- `RESEND_API_KEY` - Your Resend API key for email functionality
-- `PLAUSIBLE_DOMAIN` - Your Plausible domain (optional)
-- `NEXT_PUBLIC_SITE_URL` - Your site URL (e.g., https://studiosc.dev)
+- `RESEND_API_KEY` - Your Resend API key for email functionality (required)
+- `NEXT_PUBLIC_SITE_URL` - Your site URL (defaults to https://studiosc.dev if not set)
+- `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` - Your Plausible domain for analytics (optional)
 
 ### Development
 

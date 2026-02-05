@@ -26,3 +26,15 @@ export interface Person {
   linkedIn: string;
   resumePath: string;
 }
+
+export interface Project {
+  slug: string;
+  title: string;
+  description: string;
+  tags: string[];
+  qaVerified: boolean;
+  githubUrl?: string;
+  liveUrl?: string;
+  date: string;
+  content?: string;
+}

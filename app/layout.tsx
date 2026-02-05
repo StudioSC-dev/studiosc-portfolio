@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s | StudioSC",
   },
   description:
-    "We build and harden digital products. StudioSC combines senior-level development with expert QA to deliver software that scales and survives the real world.",
+    "A specialized engineering duo focused on building robust architecture and hardening it through enterprise-grade QA.",
   keywords: [
     "software development",
     "quality assurance",
@@ -33,13 +33,13 @@ export const metadata: Metadata = {
     siteName: "StudioSC",
     title: "StudioSC | High-Integrity Engineering & Quality Assurance",
     description:
-      "We build and harden digital products. StudioSC combines senior-level development with expert QA to deliver software that scales and survives the real world.",
+      "A specialized engineering duo focused on building robust architecture and hardening it through enterprise-grade QA.",
   },
   twitter: {
     card: "summary_large_image",
     title: "StudioSC | High-Integrity Engineering & Quality Assurance",
     description:
-      "We build and harden digital products. StudioSC combines senior-level development with expert QA to deliver software that scales and survives the real world.",
+      "A specialized engineering duo focused on building robust architecture and hardening it through enterprise-grade QA.",
   },
   robots: {
     index: true,

@@ -12,11 +12,18 @@
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
+
+  /* Brand Colors - Sophisticated Dark Palette */
+  --color-brand-slate-950: #0a0a0f;
+  --color-brand-slate-900: #0f172a;
+  --color-brand-slate-800: #1e293b;
+  --color-brand-blue-500: #3b82f6;
+  --color-brand-emerald-500: #10b981;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #0f172a;
     --foreground: #ededed;
   }
 }
