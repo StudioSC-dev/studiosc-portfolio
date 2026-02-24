@@ -145,7 +145,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
           {project.tags && project.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-6">
-              {project.tags.map((tag) => (
+              {project.tags.map((tag: string) => (
                 <span
                   key={tag}
                   className="text-xs font-mono bg-gray-800 text-gray-300 px-2 py-1 rounded"
