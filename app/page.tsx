@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Hero from "@/components/home/Hero";
 import ProjectCard from "@/components/home/ProjectCard";
 import LatestBlogPosts from "@/components/home/LatestBlogPosts";
-import { getBlogPosts } from "@/lib/mdx";
+import { getBlogPosts, getProjects } from "@/lib/mdx";
 
 export const metadata: Metadata = {
   title: "StudioSC",
@@ -13,6 +13,26 @@ export const metadata: Metadata = {
 export default async function Home() {
   const allPosts = await getBlogPosts();
   const latestPosts = allPosts.slice(0, 3);
+  const allProjects = await getProjects();
+
+  // Get featured projects
+  const featuredProjects = allProjects.filter(
+    (p) =>
+      p.slug === "portfolio-site" ||
+      p.slug === "tallyandtrace" ||
+      p.slug === "fitness-rival"
+  );
+
+  // Sort by completion status: QA Verified > QA In Progress > Under Development
+  const sortedFeaturedProjects = featuredProjects.sort((a, b) => {
+    const getStatusPriority = (project: typeof a) => {
+      if (project.qaVerified) return 1;
+      if (project.qaInProgress) return 2;
+      if (project.underDevelopment) return 3;
+      return 4;
+    };
+    return getStatusPriority(a) - getStatusPriority(b);
+  });
 
   return (
     <>
@@ -23,37 +43,21 @@ export default async function Home() {
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl font-bold text-white mb-12">Featured Work</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <ProjectCard
-              title="StudioSC Portfolio"
-              description="The very site you're on. A modern Next.js portfolio showcasing our duo approach to software development and quality assurance."
-              tags={["Next.js", "TypeScript", "Playwright", "Tailwind"]}
-              qaInProgress={true}
-              githubUrl="https://github.com/studiosc"
-            />
-            <ProjectCard
-              title="Tally And Trace"
-              description="A full-stack, type-safe financial management tool for personal and business finances. Features React web frontend, FastAPI backend, and React Native mobile app (coming soon)."
-              tags={[
-                "React",
-                "FastAPI",
-                "TypeScript",
-                "PostgreSQL",
-                "React Native",
-                "Redux Toolkit",
-                "TanStack Router",
-                "Supabase",
-                "Render",
-              ]}
-              qaInProgress={true}
-              liveUrl="https://tallyandtrace.studiosc.dev"
-              githubUrl="https://github.com/StudioSC-dev/tally-and-trace"
-            />
-            <ProjectCard
-              title="Fitness Rival"
-              description="A gamified fitness application designed to make working out more engaging and social. Currently in active development."
-              tags={["React", "TypeScript", "Node.js"]}
-              underDevelopment={true}
-            />
+            {sortedFeaturedProjects.map((project) => (
+              <ProjectCard
+                key={project.slug}
+                slug={project.slug}
+                title={project.title}
+                description={project.description}
+                tags={project.tags}
+                thumbnail={project.thumbnail}
+                qaVerified={project.qaVerified}
+                qaInProgress={project.qaInProgress}
+                underDevelopment={project.underDevelopment}
+                githubUrl={project.githubUrl}
+                liveUrl={project.liveUrl}
+              />
+            ))}
           </div>
         </div>
       </section>

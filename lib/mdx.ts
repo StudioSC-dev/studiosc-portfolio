@@ -85,6 +85,7 @@ export async function getProjects(): Promise<Project[]> {
           githubUrl: data.githubUrl,
           liveUrl: data.liveUrl,
           date: data.date || new Date().toISOString(),
+          thumbnail: data.thumbnail,
         } as Project;
       })
     );
@@ -115,6 +116,7 @@ export async function getProject(slug: string) {
       githubUrl: data.githubUrl,
       liveUrl: data.liveUrl,
       date: data.date || new Date().toISOString(),
+      thumbnail: data.thumbnail,
       content,
     };
   } catch (error) {

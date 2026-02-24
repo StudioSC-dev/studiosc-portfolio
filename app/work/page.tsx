@@ -32,9 +32,11 @@ export default async function WorkPage() {
           {projects.map((project) => (
             <ProjectCard
               key={project.slug}
+              slug={project.slug}
               title={project.title}
               description={project.description}
               tags={project.tags}
+              thumbnail={project.thumbnail}
               qaVerified={project.qaVerified}
               qaInProgress={project.qaInProgress}
               underDevelopment={project.underDevelopment}

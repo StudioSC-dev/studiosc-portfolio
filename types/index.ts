@@ -40,4 +40,5 @@ export interface Project {
   liveUrl?: string;
   date: string;
   content?: string;
+  thumbnail?: string;
 }
