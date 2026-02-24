@@ -1,0 +1,67 @@
+---
+title: "Tally And Trace"
+description: "A full-stack, type-safe financial management tool for personal and business finances"
+tags:
+  [
+    "React",
+    "FastAPI",
+    "TypeScript",
+    "PostgreSQL",
+    "React Native",
+    "Redux Toolkit",
+    "TanStack Router",
+    "Supabase",
+    "Render",
+    "Vite",
+    "Expo",
+  ]
+qaInProgress: true
+liveUrl: "https://tallyandtrace.studiosc.dev"
+githubUrl: "https://github.com/StudioSC-dev/tally-and-trace"
+date: "2026-02-24"
+---
+
+# Tally And Trace
+
+A full-stack, type-safe monorepo for personal and business financial management. Features a React web frontend, a FastAPI backend, a shared TypeScript package, and a React Native mobile app (coming soon).
+
+## Project Overview
+
+Tally And Trace was developed to solve our own need for a simple, flexible financial tracking tool that would replace our aging Google Sheet tracker. Existing solutions were either too complex, too expensive, or lacked the multi-entity support we needed to manage both personal and business finances in one place.
+
+## The Build (Seth)
+
+- Architected a monorepo structure with shared TypeScript package
+- Built React web frontend with TanStack Router and Redux Toolkit
+- Developed FastAPI backend with Pydantic v2 for type safety
+- Implemented PostgreSQL database with SQLAlchemy ORM
+- Created React Native mobile app foundation (Expo)
+- Deployed on Render with Supabase for database hosting
+
+## The Break (Christine)
+
+- Comprehensive testing strategy for financial calculations
+- API endpoint validation and error handling
+- Multi-currency transaction testing
+- Data integrity and security audits
+- Performance testing for large transaction sets
+
+## Features
+
+- **Multi-Entity Architecture**: Manage personal and business finances under separate entities
+- **Account Management**: Cash, e-wallets, savings, checking, and credit accounts with multi-currency support
+- **Transaction Tracking**: Record income, expenses, and transfers with FX fields
+- **Budget Entries**: Recurring income/expense items with configurable cadence
+- **Allocations**: Savings goals, budgets, and period-based allocations
+- **Wishlist**: Prioritised wishlist items linked to categories and entities
+- **Type Safety**: Pydantic v2 on the backend, TypeScript everywhere on the frontend
+- **Mobile App** _(coming soon)_: React Native (Expo) app with NativeWind styling
+
+## Tech Stack
+
+- **Frontend**: React, TypeScript, Vite, TanStack Router, Redux Toolkit, Tailwind CSS
+- **Backend**: FastAPI, Python 3.12, SQLAlchemy, Pydantic v2
+- **Database**: PostgreSQL (Supabase)
+- **Mobile**: React Native, Expo SDK 52, NativeWind
+- **Deployment**: Render (backend + frontend), Supabase (database)
+- **Shared**: TypeScript package for type definitions and utilities

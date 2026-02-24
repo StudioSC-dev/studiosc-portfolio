@@ -26,6 +26,7 @@ export async function getBlogPosts(): Promise<BlogPost[]> {
           author: data.author || "StudioSC",
           category: data.category || "technical",
           readingTime: calculateReadingTime(content),
+          projectSlug: data.projectSlug,
         } as BlogPost;
       })
     );
@@ -53,6 +54,7 @@ export async function getBlogPost(slug: string) {
       author: data.author || "StudioSC",
       category: data.category || "technical",
       readingTime: calculateReadingTime(content),
+      projectSlug: data.projectSlug,
       content,
     };
   } catch (error) {
@@ -78,6 +80,8 @@ export async function getProjects(): Promise<Project[]> {
           description: data.description || "",
           tags: data.tags || [],
           qaVerified: data.qaVerified || false,
+          qaInProgress: data.qaInProgress || false,
+          underDevelopment: data.underDevelopment || false,
           githubUrl: data.githubUrl,
           liveUrl: data.liveUrl,
           date: data.date || new Date().toISOString(),
@@ -106,6 +110,8 @@ export async function getProject(slug: string) {
       description: data.description || "",
       tags: data.tags || [],
       qaVerified: data.qaVerified || false,
+      qaInProgress: data.qaInProgress || false,
+      underDevelopment: data.underDevelopment || false,
       githubUrl: data.githubUrl,
       liveUrl: data.liveUrl,
       date: data.date || new Date().toISOString(),

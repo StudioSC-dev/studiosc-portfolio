@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { Terminal, ShieldCheck, ArrowRight } from "lucide-react";
 
 const Hero = () => {
@@ -72,9 +73,12 @@ const Hero = () => {
         </div>
       </div>
 
-      <button className="z-10 mt-12 flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-full hover:bg-slate-200 transition-colors">
+      <Link
+        href="/work"
+        className="z-10 mt-12 flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-full hover:bg-slate-200 transition-colors"
+      >
         View the Studio Showcase <ArrowRight className="w-4 h-4" />
-      </button>
+      </Link>
     </section>
   );
 };

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Hero from "@/components/home/Hero";
 import ProjectCard from "@/components/home/ProjectCard";
+import LatestBlogPosts from "@/components/home/LatestBlogPosts";
+import { getBlogPosts } from "@/lib/mdx";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -8,7 +10,10 @@ export const metadata: Metadata = {
     "A specialized engineering duo focused on building robust architecture and hardening it through enterprise-grade QA.",
 };
 
-export default function Home() {
+export default async function Home() {
+  const allPosts = await getBlogPosts();
+  const latestPosts = allPosts.slice(0, 3);
+
   return (
     <>
       <Hero />
@@ -22,27 +27,39 @@ export default function Home() {
               title="StudioSC Portfolio"
               description="The very site you're on. A modern Next.js portfolio showcasing our duo approach to software development and quality assurance."
               tags={["Next.js", "TypeScript", "Playwright", "Tailwind"]}
-              qaVerified={true}
+              qaInProgress={true}
               githubUrl="https://github.com/studiosc"
             />
             <ProjectCard
-              title="E-Commerce Platform Rebuild"
-              description="Full-stack TypeScript rebuild with 99.9% uptime. Complete modernization of legacy e-commerce system with comprehensive test coverage."
-              tags={["Next.js", "PostgreSQL", "Playwright"]}
-              qaVerified={true}
-              githubUrl="https://github.com/studiosc"
-              liveUrl="https://demo.studiosc.dev"
+              title="Tally And Trace"
+              description="A full-stack, type-safe financial management tool for personal and business finances. Features React web frontend, FastAPI backend, and React Native mobile app (coming soon)."
+              tags={[
+                "React",
+                "FastAPI",
+                "TypeScript",
+                "PostgreSQL",
+                "React Native",
+                "Redux Toolkit",
+                "TanStack Router",
+                "Supabase",
+                "Render",
+              ]}
+              qaInProgress={true}
+              liveUrl="https://tallyandtrace.studiosc.dev"
+              githubUrl="https://github.com/StudioSC-dev/tally-and-trace"
             />
             <ProjectCard
-              title="API Gateway Service"
-              description="High-performance API gateway handling 10k+ req/s. Built with Node.js and hardened through load testing and security audits."
-              tags={["Node.js", "Redis", "Docker", "k6"]}
-              qaVerified={true}
-              githubUrl="https://github.com/studiosc"
+              title="Fitness Rival"
+              description="A gamified fitness application designed to make working out more engaging and social. Currently in active development."
+              tags={["React", "TypeScript", "Node.js"]}
+              underDevelopment={true}
             />
           </div>
         </div>
       </section>
+
+      {/* Latest Blog Posts Section */}
+      <LatestBlogPosts posts={latestPosts} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getBlogPosts } from "@/lib/mdx";
-import BlogCard from "@/components/blog/BlogCard";
+import BlogList from "@/components/blog/BlogList";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -29,11 +29,7 @@ export default async function BlogPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-8 md:grid-cols-2">
-          {posts.map((post, index) => (
-            <BlogCard key={post.slug} post={post} index={index} />
-          ))}
-        </div>
+        <BlogList posts={posts} />
       )}
     </div>
   );

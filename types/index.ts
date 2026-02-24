@@ -15,6 +15,7 @@ export interface BlogPost {
   author: string;
   category: "technical" | "non-technical";
   readingTime?: number;
+  projectSlug?: string;
 }
 
 export interface Person {
@@ -33,6 +34,8 @@ export interface Project {
   description: string;
   tags: string[];
   qaVerified: boolean;
+  qaInProgress?: boolean;
+  underDevelopment?: boolean;
   githubUrl?: string;
   liveUrl?: string;
   date: string;

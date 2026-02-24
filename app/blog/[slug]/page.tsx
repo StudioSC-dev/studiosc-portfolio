@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getBlogPost, getBlogPosts } from "@/lib/mdx";
+import { getBlogPost, getBlogPosts, getProject } from "@/lib/mdx";
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { Calendar, Clock } from "lucide-react";
+import { Calendar, Clock, ExternalLink } from "lucide-react";
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
+import Link from "next/link";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -33,6 +34,29 @@ export async function generateMetadata({
     title: post.title,
     description: post.description,
   };
+}
+
+// Helper function to extract YouTube video ID from URL or return ID if already provided
+function getYouTubeVideoId(urlOrId: string): string | null {
+  // If it's already just an ID (no special characters except alphanumeric, hyphens, underscores)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(urlOrId)) {
+    return urlOrId;
+  }
+
+  // Try to extract from various YouTube URL formats
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = urlOrId.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 const components = {
@@ -66,6 +90,31 @@ const components = {
       </div>
     );
   },
+  YouTube: ({ videoId, url }: { videoId?: string; url?: string }) => {
+    const id = videoId || (url ? getYouTubeVideoId(url) : null);
+
+    if (!id) {
+      return (
+        <div className="my-8 p-4 bg-red-900/20 border border-red-500/50 rounded-lg text-red-400">
+          Invalid YouTube video ID or URL provided
+        </div>
+      );
+    }
+
+    return (
+      <div className="my-8">
+        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${id}`}
+            title="YouTube video player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            className="absolute top-0 left-0 w-full h-full rounded-lg"
+          />
+        </div>
+      </div>
+    );
+  },
 };
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
@@ -75,6 +124,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   if (!post) {
     notFound();
   }
+
+  // Get project if this blog post is linked to a project
+  const project = post.projectSlug ? await getProject(post.projectSlug) : null;
 
   const formattedDate = new Date(post.date).toLocaleDateString("en-US", {
     year: "numeric",
@@ -121,6 +173,28 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             }}
           />
         </div>
+
+        {/* Project Link Section */}
+        {project && (
+          <div className="mt-12 pt-8 border-t border-gray-800">
+            <h2 className="text-2xl font-bold text-white mb-4">
+              Related Project
+            </h2>
+            <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-xl font-semibold text-white mb-2">
+                {project.title}
+              </h3>
+              <p className="text-gray-300 mb-4">{project.description}</p>
+              <Link
+                href={`/work/${project.slug}`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                View Project Details
+                <ExternalLink className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
       </article>
     </div>
   );
