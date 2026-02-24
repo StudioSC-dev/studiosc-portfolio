@@ -86,7 +86,7 @@ const ProjectCard = ({
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
-            Live Demo
+            Visit
           </a>
         )}
         {githubUrl && (

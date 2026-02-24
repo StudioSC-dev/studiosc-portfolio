@@ -177,7 +177,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                   className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  <span className="text-sm font-medium">Live Demo</span>
+                  <span className="text-sm font-medium">Visit</span>
                 </a>
               )}
             </div>

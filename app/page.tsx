@@ -5,7 +5,7 @@ import LatestBlogPosts from "@/components/home/LatestBlogPosts";
 import { getBlogPosts } from "@/lib/mdx";
 
 export const metadata: Metadata = {
-  title: "Home",
+  title: "StudioSC",
   description:
     "A specialized engineering duo focused on building robust architecture and hardening it through enterprise-grade QA.",
 };
