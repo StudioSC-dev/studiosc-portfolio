@@ -25,3 +25,40 @@ We built this portfolio to establish a professional online presence that accurat
 ## Mission/Reason
 
 At StudioSC, we believe in transparency and authenticity. This portfolio site allows us to share not just what we've built, but how we build it—combining senior-level development with enterprise-grade quality assurance. It's our way of showing that great software comes from the right balance of building and breaking, of creating and validating.
+
+## The Stack
+
+Every technology choice here was deliberate. **Next.js 16 with the App Router** gave us file-system routing, React Server Components, and static generation out of the box — the right foundation for a content-heavy site that needs to load fast. **TypeScript** throughout keeps the codebase honest; a stray `any` stands out immediately.
+
+Content lives in **MDX files** alongside the code. No database, no CMS subscription, no admin panel to maintain. When we want to write a post, we open a file and write. `gray-matter` parses the frontmatter, `next-mdx-remote` renders the content, and the blog has full support for custom components like image embeds and YouTube videos.
+
+**Tailwind CSS v4** handles all the styling. We leaned heavily on `@tailwindcss/typography` for the blog prose styles — it makes long-form content readable without writing a stylesheet from scratch. **Framer Motion** handles page transitions and the subtle animations on the home page.
+
+The contact form uses **React Hook Form + Zod** for validation and **Resend** for delivery. The form schema is defined once in TypeScript and enforced on both client and server.
+
+## The Build (Seth)
+
+Building this site was partly a technical exercise and partly an act of clarity. The challenge was keeping it genuinely simple — not artificially simple, but simple in the way that comes from knowing exactly what you need and nothing more.
+
+The App Router structure maps cleanly onto the site: `/blog/[slug]`, `/work/[slug]`, `/about`, `/contact`. Each route is a Server Component that reads MDX files at build time via `gray-matter`. No client-side data fetching, no loading states, no spinners — just fast static pages.
+
+The hardest part was the MDX setup. Getting custom components (`img`, `YouTube`, `SocialPost`) to render correctly inside `next-mdx-remote` required understanding how the `components` prop works at the page level. Once that clicked, adding new MDX components became straightforward.
+
+## The Break (Christine)
+
+Quality assurance on a portfolio site sounds trivial until you realise it has to work across five browsers, two device form factors, and an ever-changing set of external URLs. The Playwright suite covers the golden paths — navigation, blog rendering, the contact form — across Chrome, Firefox, Safari, Pixel 5, and iPhone 12.
+
+The CI pipeline runs lint, type-check, and the full E2E suite on every push and PR. A broken blog post won't reach production without a failing build catching it first. The Playwright test report is uploaded as a GitHub Actions artifact on every run, so failures are never mysterious.
+
+## Key Features
+
+- **MDX blog system** with dynamic routing, reading time, and category badges
+- **Project case studies** with status indicators (`underDevelopment`, `qaInProgress`), tech tags, and links
+- **Contact form** with client + server validation, Resend email delivery, and React Email templates
+- **Social embeds** via the `<SocialPost />` component for non-technical posts
+- **Responsive design** — mobile-first, tested across five browsers
+- **Optional Plausible analytics** — wired up but dormant until the env var is set
+
+## What's Next
+
+The site itself is in QA. The immediate backlog includes completing the remaining blog posts, enabling Plausible analytics, and adding the Fitness Rival project once it reaches a shareable state. The codebase will also serve as the template for future StudioSC projects — the patterns here (MDX content, Resend email, Playwright tests) are worth reusing.

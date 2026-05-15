@@ -25,3 +25,50 @@ We developed TallyAndTrace to solve our own need for a simple, flexible financia
 ## Mission/Reason
 
 Existing financial management solutions were either too complex, too expensive, or lacked the multi-entity support we needed. TallyAndTrace represents our personal use cases—managing individual finances, household finances, and potential business ventures—all in one cohesive application. While it might not fit everyone's needs right away, it's built with flexibility in mind, allowing us to iterate and expand based on real-world usage.
+
+## The Stack
+
+TallyAndTrace is a **monorepo** — one repository, four packages that share types and utilities without duplicating code.
+
+The **React web frontend** runs on Vite with TanStack Router for type-safe client-side routing and Redux Toolkit for global state. We chose TanStack Router over React Router because it generates fully typed route parameters and search params at build time — a perfect match for a TypeScript-first project.
+
+The **FastAPI backend** is written in Python 3.12 with Pydantic v2 for request/response validation and SQLAlchemy as the ORM. FastAPI auto-generates an OpenAPI schema from the Pydantic models, which we use to keep the frontend types in sync. The API sits behind a **PostgreSQL database hosted on Supabase** — managed Postgres with sensible defaults and a generous free tier.
+
+The **shared TypeScript package** contains the type definitions that both the web frontend and the upcoming React Native app consume. Keeping types in one place means a backend schema change propagates to every client in a single commit.
+
+The **React Native (Expo) mobile app** is in progress, styled with NativeWind so it shares Tailwind class names with the web frontend.
+
+Deployment: **Render** hosts both the FastAPI backend and the compiled frontend. Supabase handles the database. The whole stack costs us essentially nothing at our current usage level.
+
+## The Build (Seth)
+
+The most interesting architectural decision was the multi-entity data model. Every account, transaction, and budget entry belongs to an **entity** — a named financial unit (e.g., "Personal - Seth", "Household", "StudioSC"). This lets a single login manage multiple financial contexts without any data bleeding between them.
+
+Building the transaction model was the other challenge. Transactions need to support income, expenses, and transfers — each with optional FX fields for multi-currency support. Getting the SQLAlchemy model right required a few iterations, but the result is clean: one table, a `transaction_type` discriminator, and nullable FX columns that the frontend knows to show or hide based on account currency.
+
+## The Break (Christine)
+
+Financial software has a higher bar for correctness than most applications. A rounding error in a currency conversion or an off-by-one in a budget calculation isn't just a bug — it's a trust violation.
+
+The QA strategy here is defence in depth: **Pydantic v2** catches type errors at the API boundary before they reach the database. **SQLAlchemy constraints** catch integrity violations at the storage layer. And the Playwright suite validates the full stack end-to-end — entering a transaction on the frontend and verifying the balance updates correctly in the database.
+
+Multi-entity isolation is a particular focus. Tests verify that data from one entity never appears in another entity's views, even when the same user account owns both.
+
+## Key Features
+
+- **Multi-entity architecture** — manage personal, household, and business finances under one login
+- **Account types** — cash, e-wallets, savings, checking, credit, all with multi-currency support
+- **Transaction tracking** — income, expenses, and transfers with optional FX fields
+- **Budget entries** — recurring income/expense items with configurable cadence
+- **Allocations** — savings goals, budgets, and period-based allocations
+- **Wishlist** — prioritised items linked to categories and entities
+- **Type safety end-to-end** — Pydantic v2 on the backend, TypeScript on every frontend surface
+- **Mobile app** _(in progress)_ — React Native with Expo and NativeWind
+
+## Where We Are Now
+
+TallyAndTrace is live at [tallyandtrace.studiosc.dev](https://tallyandtrace.studiosc.dev) and in active daily use. The web app covers all the core financial workflows. The mobile app foundation is built; native screens are in progress.
+
+## What's Next
+
+The near-term roadmap: complete the React Native mobile app, add report views (monthly summaries, category breakdowns), and tighten the QA coverage on edge cases in the FX calculation logic. Longer term, we're considering a read-only sharing mode so you can give a financial advisor or accountant a view-only link to a specific entity.
