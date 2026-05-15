@@ -13,7 +13,7 @@ import {
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
-import Mermaid from "@/components/blog/Mermaid";
+import { Mermaid } from "@/components/blog/ClientComponents";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;

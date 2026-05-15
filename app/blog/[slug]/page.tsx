@@ -6,8 +6,7 @@ import { Calendar, Clock, ExternalLink } from "lucide-react";
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
-import SocialPost from "@/components/blog/SocialPost";
-import Mermaid from "@/components/blog/Mermaid";
+import { SocialPost, Mermaid } from "@/components/blog/ClientComponents";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
