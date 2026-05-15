@@ -13,6 +13,7 @@ import {
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
+import Mermaid from "@/components/blog/Mermaid";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -44,6 +45,7 @@ export async function generateMetadata({
 }
 
 const components = {
+  Mermaid,
   img: ({
     src,
     alt,

@@ -6,6 +6,8 @@ import { Calendar, Clock, ExternalLink } from "lucide-react";
 import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
+import SocialPost from "@/components/blog/SocialPost";
+import Mermaid from "@/components/blog/Mermaid";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -90,6 +92,8 @@ const components = {
       </div>
     );
   },
+  SocialPost,
+  Mermaid,
   YouTube: ({ videoId, url }: { videoId?: string; url?: string }) => {
     const id = videoId || (url ? getYouTubeVideoId(url) : null);
 
