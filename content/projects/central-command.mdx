@@ -1,0 +1,88 @@
+---
+title: "Central Command"
+description: "A Cloudflare-native personal performance dashboard."
+tags:
+  [
+    "TypeScript",
+    "Cloudflare Workers",
+    "Hono",
+    "Drizzle ORM",
+    "Cloudflare D1",
+    "Cloudflare KV",
+    "Cron Triggers",
+    "Cloudflare Pages",
+    "React",
+    "Vite",
+    "TanStack Router",
+    "TanStack Query",
+    "pnpm workspaces",
+    "Turborepo",
+  ]
+qaInProgress: true
+liveUrl: "https://centralcommand.studiosc.dev"
+githubUrl: "https://github.com/StudioSC-dev/studiosc-centralcommand"
+# TODO: add thumbnail — upload a 2:1 screenshot to Cloudinary (account dg0t8ipwi)
+# and paste the CDN URL here, e.g.
+# thumbnail: "https://res.cloudinary.com/dg0t8ipwi/image/upload/v.../central-command_2x1.png"
+date: "2026-06-10"
+---
+
+# Central Command
+
+A Cloudflare-native personal performance dashboard. Central Command unifies calendar, weather, fitness, nutrition, sleep, gaming, news, tasks, and rule-based insights into a single edge-deployed view of your day — built entirely on the Cloudflare developer platform, on free tiers, with no paid services.
+
+## Project Overview
+
+Central Command pulls a scattered set of personal data sources into one fast, edge-rendered dashboard. It is multi-user with Google sign-in, and ships with a public read-only demo so anyone can see the real product without an account. The entire stack — API, database, scheduled jobs, caching, and the web app — runs on Cloudflare's free tier.
+
+**Status:** v1, public. Solo project — design, architecture, and implementation.
+
+[**View the live app and demo →**](https://centralcommand.studiosc.dev) (use "View demo" for a no-sign-in, read-only walkthrough backed by seeded sample data.)
+
+## The Build (Seth)
+
+- Designed and built an end-to-end Cloudflare-native, edge-first architecture running entirely on free tiers
+- Implemented a Hono API on Cloudflare Workers with Drizzle ORM over Cloudflare D1, plus KV for caching and rate limiting
+- Scheduled background refreshes of external data with Cron Triggers
+- Built the React + Vite frontend with TanStack Router (compile-time typed routing) and TanStack Query, deployed on Cloudflare Pages
+- Structured the whole project as a pnpm-workspaces + Turborepo monorepo with types shared between API and web
+
+## Highlights
+
+- **End-to-end Cloudflare-native, edge-first** architecture running entirely on free tiers — no paid services anywhere in the stack.
+- **Auth evolution as a deliberate story.** Built behind Cloudflare Access (Zero Trust, Google SSO) while single-user, then migrated for the public v1 to first-party Google OAuth (PKCE) with stateless signed session cookies — shipped deploy-safe with a temporary fallback so production never broke mid-migration.
+- **Public read-only demo** backed by a seeded user with a server-side write guard, so the real stack is exercised without exposing shared state or third-party API keys.
+- **Per-user + global KV rate limiting** to protect free-tier and third-party API quotas.
+- **Rule-based insights engine** (correlations + nudges) computed from the user's own data with zero external calls.
+- **Type-safe throughout** — strict TypeScript, compile-time-checked routing, and shared types between API and web in a Turborepo monorepo.
+
+## Tech Stack
+
+- **API**: TypeScript, Hono on Cloudflare Workers
+- **Data**: Drizzle ORM over Cloudflare D1, Cloudflare KV for caching and rate limiting
+- **Scheduled jobs**: Cloudflare Cron Triggers
+- **Frontend**: React, Vite, TanStack Router, TanStack Query
+- **Hosting**: Cloudflare Pages (web) + Workers (API)
+- **Monorepo**: pnpm workspaces, Turborepo
+
+## Features
+
+- **Unified dashboard**: calendar, weather, fitness, nutrition, sleep, gaming, news, and tasks in one edge-rendered view
+- **Multi-user**: Google sign-in with stateless signed session cookies
+- **Public demo**: read-only, seeded sample data, no sign-in required
+- **Insights engine**: rule-based correlations and nudges from your own data, no external calls
+- **Rate limiting**: per-user and global KV limits to protect free-tier quotas
+- **Free-tier by design**: the entire platform runs on Cloudflare free tiers
+
+## Screenshots
+
+{/\* TODO: add screenshots — upload to Cloudinary (account dg0t8ipwi) and embed with the
+same <img> pattern used in tallyandtrace.mdx, e.g.:
+
+<img
+  src="https://res.cloudinary.com/dg0t8ipwi/image/upload/v.../central-command-dashboard.png"
+  alt="Central Command dashboard"
+  width="1200"
+  height="800"
+/>
+*/}
