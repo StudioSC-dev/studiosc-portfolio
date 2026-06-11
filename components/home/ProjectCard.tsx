@@ -66,7 +66,7 @@ const ProjectCard = ({
   };
 
   return (
-    <div className="group relative bg-slate-900/40 border border-slate-800 rounded-xl hover:bg-slate-900/60 hover:border-slate-700 transition-all overflow-hidden">
+    <div className="group relative bg-slate-900/40 border border-slate-800 rounded-xl hover:bg-slate-900/60 hover:border-slate-700 transition-all overflow-hidden h-full flex flex-col">
       {/* Stretched link makes the whole card navigate to the project page.
           Action buttons below sit above it via z-index, avoiding nested <a>. */}
       <Link
@@ -98,7 +98,7 @@ const ProjectCard = ({
           </div>
         </div>
       )}
-      <div className="p-6">
+      <div className="p-6 flex flex-col flex-1">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">
             {title}
@@ -122,7 +122,7 @@ const ProjectCard = ({
         </div>
 
         {(liveUrl || githubUrl) && (
-          <div className="relative z-20 flex items-center gap-3 pt-4 border-t border-slate-800">
+          <div className="relative z-20 flex items-center gap-3 pt-4 mt-auto border-t border-slate-800">
             {liveUrl && (
               <a
                 href={liveUrl}
