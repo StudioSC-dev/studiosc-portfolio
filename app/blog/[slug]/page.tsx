@@ -161,6 +161,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
       <article className="rounded-lg bg-gray-900 p-8 shadow-2xl md:p-16 lg:p-20">
         <header className="mb-8">
+          <div className="mb-4">
+            <Link
+              href="/blog"
+              className="text-sm text-gray-400 hover:text-white transition-colors mb-4 inline-block"
+            >
+              ← Back to Blog
+            </Link>
+          </div>
           <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">
             {post.title}
           </h1>
