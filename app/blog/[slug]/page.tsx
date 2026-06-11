@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
 import { SocialPost, Mermaid } from "@/components/blog/ClientComponents";
+import { Children, isValidElement } from "react";
 
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
@@ -93,6 +94,25 @@ const components = {
   },
   SocialPost,
   Mermaid,
+  // Render ```mermaid fenced code blocks as diagrams. The code string survives
+  // next-mdx-remote/rsc (MDX expressions {...} do not), so this is how diagrams
+  // are passed — see Mermaid.tsx.
+  pre: (props: React.HTMLAttributes<HTMLPreElement>) => {
+    const child = Children.toArray(props.children)[0];
+    if (isValidElement(child)) {
+      const { className, children } = child.props as {
+        className?: string;
+        children?: React.ReactNode;
+      };
+      if (
+        typeof children === "string" &&
+        className?.includes("language-mermaid")
+      ) {
+        return <Mermaid chart={children} />;
+      }
+    }
+    return <pre {...props} />;
+  },
   YouTube: ({ videoId, url }: { videoId?: string; url?: string }) => {
     const id = videoId || (url ? getYouTubeVideoId(url) : null);
 

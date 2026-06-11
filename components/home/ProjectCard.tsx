@@ -66,10 +66,16 @@ const ProjectCard = ({
   };
 
   return (
-    <Link
-      href={`/work/${slug}`}
-      className="group block bg-slate-900/40 border border-slate-800 rounded-xl hover:bg-slate-900/60 hover:border-slate-700 transition-all overflow-hidden"
-    >
+    <div className="group relative bg-slate-900/40 border border-slate-800 rounded-xl hover:bg-slate-900/60 hover:border-slate-700 transition-all overflow-hidden">
+      {/* Stretched link makes the whole card navigate to the project page.
+          Action buttons below sit above it via z-index, avoiding nested <a>. */}
+      <Link
+        href={`/work/${slug}`}
+        className="absolute inset-0 z-10"
+        aria-label={`View ${title}`}
+      >
+        <span className="sr-only">View {title}</span>
+      </Link>
       {thumbnail ? (
         <div className="relative w-full h-48 overflow-hidden border-b border-slate-800 bg-slate-950">
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/20 to-transparent z-10" />
@@ -115,37 +121,34 @@ const ProjectCard = ({
           ))}
         </div>
 
-        <div
-          className="flex items-center gap-3 pt-4 border-t border-slate-800"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {liveUrl && (
-            <a
-              href={liveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Visit
-            </a>
-          )}
-          {githubUrl && (
-            <a
-              href={githubUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors"
-            >
-              <Github className="w-4 h-4" />
-              GitHub
-            </a>
-          )}
-        </div>
+        {(liveUrl || githubUrl) && (
+          <div className="relative z-20 flex items-center gap-3 pt-4 border-t border-slate-800">
+            {liveUrl && (
+              <a
+                href={liveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Visit
+              </a>
+            )}
+            {githubUrl && (
+              <a
+                href={githubUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Github className="w-4 h-4" />
+                GitHub
+              </a>
+            )}
+          </div>
+        )}
       </div>
-    </Link>
+    </div>
   );
 };
 

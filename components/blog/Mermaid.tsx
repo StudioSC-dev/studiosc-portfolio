@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import mermaid from "mermaid";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 type State =
   | { status: "loading" }
@@ -9,43 +8,76 @@ type State =
   | { status: "error"; message: string };
 
 interface MermaidProps {
-  chart: string;
+  /** Diagram source. Prefer passing as children: <Mermaid>{`flowchart...`}</Mermaid> */
+  children?: ReactNode;
+  /** Legacy/alternate way to pass the diagram source. */
+  chart?: string;
 }
 
-export default function Mermaid({ chart }: MermaidProps) {
+export default function Mermaid({ children, chart }: MermaidProps) {
   const id = useId().replace(/:/g, "");
   const initialized = useRef(false);
   const [state, setState] = useState<State>({ status: "loading" });
 
+  // next-mdx-remote/rsc strips MDX expressions ({...}), so the diagram is passed
+  // as a fenced ```mermaid code block whose string content arrives via `chart`
+  // (see the `code` component mapping in the blog/work page). `children` is kept
+  // as a fallback for direct React usage.
+  const raw =
+    typeof chart === "string"
+      ? chart
+      : typeof children === "string"
+        ? children
+        : "";
+
   useEffect(() => {
-    if (!initialized.current) {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "dark",
-        darkMode: true,
-        themeVariables: {
-          background: "#111827",
-          primaryColor: "#1d4ed8",
-          primaryTextColor: "#f9fafb",
-          primaryBorderColor: "#374151",
-          lineColor: "#6b7280",
-          secondaryColor: "#1f2937",
-          tertiaryColor: "#1f2937",
-        },
-      });
-      initialized.current = true;
+    const source = raw.trim();
+    if (!source) {
+      setState({ status: "error", message: "No diagram source provided." });
+      return;
     }
 
-    mermaid
-      .render(`mermaid-${id}`, chart.trim())
-      .then(({ svg }) => setState({ status: "done", svg }))
-      .catch((e: unknown) =>
+    let cancelled = false;
+
+    (async () => {
+      // mermaid touches the DOM on import, so load it only on the client.
+      const mermaid = (await import("mermaid")).default;
+
+      if (!initialized.current) {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "dark",
+          darkMode: true,
+          themeVariables: {
+            background: "#111827",
+            primaryColor: "#1d4ed8",
+            primaryTextColor: "#f9fafb",
+            primaryBorderColor: "#374151",
+            lineColor: "#6b7280",
+            secondaryColor: "#1f2937",
+            tertiaryColor: "#1f2937",
+          },
+        });
+        initialized.current = true;
+      }
+
+      const { svg } = await mermaid.render(`mermaid-${id}`, source);
+      if (!cancelled) {
+        setState({ status: "done", svg });
+      }
+    })().catch((e: unknown) => {
+      if (!cancelled) {
         setState({
           status: "error",
           message: e instanceof Error ? e.message : "Failed to render diagram",
-        })
-      );
-  }, [chart, id]);
+        });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [raw, id]);
 
   if (state.status === "error") {
     return (

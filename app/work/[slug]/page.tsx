@@ -14,6 +14,7 @@ import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
 import { Mermaid } from "@/components/blog/ClientComponents";
+import { Children, isValidElement } from "react";
 
 interface ProjectPageProps {
   params: Promise<{ slug: string }>;
@@ -46,6 +47,24 @@ export async function generateMetadata({
 
 const components = {
   Mermaid,
+  // Render ```mermaid fenced code blocks as diagrams (MDX expressions {...} are
+  // stripped by next-mdx-remote/rsc, so diagrams are passed as code blocks).
+  pre: (props: React.HTMLAttributes<HTMLPreElement>) => {
+    const child = Children.toArray(props.children)[0];
+    if (isValidElement(child)) {
+      const { className, children } = child.props as {
+        className?: string;
+        children?: React.ReactNode;
+      };
+      if (
+        typeof children === "string" &&
+        className?.includes("language-mermaid")
+      ) {
+        return <Mermaid chart={children} />;
+      }
+    }
+    return <pre {...props} />;
+  },
   img: ({
     src,
     alt,
