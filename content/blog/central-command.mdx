@@ -15,6 +15,12 @@ Central Command is a personal performance dashboard that pulls a scattered set o
 
 It's a solo project: design, architecture, and implementation. This post is the case study behind it.
 
+## Why I Built This
+
+I'm a zero-inbox kind of person, and the way I stay that way is by keeping the things that matter permanently in view. I run a secondary monitor that's always showing the apps I live in — a calendar, Slack, Linear — alongside a Stream Deck configured with the time across a few cities, notification counts, unread badges, and the like. It's an always-visible command center, and it's how I stay on top of everything without things quietly slipping.
+
+Central Command grew out of wanting a single, all-in-one version of that setup. While reading through the Cloudflare developer platform, I realized I could hit two birds with one stone: scratch that itch and learn the platform end to end by building something real on it. Hence this app.
+
 ## Goals
 
 The brief was simple to state and interesting to build:
@@ -34,6 +40,20 @@ Central Command is **Cloudflare-native and edge-first**. Every layer is somethin
 - The **frontend** is React + Vite with **TanStack Router** (compile-time typed routes) and **TanStack Query**, deployed on **Cloudflare Pages**.
 - It's all one **pnpm-workspaces + Turborepo monorepo**, with types shared between the API and the web app so a schema change propagates to every caller in a single commit.
 
+At a glance, the pieces fit together like this:
+
+```mermaid
+flowchart TD
+    U["User's browser"] --> P["Cloudflare Pages — React + Vite SPA"]
+    P -->|"/api requests"| W["Hono API on Cloudflare Workers"]
+    G["Google OAuth · PKCE"] -.->|"sign-in"| W
+    W --> D["Cloudflare D1 · Drizzle ORM"]
+    W --> KV["Cloudflare KV · cache + rate limit"]
+    CR["Cron Triggers"] -->|"scheduled refresh"| W
+    W -->|"fetch + cache"| EXT["Third-party APIs · weather, fitness, news…"]
+    EXT --> D
+```
+
 ## The Build (Seth)
 
 ### Auth evolution as a deliberate story
@@ -45,22 +65,6 @@ While Central Command was single-user, it sat **behind Cloudflare Access** (Zero
 Opening it up for a public v1 meant the app itself had to own identity. I migrated to **first-party Google OAuth (PKCE)** with **stateless, signed session cookies** — no server-side session store to operate, which keeps it true to the free-tier, edge-first goal.
 
 The risk in any auth migration is breaking production mid-flight. I shipped it **deploy-safe**: a temporary fallback let the app accept both the old Cloudflare Access identity and the new first-party session during the transition, so production never had a window where nobody could log in. Once the new path was verified, the fallback came out.
-
-<Mermaid
-  chart={`
-  flowchart TD
-    subgraph v0[Single-user]
-      A[Cloudflare Access<br/>Zero Trust + Google SSO] --> B[App assumes request is me]
-    end
-    subgraph transition[Deploy-safe migration]
-      C[Accept Access identity<br/>OR new session cookie] --> D[Verify new path in prod]
-    end
-    subgraph v1[Public v1]
-      E[First-party Google OAuth<br/>PKCE] --> F[Stateless signed<br/>session cookie]
-    end
-    v0 --> transition --> v1
-`}
-/>
 
 ### A public demo that exercises the real stack
 
@@ -85,16 +89,9 @@ The **insights engine** computes rule-based correlations and nudges (e.g. relati
 
 ## Screenshots
 
-{/\* TODO: add screenshots — upload to Cloudinary (account dg0t8ipwi) and embed with the
-<img> pattern used in tallyandtrace.mdx:
+_Screenshots coming soon._
 
-<img
-  src="https://res.cloudinary.com/dg0t8ipwi/image/upload/v.../central-command-dashboard.png"
-  alt="Central Command dashboard"
-  width="1200"
-  height="800"
-/>
-*/}
+{/* TODO: add screenshots — upload to Cloudinary (account dg0t8ipwi) and embed using the img pattern from tallyandtrace.mdx. */}
 
 ## Where We Are Now
 
