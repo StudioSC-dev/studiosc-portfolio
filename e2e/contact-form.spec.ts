@@ -19,7 +19,7 @@ test.describe("Contact Form", () => {
 
     // Check for validation errors
     await expect(
-      page.getByText(/Name must be at least 2 characters/i)
+      page.getByText("Name must be at least 2 characters", { exact: true })
     ).toBeVisible();
   });
 
