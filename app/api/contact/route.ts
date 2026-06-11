@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { render } from "@react-email/render";
 import ContactEmail from "@/lib/email";
+import { isRateLimited } from "@/lib/rate-limit";
 
 const contactFormSchema = z.object({
   name: z.string().min(2),
@@ -12,12 +13,28 @@ const contactFormSchema = z.object({
   projectGoals: z.string().min(10),
   estimatedBudget: z.string().optional(),
   referralSource: z.string().optional(),
+  // Honeypot — real users never fill this in. Bots that auto-fill every
+  // field will trip it.
+  website: z.string().optional(),
 });
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim();
+    if (isRateLimited(ip ?? "unknown")) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const validatedData = contactFormSchema.parse(body);
+
+    if (validatedData.website) {
+      // Honeypot tripped — pretend success so bots don't adapt.
+      return NextResponse.json({ message: "Email sent successfully" });
+    }
 
     if (!process.env.RESEND_API_KEY) {
       console.error("RESEND_API_KEY is not set");

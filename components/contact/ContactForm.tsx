@@ -18,6 +18,7 @@ const contactFormSchema = z.object({
     .min(10, "Please provide at least 10 characters about your project"),
   estimatedBudget: z.string().optional(),
   referralSource: z.string().optional(),
+  website: z.string().optional(),
 });
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
@@ -112,6 +113,18 @@ export default function ContactForm() {
       onSubmit={handleSubmit(onSubmit)}
       className="space-y-6"
     >
+      {/* Honeypot field — hidden from real users, bots tend to fill every field */}
+      <div className="absolute -left-2499.75" aria-hidden="true">
+        <label htmlFor="website">Website</label>
+        <input
+          type="text"
+          id="website"
+          tabIndex={-1}
+          autoComplete="off"
+          {...register("website")}
+        />
+      </div>
+
       <div className="grid gap-6 md:grid-cols-2">
         <div>
           <label
