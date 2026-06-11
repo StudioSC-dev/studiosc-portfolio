@@ -1,143 +1,108 @@
 ---
-title: "Carrying the Hardening Over: Security Pass on Central Command"
-description: "The same security goals as the portfolio pass — dependency hygiene, security headers, a CSP, and abuse protection on public endpoints — re-derived for a Cloudflare-native stack. KV instead of Upstash, no honeypot, and an HSTS gate that hostname detection couldn't solve."
-date: "2026-06-11"
+title: "Hardening Our Own Front Door: Security Pass on the StudioSC Portfolio"
+description: "Closing out Dependabot alerts, adding security headers and a CSP, and putting rate limiting + a honeypot in front of our contact form — durable rate limiting via Upstash Redis."
+date: "2026-06-12"
 author: "Seth"
 category: "technical"
-projectSlug: "central-command"
+projectSlug: "portfolio-site"
 ---
 
-# Carrying the Hardening Over: Security Pass on Central Command
+# Hardening Our Own Front Door: Security Pass on the StudioSC Portfolio
 
 ## Project Overview
 
-In the [last post](/blog/portfolio-security-hardening) we hardened the StudioSC portfolio — a static-first Next.js site on Vercel. This is the promised follow-up: the same security pass on **Central Command**, a personal performance dashboard built on an entirely different stack. Cloudflare Workers (Hono + Drizzle on D1) for the API, a React/Vite SPA on Cloudflare Pages, pnpm + Turborepo for the monorepo.
-
-That stack difference is the whole story here. The _goals_ port over cleanly; almost none of the _implementation_ does. A `next.config.ts` `headers()` block, `process.env.NODE_ENV`, an Upstash Redis limiter, a contact-form honeypot — every one of those assumes a Next.js-on-Vercel world that Central Command doesn't live in. So this was an **audit-and-adapt** pass, not a copy-paste.
+Right after getting the portfolio to **QA Verified** and wiring up automated production deploys, we turned to a question every public-facing site eventually has to answer: what happens when the traffic hitting it isn't a visitor? This post covers the security and abuse-protection pass on `studiosc.dev` — a static-first Next.js site with no database and no auth, but a contact form that talks to a real inbox.
 
 ## Scope
 
-- Clear out `pnpm audit` vulnerabilities
-- Add standard security headers and a Content Security Policy (CSP) — across _two_ surfaces, not one
-- Protect the only unauthenticated endpoints from scripted abuse
-- Keep everything on the Cloudflare free tier, with no new runtime dependencies
+- Clear out npm audit / Dependabot vulnerabilities
+- Add standard security headers and a Content Security Policy (CSP)
+- Protect the contact form from scripted abuse without adding friction for real visitors
+- Make the rate limiting durable across serverless instances — within a Vercel **Hobby** plan budget
 
 ## Dependency Cleanup
 
-Where the portfolio had 19 local advisories (60 via Dependabot), Central Command's newer, leaner tree had just **two** — but one of them mattered:
+`npm audit` was reporting **19 vulnerabilities locally (60 via GitHub's broader Dependabot scan)**, the bulk of them tracing back to Next.js itself. Upgrading `next` from `16.1.6` → `16.2.9` closed out a batch of critical advisories — HTTP request smuggling, a CSRF bypass, cache poisoning, and an XSS/DoS issue. One nested `postcss@8.4.31` (bundled inside `next`) was still flagged after the upgrade; a flat `overrides` entry in `package.json` deduped it to the patched `8.5.x` line.
 
-- **`drizzle-orm` (high)** — SQL injection via improperly escaped SQL identifiers ([GHSA-gpj5-g38j-94v9](https://github.com/advisories/GHSA-gpj5-g38j-94v9)). Fixed by bumping `^0.44.2` → `^0.45.2`.
-- **`esbuild` (moderate)** — the dev-server SSRF issue ([GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99)), nested three deep under `drizzle-kit`'s deprecated `@esbuild-kit/*` chain.
+Result: **0 vulnerabilities**, verified with a full lint/type-check/build/e2e pass afterward (40/40 Playwright tests across five browsers).
 
-The esbuild one is the more interesting fix. The usual advice — "upgrade the parent" — doesn't work: even the _latest_ `drizzle-kit` still pulls `@esbuild-kit/esm-loader`, which still nests a vulnerable `esbuild`. So the patched version has to be forced directly. On the portfolio (npm) that was a flat `overrides` entry. Here it's a pnpm override — and a small gotcha worth noting: **pnpm 11.5 stopped reading the `pnpm.overrides` field in `package.json`** and moved it to `pnpm-workspace.yaml`:
+## Security Headers & CSP
 
-```yaml
-# pnpm-workspace.yaml
-overrides:
-  esbuild: ">=0.25.4"
-```
+Added a `headers()` block in `next.config.ts` applied to every route:
 
-That deduped every nested copy to the patched line. Dev-only tooling — it never ships to the Worker — but a clean audit is a clean audit.
+- `Content-Security-Policy` — locks `default-src` to `'self'`, allow-lists Plausible and Vercel's Speed Insights endpoint for `connect-src`, and sets `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+- `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — disables camera, microphone, and geolocation, none of which the site uses
+- `Strict-Transport-Security` (HSTS) and the CSP's `upgrade-insecure-requests` directive
 
-Result: **No known vulnerabilities found**, verified with a full `build` + `typecheck` + `lint` pass afterward. (No Playwright suite here yet — the verification gate is different, more on that below.)
+### The WebKit gotcha
 
-## Security Headers & CSP — Two Surfaces, Not One
+The last two — HSTS and `upgrade-insecure-requests` — turn out to be the kind of header Safari takes _very_ literally, even on `localhost`. With both enabled unconditionally, **all 8 WebKit and Mobile Safari Playwright tests started failing** with navigation timeouts: Safari was rewriting every `http://localhost:3000` request to `https://`, which doesn't exist in dev.
 
-The portfolio could set every header in a single `next.config.ts` block because Next.js serves both the pages and the API from one origin. Central Command is split: the **API Worker** serves only JSON, and the **SPA** is static files on Pages. Those are two different runtimes with two different mechanisms, and they want two different policies.
-
-**API Worker** — Hono ships a built-in `secureHeaders` middleware, so no new dependency. Because the API only ever returns JSON or redirects — never HTML — its CSP is locked all the way down:
-
-```
-Content-Security-Policy: default-src 'none'; base-uri 'none';
-  frame-ancestors 'none'; form-action 'none'; object-src 'none'
-```
-
-There are simply no scripts, styles, or images for an API response to load, so nothing legitimate is denied. Plus `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` denying camera/microphone/geolocation.
-
-**Web SPA** — the real browser-facing CSP lives in a Cloudflare Pages [`_headers`](https://developers.cloudflare.com/pages/configuration/headers/) file. This is where the allow-list actually has to think:
-
-- `script-src 'self'` — kept strict. The one inline script in the app (a theme bootstrap that sets light/dark before first paint to avoid a flash) was **moved out of `index.html` into a same-origin file**, specifically so the CSP wouldn't need an `'unsafe-inline'` or a brittle hash.
-- `img-src 'self' data: https:` — the news pillar renders thumbnails straight from RSS feeds (ESPN, Hacker News, TechCrunch, PCGamesN, Dexerto). Those image hosts are unpredictable and numerous, so `https:` is the honest allow-list for images specifically. Low risk: with `object-src 'none'` and `script-src 'self'`, an image can't execute anything.
-- `style-src 'self' 'unsafe-inline'` — React and SVG set styles via element attributes; there's no inline `<style>` or CSS-in-JS to nonce.
-- `connect-src 'self'` — the API is same-origin (`/api/*` on the same host; Vite proxies it in dev). No cross-origin fetches at all.
-- `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, plus the standard header set.
-
-### The WebKit gotcha — and the twist that broke the obvious fix
-
-The portfolio pass taught us that Safari/WebKit honor `Strict-Transport-Security` and `upgrade-insecure-requests` _even on `localhost`_, rewriting `http://localhost` to `https://` and timing out every WebKit test. The fix there was one line: gate both behind `process.env.NODE_ENV === "production"`.
-
-That line doesn't exist on Workers. There's no `NODE_ENV`. The obvious substitute is to check the request's hostname — `localhost` means dev, the real domain means prod. So that's what I wrote first.
-
-It didn't work, and the reason is a genuinely sharp edge. Central Command's `wrangler.toml` has a `[[routes]]` pattern binding the Worker to `centralcommand.studiosc.dev/api/*`. When you run `wrangler dev`, it **simulates that route** — which means the Worker sees the _production_ hostname locally too. Both my "dev" and "prod" `curl` checks came back with HSTS attached. Hostname detection is structurally blind here.
-
-The signal that _does_ work is one the project already had: `DEV_AUTH_EMAIL`, a variable set only in `.dev.vars` for local auth and never deployed. Its absence reliably identifies a deployed Worker, and it's safe-by-default — a functioning local dev always has it, so HSTS can never leak onto `localhost`.
+Fix was straightforward once diagnosed — gate both behind `process.env.NODE_ENV === "production"`:
 
 ```mermaid
 flowchart LR
-    A[wrangler dev] -->|DEV_AUTH_EMAIL present| B[No HSTS, no upgrade-insecure-requests]
-    C[Deployed Worker] -->|DEV_AUTH_EMAIL absent| D[Full header set incl. HSTS]
-    E[Tried first: hostname check] -.->|"[[routes]] makes dev see prod host"| F[Both got HSTS — failed]
-    B --> G[WebKit / dev safe on http://localhost]
-    D --> H[Browsers enforce HTTPS-only]
+    A[next dev] -->|NODE_ENV=development| B[No HSTS, no upgrade-insecure-requests]
+    C[next start / Vercel prod] -->|NODE_ENV=production| D[Full header set incl. HSTS]
+    B --> E[WebKit tests pass on http://localhost]
+    D --> F[Real browsers enforce HTTPS-only]
 ```
 
-The SPA side is simpler: a Pages `_headers` file is only served on deployed builds, which are always HTTPS, while the local `vite dev` loop never reads it — so the gotcha can't fire there at all.
+Confirmed via `curl` against both `next dev` and a production `next start` that the header sets differ as intended, then re-ran the full e2e suite: **40/40 passing** again.
 
-Confirmed with `curl -sD -` against `wrangler dev` (no HSTS, no `upgrade-insecure-requests`) versus the production header set (both present), and against `wrangler pages dev` to validate the SPA's full `_headers` set renders correctly.
+## Contact Form: Rate Limiting + Honeypot
 
-## Public Endpoints: Rate Limiting, and the Things We _Didn't_ Add
+The contact form is the only write path on the site, so it's the realistic target for spam bots. Two layers, both transparent to real visitors:
 
-Here's the biggest divergence from the portfolio pass. That site's attack surface was a **contact form** — a public POST to a real inbox — so it got a honeypot field and per-IP rate limiting.
+1. **Honeypot field** — a `website` field, visually hidden (off-screen, `aria-hidden`, `tabIndex={-1}`) and never shown to real users. Bots that auto-fill every input on a form trip it; the API route silently returns a fake "success" without sending an email, so the bot doesn't learn to adapt.
 
-Central Command **has no public forms.** Sign-in isn't a form post; it's a Google OAuth redirect. There's no signup, no contact form, no public webhook. So the honeypot — which exists to catch bots that auto-fill form inputs — would have nothing to guard. It was dropped, deliberately.
+2. **Per-IP rate limiting** — 5 requests per 10 minutes, returning `429 Too Many Requests` once exceeded.
 
-What _is_ exposed is the auth group: sign-in start, the OAuth callback, demo entry, logout. These run _before_ any session exists, so the app's normal per-user limits can't see them. The only stable identifier is the caller's IP — and on Cloudflare that's `CF-Connecting-IP`, set by the edge and unspoofable by the client. So those routes sit behind a per-IP limiter: **20 requests / 10 minutes**, returning `429` with a `Retry-After` header.
+The first cut of the rate limiter was a simple in-memory `Map`, keyed by IP. That's a fine first line of defense, but Vercel serverless functions don't share memory across instances — under any real load, an attacker spread across cold starts could blow well past 5 requests.
+
+### Making it durable: Upstash Redis
+
+We provisioned a free-tier Upstash Redis database through the Vercel Marketplace (Production environment only) and swapped the limiter to `@upstash/ratelimit` + `@upstash/redis`, using a sliding-window algorithm:
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Edge as Cloudflare Edge
-    participant Worker as Hono Worker
-    participant KV as Workers KV
+    participant API as /api/contact
+    participant Redis as Upstash Redis
 
-    User->>Edge: GET /api/auth/login/google
-    Edge->>Worker: request + CF-Connecting-IP
-    Worker->>KV: GET rl:ip:auth:<ip>:<window>
-    KV-->>Worker: current count
-    alt under 20 / 10 min
-        Worker->>KV: increment (TTL self-expires)
-        Worker-->>User: 302 → Google OAuth
+    User->>API: POST contact form
+    API->>Redis: ratelimit.limit(ip)
+    Redis-->>API: success / blocked
+    alt under limit
+        API->>API: Zod validation + honeypot check
+        API-->>User: 200 OK
     else over limit
-        Worker-->>User: 429 + Retry-After
+        API-->>User: 429 Too Many Requests
     end
 ```
 
-### KV, not Upstash Redis
-
-The portfolio made its limiter durable across serverless instances with Upstash Redis via the Vercel Marketplace. That's the right call _on Vercel_. On Cloudflare it's the wrong one: Upstash is off-platform, Vercel-oriented, and would be a new external dependency to solve a problem the platform already solves. Workers KV is the native, free-tier equivalent — and Central Command already had a KV-backed rate-limit service for its third-party API budgets, so the per-IP limiter is a fixed-window counter layered onto that existing service. No new dependency, no second vendor.
-
-The honest tradeoff: KV is eventually consistent, so the cap is a _safety ceiling_, not an exact quota — good enough to blunt scripted abuse on a free-tier Worker. If atomic limiting is ever needed, Durable Objects are the documented Phase 2 path.
+`lib/rate-limit.ts` checks for `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` at module load. If they're present (Production), it uses the Redis-backed sliding-window limiter — global across every instance and region. If they're absent (local dev, Preview deploys, which aren't connected to Upstash), it falls back to the original in-memory `Map`. Same `429` contract either way; `route.ts` didn't need to change beyond `await`-ing the now-async call.
 
 ## Verification
 
-Central Command has no Playwright suite (yet), so the gate is the project's existing pre-commit quality bar plus targeted smoke tests:
+Every change in this pass went through the same gate:
 
 ```bash
-pnpm build && pnpm typecheck && pnpm lint
+npm run lint && npm run type-check && npm run build && npm run test:e2e
 ```
 
-Then, against a running Worker and a local Pages serve:
+Plus a production smoke test (`next start` with `NODE_ENV=production`):
 
-- `curl`'d the dev Worker and confirmed **no** HSTS / `upgrade-insecure-requests`; confirmed the production branch emits the full set — the dev/prod diff working as designed.
-- Served the built SPA through `wrangler pages dev` and confirmed the complete CSP + header set on real responses, with the served `index.html` carrying only external scripts (so `script-src 'self'` breaks nothing).
-- Hit `/api/auth/login/google` 23 times from one IP: the first **20 returned `302`**, the rest **`429` with `Retry-After: 571`** — exactly the configured 20-per-10-minute window.
-
-`pnpm audit`: clean.
+- Confirmed CSP, HSTS, and the full security header set are present on real responses
+- Confirmed a Mermaid-bearing blog page still renders correctly under the new CSP (`'unsafe-inline'`/`'unsafe-eval'` keep client-side diagram rendering working)
+- Hit `/api/contact` 6 times in a row from the same IP — first several returned `200`, the rest `429`, exactly as designed
 
 ## Why This Matters
 
-The portfolio post made the case that hardening changes _what happens when someone tries to make your site misbehave_, not what it does day to day. That's still true here. What this pass adds is a second lesson: **security measures don't port across stacks — the goals do.** "Add a CSP, gate HSTS to prod, rate-limit public endpoints" survived the move from Next.js/Vercel to Cloudflare intact. `next.config.ts`, `NODE_ENV`, Upstash, and the honeypot did not. Treating the portfolio's solution as a checklist of _intentions_ rather than a snippet to paste is what turned a `[[routes]]`-shaped footgun and an Upstash-shaped dependency into a couple of clean, platform-native fixes.
+None of this changes what the site _does_ — it changes what happens when someone tries to make it do something it shouldn't. A portfolio site doesn't need enterprise-grade WAFs, but it does need: no known-vulnerable dependencies, sane default headers so browsers protect users automatically, and a contact form that can't be turned into a spam relay or a denial-of-service vector. All of that is now true of `studiosc.dev`, verified the same way we'd verify it for a client.
 
 ## What's Next
 
-Central Command is still Phase 1. As it grows — a production Riot API key, a publicly open demo mode behind Cloudflare Access, higher ingest volume — a few of these "good enough for now" calls graduate: Durable Objects for atomic rate limiting, Cloudflare Queues for scaled background fetches, and a tighter CSP if the news-thumbnail story ever moves to a proxied/cached image path. All documented, none of it premature.
+This is the portfolio site's pass. The [next post in this series](/blog/central-command-security-hardening) covers carrying the same hardening — CSP, rate limiting, dependency hygiene — over to **Central Command**.
