@@ -126,6 +126,14 @@ This project uses:
 
 Code is automatically formatted and linted before commits.
 
+## Security
+
+- **Dependencies**: kept current via Dependabot; `npm audit` is clean (0 vulnerabilities)
+- **Security headers & CSP**: set in `next.config.ts` for every route — `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` (HSTS, production only)
+- **Contact form abuse protection**:
+  - Hidden honeypot field (`website`) — bots that fill every field get a fake success response
+  - Per-IP rate limiting (5 requests / 10 min, `429` once exceeded), backed by Upstash Redis in production with an in-memory fallback for local dev/Preview (`lib/rate-limit.ts`)
+
 ## Deployment
 
 This project is configured for deployment on Vercel. The GitHub Actions CI/CD pipeline will:

@@ -39,3 +39,10 @@ This portfolio website represents our commitment to showcasing high-integrity en
 - **Responsive Design**: Mobile-first, fully responsive
 - **SEO Optimized**: Comprehensive SEO setup
 - **Analytics**: Plausible analytics integration
+
+## Security
+
+- **Zero known vulnerabilities** — dependencies kept current via Dependabot, with a clean `npm audit`
+- **Security headers & CSP**: `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and HSTS applied to every route in production
+- **Contact form protection**: a hidden honeypot field plus per-IP rate limiting (5 requests / 10 min), backed by Upstash Redis for durability across serverless instances
+- See [Hardening Our Own Front Door](/blog/portfolio-security-hardening) for the full write-up
