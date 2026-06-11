@@ -19,8 +19,8 @@ export default async function Home() {
   const featuredProjects = allProjects.filter(
     (p) =>
       p.slug === "portfolio-site" ||
-      p.slug === "tallyandtrace" ||
-      p.slug === "fitness-rival"
+      p.slug === "central-command" ||
+      p.slug === "tallyandtrace"
   );
 
   // Sort by completion status: QA Verified > QA In Progress > Under Development

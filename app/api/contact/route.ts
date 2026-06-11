@@ -21,7 +21,7 @@ const contactFormSchema = z.object({
 export async function POST(request: Request) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim();
-    if (isRateLimited(ip ?? "unknown")) {
+    if (await isRateLimited(ip ?? "unknown")) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         { status: 429 }
