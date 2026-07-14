@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProject, getProjects } from "@/lib/mdx";
+import { getProject, getProjects, getBlogPostsByProject } from "@/lib/mdx";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import {
   Calendar,
@@ -14,6 +14,7 @@ import remarkGfm from "remark-gfm";
 import Image from "next/image";
 import Link from "next/link";
 import { Mermaid } from "@/components/blog/ClientComponents";
+import RelatedPosts from "@/components/work/RelatedPosts";
 import { Children, isValidElement } from "react";
 
 interface ProjectPageProps {
@@ -103,6 +104,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   if (!project) {
     notFound();
   }
+
+  const relatedPosts = await getBlogPostsByProject(slug);
 
   const formattedDate = new Date(project.date).toLocaleDateString("en-US", {
     year: "numeric",
@@ -219,6 +222,8 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
         )}
       </article>
+
+      <RelatedPosts posts={relatedPosts} />
     </div>
   );
 }

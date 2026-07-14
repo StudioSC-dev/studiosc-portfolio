@@ -41,7 +41,7 @@ Tally And Trace was developed to solve our own need for a simple, flexible finan
 
 ## The Break (Christine)
 
-- Comprehensive testing strategy for financial calculations
+- Test baseline for the cash-flow forecast engine, with CI gating on backend and shared-package suites
 - API endpoint validation and error handling
 - Multi-currency transaction testing
 - Data integrity and security audits
@@ -52,9 +52,12 @@ Tally And Trace was developed to solve our own need for a simple, flexible finan
 - **Multi-Entity Architecture**: Manage personal and business finances under separate entities
 - **Account Management**: Cash, e-wallets, savings, checking, and credit accounts with multi-currency support
 - **Transaction Tracking**: Record income, expenses, and transfers with FX fields
-- **Budget Entries**: Recurring income/expense items with configurable cadence
+- **Cash-Flow Forecast**: Day-ordered running-balance timeline that surfaces the lowest point before payday and flags shortfalls — not just the reassuring month-end total
+- **Mark Paid**: Materialise a due entry into a real transaction, moving the account balance and rolling the recurring schedule to its next date
+- **Budget Entries**: Recurring income/expense items with configurable cadence — weekly, biweekly, semi-monthly, monthly, quarterly, semi-annual, and annual
 - **Allocations**: Savings goals, budgets, and period-based allocations
 - **Wishlist**: Prioritised wishlist items linked to categories and entities
+- **Data Export**: One-click JSON/CSV export of your entire dataset
 - **Type Safety**: Pydantic v2 on the backend, TypeScript everywhere on the frontend
 - **Mobile App** _(coming soon)_: React Native (Expo) app with NativeWind styling
 
