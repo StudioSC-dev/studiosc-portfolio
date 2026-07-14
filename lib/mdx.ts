@@ -40,6 +40,13 @@ export async function getBlogPosts(): Promise<BlogPost[]> {
   }
 }
 
+export async function getBlogPostsByProject(
+  projectSlug: string
+): Promise<BlogPost[]> {
+  const posts = await getBlogPosts();
+  return posts.filter((post) => post.projectSlug === projectSlug);
+}
+
 export async function getBlogPost(slug: string) {
   try {
     const filePath = join(blogDirectory, `${slug}.mdx`);
