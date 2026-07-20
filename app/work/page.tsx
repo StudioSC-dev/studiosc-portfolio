@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getProjects } from "@/lib/mdx";
 import ProjectCard from "@/components/home/ProjectCard";
+import PageHeader from "@/components/layout/PageHeader";
 
 export const metadata: Metadata = {
   title: "Work",
@@ -18,17 +19,16 @@ export default async function WorkPage() {
 
   const renderProjectSection = (
     title: string,
-    projects: typeof allProjects,
-    emptyMessage: string
+    projects: typeof allProjects
   ) => {
     if (projects.length === 0) {
       return null;
     }
 
     return (
-      <div className="mb-16">
-        <h2 className="text-2xl font-bold text-white mb-6">{title}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section className="mb-16">
+        <h2 className="label mb-6 border-b border-line pb-3">{title}</h2>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <ProjectCard
               key={project.slug}
@@ -45,45 +45,25 @@ export default async function WorkPage() {
             />
           ))}
         </div>
-      </div>
+      </section>
     );
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mb-12 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-          Our Work
-        </h1>
-        <p className="mt-4 text-xl text-slate-400">
-          A catalog of our projects, showcasing our approach to building and
-          breaking software
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl px-6 py-16">
+      <PageHeader
+        label="Work"
+        title="Our Work"
+        lead="A catalog of our projects, showcasing our approach to building and breaking software."
+      />
 
       {allProjects.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center">
-          <p className="text-lg text-slate-400">
-            No projects yet. Check back soon!
-          </p>
-        </div>
+        <p className="py-16 text-body">No projects yet. Check back soon.</p>
       ) : (
         <>
-          {renderProjectSection(
-            "QA Verified",
-            qaVerified,
-            "No QA verified projects yet."
-          )}
-          {renderProjectSection(
-            "QA In Progress",
-            qaInProgress,
-            "No projects in QA currently."
-          )}
-          {renderProjectSection(
-            "Under Development",
-            underDevelopment,
-            "No projects in development currently."
-          )}
+          {renderProjectSection("QA Verified", qaVerified)}
+          {renderProjectSection("QA In Progress", qaInProgress)}
+          {renderProjectSection("Under Development", underDevelopment)}
         </>
       )}
     </div>
