@@ -7,6 +7,18 @@ import { calculateReadingTime } from "./utils";
 const blogDirectory = join(process.cwd(), "content/blog");
 const projectsDirectory = join(process.cwd(), "content/projects");
 
+/**
+ * Drop a leading `# Heading` from an MDX body.
+ *
+ * Every content file opens with an H1 that repeats its frontmatter `title`,
+ * which the page already renders as the real `<h1>`. Left in, each page ships
+ * two H1s — a duplicated title on screen and an accessibility problem. Stripping
+ * it here keeps the MDX files readable on their own (e.g. on GitHub).
+ */
+function stripLeadingH1(content: string): string {
+  return content.replace(/^\s*#\s+.*(\r?\n)+/, "");
+}
+
 export async function getBlogPosts(): Promise<BlogPost[]> {
   try {
     const files = await readdir(blogDirectory);
@@ -62,7 +74,7 @@ export async function getBlogPost(slug: string) {
       category: data.category || "technical",
       readingTime: calculateReadingTime(content),
       projectSlug: data.projectSlug,
-      content,
+      content: stripLeadingH1(content),
     };
   } catch (error) {
     console.error(`Error reading blog post ${slug}:`, error);
@@ -124,7 +136,7 @@ export async function getProject(slug: string) {
       liveUrl: data.liveUrl,
       date: data.date || new Date().toISOString(),
       thumbnail: data.thumbnail,
-      content,
+      content: stripLeadingH1(content),
     };
   } catch (error) {
     console.error(`Error reading project ${slug}:`, error);
