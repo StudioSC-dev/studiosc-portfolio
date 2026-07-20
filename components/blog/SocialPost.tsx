@@ -41,11 +41,11 @@ function LinkCard({
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/60 px-5 py-4 text-gray-200 no-underline transition-colors hover:border-gray-500 hover:bg-gray-800"
+      className="flex items-center gap-3 border border-line bg-surface px-5 py-4 text-ink no-underline transition-colors hover:border-line-strong"
     >
-      <span className="text-gray-400">{ICONS[platform]}</span>
-      <span className="text-sm font-medium">{LABELS[platform]}</span>
-      <span className="ml-auto text-xs text-gray-500">↗</span>
+      <span className="text-muted">{ICONS[platform]}</span>
+      <span className="text-sm">{LABELS[platform]}</span>
+      <span className="ml-auto text-xs text-muted">↗</span>
     </a>
   );
 }

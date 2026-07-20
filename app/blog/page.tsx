@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getBlogPosts } from "@/lib/mdx";
 import BlogList from "@/components/blog/BlogList";
+import PageHeader from "@/components/layout/PageHeader";
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -12,22 +13,15 @@ export default async function BlogPage() {
   const posts = await getBlogPosts();
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="mb-12 text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
-          Blog
-        </h1>
-        <p className="mt-4 text-xl text-gray-600 dark:text-gray-400">
-          Technical insights, QA strategies, and stories from the field
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl px-6 py-16">
+      <PageHeader
+        label="Writing"
+        title="Blog"
+        lead="Technical insights, QA strategies, and stories from the field."
+      />
 
       {posts.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            No blog posts yet. Check back soon!
-          </p>
-        </div>
+        <p className="py-16 text-body">No blog posts yet. Check back soon.</p>
       ) : (
         <BlogList posts={posts} />
       )}

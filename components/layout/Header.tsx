@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -17,40 +18,40 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-gray-800 dark:bg-gray-900/80">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b border-line bg-paper/85 backdrop-blur-sm">
+      <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
         <Link
           href="/"
-          className="text-xl font-bold text-gray-900 transition-colors hover:text-gray-700 dark:text-white dark:hover:text-gray-300"
+          className="font-serif text-xl text-ink transition-colors hover:text-body"
         >
           StudioSC
         </Link>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex md:items-center md:space-x-8">
+        <div className="hidden md:flex md:items-center md:gap-8">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+              className="text-sm text-muted transition-colors hover:text-ink"
             >
               {item.label}
             </Link>
           ))}
+          <ThemeToggle />
         </div>
 
-        {/* Mobile Menu Button */}
-        <button
-          className="md:hidden"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Toggle menu"
-        >
-          {isOpen ? (
-            <X className="h-6 w-6 text-gray-900 dark:text-white" />
-          ) : (
-            <Menu className="h-6 w-6 text-gray-900 dark:text-white" />
-          )}
-        </button>
+        {/* Mobile controls */}
+        <div className="flex items-center gap-5 md:hidden">
+          <ThemeToggle />
+          <button
+            className="text-ink"
+            onClick={() => setIsOpen(!isOpen)}
+            aria-label="Toggle menu"
+          >
+            {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </nav>
 
       {/* Mobile Navigation */}
@@ -61,14 +62,14 @@ export default function Header() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden"
+            className="overflow-hidden md:hidden"
           >
-            <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-800">
+            <div className="border-t border-line px-6 py-4">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="block py-2 text-base font-medium text-gray-700 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  className="block py-2 text-base text-muted transition-colors hover:text-ink"
                   onClick={() => setIsOpen(false)}
                 >
                   {item.label}

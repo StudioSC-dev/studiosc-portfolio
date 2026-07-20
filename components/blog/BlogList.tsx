@@ -39,79 +39,66 @@ export default function BlogList({ posts }: BlogListProps) {
   return (
     <div>
       {/* Search and Filter Section */}
-      <div className="mb-8 space-y-4">
+      <div className="mb-4 border-b border-line pb-6">
         {/* Search Input */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            placeholder="Search posts..."
+            placeholder="Search posts"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
+            className="w-full border-b border-line bg-transparent py-3 pl-7 pr-8 text-ink placeholder-muted transition-colors focus:border-ink focus:outline-none"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-ink"
               aria-label="Clear search"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        {/* Category Filter */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedCategory("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedCategory === "all"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            }`}
-          >
-            All Posts
-          </button>
-          <button
-            onClick={() => setSelectedCategory("technical")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedCategory === "technical"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            }`}
-          >
-            Technical
-          </button>
-          <button
-            onClick={() => setSelectedCategory("non-technical")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              selectedCategory === "non-technical"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            }`}
-          >
-            Non-Technical
-          </button>
-        </div>
+        {/* Category Filter — underline marks the active filter instead of a filled pill */}
+        <div className="mt-6 flex flex-wrap items-center gap-6">
+          {(
+            [
+              ["all", "All Posts"],
+              ["technical", "Technical"],
+              ["non-technical", "Non-Technical"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setSelectedCategory(value)}
+              aria-pressed={selectedCategory === value}
+              className={`pb-1 text-sm transition-colors ${
+                selectedCategory === value
+                  ? "border-b border-ink text-ink"
+                  : "border-b border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
 
-        {/* Results count */}
-        {filteredPosts.length !== posts.length && (
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {filteredPosts.length} of {posts.length} posts
-          </p>
-        )}
+          {filteredPosts.length !== posts.length && (
+            <span className="label ml-auto">
+              {filteredPosts.length} of {posts.length}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Blog Posts List */}
       {filteredPosts.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-lg text-gray-600 dark:text-gray-400">
-            No posts found matching your search criteria.
-          </p>
-        </div>
+        <p className="py-16 text-center text-body">
+          No posts found matching your search criteria.
+        </p>
       ) : (
-        <div className="space-y-6">
+        <div>
           {filteredPosts.map((post, index) => (
             <BlogCard key={post.slug} post={post} index={index} />
           ))}

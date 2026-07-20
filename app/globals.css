@@ -1,117 +1,312 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/*
+  StudioSC design tokens.
+
+  Two themes. Components only ever reference the semantic names (--paper, --ink,
+  --line …), never a palette step, so light and dark cannot drift apart — that is
+  what let the old header (light-aware) and hero (hardcoded dark) disagree.
+
+  The theme is selected by `data-theme` on <html>, which the inline script in
+  layout.tsx sets before first paint. Light is the default; the media query at the
+  bottom only covers the no-JS case, where no attribute is ever set.
+
+  Contrast is deliberately kept off the ceiling in dark: body text lands around
+  8:1 rather than the 15:1 of pure white on near-black, which is fatiguing to read.
+*/
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /*
+    Dark palette held as constants, so switching themes below is pure aliasing
+    and no colour value is ever written twice.
+  */
+  --dark-paper: #1c1917;
+  --dark-surface: #231f1d;
+  --dark-sunken: #171412;
+  --dark-line: #332e2b;
+  --dark-line-strong: #443d39;
+  --dark-ink: #f5f5f4;
+  --dark-body: #d6d3d1;
+  --dark-muted: #a8a29e;
+  --dark-ok: #a3b18a;
+  --dark-warn: #d9a05b;
+  --dark-info: #a8a29e;
+  --dark-danger: #e0918a;
+
+  /*
+    Light theme (default).
+
+    The page is a soft grey, not white: it sits at ~70% of pure white's luminance,
+    because a full-white field at screen brightness is glaring over a long read.
+    Cards sit *lighter* than the page, so they separate without a shadow and
+    without being a near-white glare panel. Ink is pulled back off true black for
+    the same reason.
+
+    Greys are very slightly warm so light and dark read as one family (dark is a
+    warm stone), but the saturation is low enough that they present as neutral.
+
+    Dimming the page compresses contrast against dark text, so the whole ramp is
+    tuned to this specific page tone — every pairing that actually occurs still
+    clears 4.5:1 (worst is muted 11px label text on --sunken, at 4.68:1). If you
+    re-dim the page, re-darken --muted, --ok, --warn and --danger with it.
+
+    70% is the practical floor: dimmer than this and 11px label text cannot hold
+    4.5:1 without the text going so dark the page loses its tonal range.
+
+    The previous, lighter setting (~78%) if you want to go back:
+      --paper #e7e4df  --surface #f1efeb  --sunken #dbd7d1
+      --line  #cdc8c1  --line-strong #b5afa6
+      --ink   #26231f  --body #454140  --muted/--info #5f5b55
+      --ok    #436b0d  --warn #8f4926  --danger #9c2721
+  */
+
+  /* Surfaces — surface is lighter than paper, sunken is darker */
+  --paper: #dedad4;
+  --surface: #e9e6e0;
+  --sunken: #d2cdc6;
+
+  /* Hairlines */
+  --line: #c2bcb4;
+  --line-strong: #a9a29a;
+
+  /* Text */
+  --ink: #201d1a; /* headings */
+  --body: #43403c; /* paragraphs */
+  --muted: #59554f; /* metadata, labels — 4.68:1 on --sunken at 11px */
+
+  /* Status — desaturated, used as small dots and text, never as glowing fills */
+  --ok: #3c610b;
+  --warn: #7f4021;
+  --info: #59554f;
+  --danger: #8c221d;
+
+  /* Paper texture strength — see the body::before/::after rules below. */
+  --grain-opacity: 0.085;
+  --mottle-opacity: 0.075;
+
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-montserrat);
-  --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
-    monospace;
+:root[data-theme="dark"] {
+  --paper: var(--dark-paper);
+  --surface: var(--dark-surface);
+  --sunken: var(--dark-sunken);
+  --line: var(--dark-line);
+  --line-strong: var(--dark-line-strong);
+  --ink: var(--dark-ink);
+  --body: var(--dark-body);
+  --muted: var(--dark-muted);
+  --ok: var(--dark-ok);
+  --warn: var(--dark-warn);
+  --info: var(--dark-info);
+  --danger: var(--dark-danger);
 
-  /* Brand Colors - Sophisticated Dark Palette */
-  --color-brand-slate-950: #0a0a0f;
-  --color-brand-slate-900: #0f172a;
-  --color-brand-slate-800: #1e293b;
-  --color-brand-blue-500: #3b82f6;
-  --color-brand-emerald-500: #10b981;
+  /* On a dark page the same texture reads as sensor noise, so dial it back. */
+  --grain-opacity: 0.028;
+  --mottle-opacity: 0.022;
+
+  color-scheme: dark;
 }
 
+/* No-JS fallback only: with scripting on, data-theme is always present. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #ededed;
+  :root:not([data-theme]) {
+    --paper: var(--dark-paper);
+    --surface: var(--dark-surface);
+    --sunken: var(--dark-sunken);
+    --line: var(--dark-line);
+    --line-strong: var(--dark-line-strong);
+    --ink: var(--dark-ink);
+    --body: var(--dark-body);
+    --muted: var(--dark-muted);
+    --ok: var(--dark-ok);
+    --warn: var(--dark-warn);
+    --info: var(--dark-info);
+    --danger: var(--dark-danger);
+
+    --grain-opacity: 0.028;
+    --mottle-opacity: 0.022;
+
+    color-scheme: dark;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-montserrat), system-ui, sans-serif;
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
 }
 
-/* Smooth scrolling */
+/*
+  Paper texture.
+
+  Real paper is not a flat tone: it has fine grain from the fibre, plus a broader
+  unevenness where the pulp settled thicker or thinner. Two overlays reproduce
+  that — a high-frequency grain and a low-frequency mottle — both generated by
+  SVG feTurbulence inlined as data URIs, so there are no image files, no extra
+  requests, and nothing to go stale.
+
+  Both are painted on fixed, pointer-events-none pseudo-elements at z-index -1:
+  above the page colour (which lives on <html>) but behind all content, so text
+  is never overlaid and hit-testing is untouched. `stitchTiles="stitch"` makes
+  the tiles seamless, which avoids the visible grid you get from naive noise.
+
+  Card surfaces are opaque and sit on top, so they read as a separate sheet laid
+  on the page — which is the intended effect.
+*/
+
+html {
+  background-color: var(--paper);
+}
+
+body {
+  color: var(--body);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Fine fibre grain. */
+body::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E");
+  opacity: var(--grain-opacity);
+}
+
+/* Broad pulp mottling — the "traces of wood" unevenness. */
+body::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23m)'/%3E%3C/svg%3E");
+  opacity: var(--mottle-opacity);
+}
+
+/* Texture is a light-mode effect; in dark it reads as sensor noise, so it is
+   dialled well back rather than switched off entirely. */
+@media (prefers-reduced-transparency: reduce) {
+  body::before,
+  body::after {
+    display: none;
+  }
+}
+
 html {
   scroll-behavior: smooth;
 }
 
-/* Prose styling for blog posts - light gray text on dark background, white headers */
-.blog-content,
-.blog-content.prose {
-  color: rgb(156 163 175) !important;
+/*
+  Instrument Serif ships a single 400 weight — bolding it synthesises a fake
+  weight and looks muddy, so display headings get tighter tracking for presence
+  instead of more weight.
+*/
+.font-serif {
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
-.blog-content.prose h1,
-.blog-content.prose h2,
-.blog-content.prose h3,
-.blog-content.prose h4,
-.blog-content.prose h5,
-.blog-content.prose h6 {
-  color: rgb(255 255 255) !important;
+/*
+  Section headings ("Featured Work", "Related Posts", headings inside an article).
+
+  Deliberately NOT the display serif: at subhead sizes Instrument Serif's single
+  400 weight reads thin and fussy. Bold sans gives these the weight to actually
+  divide a page. The serif is now reserved for display type only — the hero, page
+  titles, article titles, and content titles on cards.
+*/
+.subhead {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
-  margin-top: 2em;
-  margin-bottom: 1em;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
-.blog-content.prose p {
-  margin-top: 1.25em;
-  margin-bottom: 1.25em;
-  color: rgb(156 163 175) !important;
+/* Mono eyebrow treatment, used for section labels and metadata. */
+.label {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
-.blog-content.prose a {
-  color: rgb(156 163 175) !important;
-  text-decoration: underline;
-  font-weight: 500;
+/*
+  Long-form MDX. The typography plugin is now actually registered (it was a
+  dependency but was never loaded, which is why this file used to re-implement
+  it by hand with !important). Theme it through the plugin's own variables so
+  light and dark both follow the tokens above.
+*/
+.prose {
+  --tw-prose-body: var(--body);
+  --tw-prose-headings: var(--ink);
+  --tw-prose-lead: var(--body);
+  --tw-prose-links: var(--ink);
+  --tw-prose-bold: var(--ink);
+  --tw-prose-counters: var(--muted);
+  --tw-prose-bullets: var(--line-strong);
+  --tw-prose-hr: var(--line);
+  --tw-prose-quotes: var(--body);
+  --tw-prose-quote-borders: var(--line-strong);
+  --tw-prose-captions: var(--muted);
+  --tw-prose-code: var(--ink);
+  --tw-prose-pre-code: var(--body);
+  --tw-prose-pre-bg: var(--sunken);
+  --tw-prose-th-borders: var(--line-strong);
+  --tw-prose-td-borders: var(--line);
 }
 
-.blog-content.prose strong {
-  color: rgb(209 213 219) !important;
+/* Headings inside an article are subheads, so they follow the .subhead rule. */
+.prose :is(h1, h2, h3, h4) {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-.blog-content.prose code {
-  background-color: rgb(31 41 55);
-  color: rgb(255 255 255) !important;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  font-size: 0.875em;
-  font-weight: 600;
+.prose a {
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.2em;
+  font-weight: 400;
 }
 
-.blog-content.prose pre {
-  background-color: rgb(17 24 39);
-  color: rgb(255 255 255) !important;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
+.prose a:hover {
+  text-decoration-color: var(--ink);
 }
 
-.blog-content.prose pre code {
-  background-color: transparent;
-  padding: 0;
-  color: rgb(255 255 255) !important;
-  font-weight: normal;
+.prose code {
+  background-color: var(--sunken);
+  border: 1px solid var(--line);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-weight: 400;
 }
 
-.blog-content.prose ul,
-.blog-content.prose ol {
-  color: rgb(156 163 175) !important;
+.prose code::before,
+.prose code::after {
+  content: none;
 }
 
-.blog-content.prose li {
-  color: rgb(156 163 175) !important;
+.prose pre {
+  border: 1px solid var(--line);
+  border-radius: 4px;
 }
 
-.blog-content.prose blockquote {
-  color: rgb(156 163 175) !important;
-  border-left-color: rgb(156 163 175);
-}
-
-.blog-content.prose img {
-  border-radius: 0.5rem;
+.prose img {
+  border-radius: 3px;
 }

@@ -18,11 +18,18 @@ export interface BlogPost {
   projectSlug?: string;
 }
 
+/** One labelled row of the tech stack, mirroring the CV's grouped layout. */
+export interface SkillGroup {
+  label: string;
+  items: string[];
+}
+
 export interface Person {
   name: string;
   role: string;
   bio: string;
-  techStack: string[];
+  /** Grouped by category rather than a flat tag cloud — see SkillGroup. */
+  techStack: SkillGroup[];
   experience: string[];
   linkedIn: string;
   resumePath: string;
