@@ -39,10 +39,10 @@ export default async function Home() {
       <Hero />
 
       {/* Featured Work Section */}
-      <section className="px-6 py-20 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-white mb-12">Featured Work</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section className="px-6 py-20">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="subhead mb-12 text-3xl">Featured Work</h2>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {sortedFeaturedProjects.map((project) => (
               <ProjectCard
                 key={project.slug}
