@@ -1,0 +1,176 @@
+---
+title: "Wiring Sentry Into a Finance App Without Leaking the Money"
+description: "Adding error and performance monitoring to Tally & Trace — off by default, PII scrubbed on both surfaces, and Session Replay deliberately left switched off. It's live and reporting, but there's no war story yet: the interesting part is the config, not the outcome."
+date: "2026-07-20"
+author: "Seth"
+category: "technical"
+projectSlug: "tallyandtrace"
+---
+
+# Wiring Sentry Into a Finance App Without Leaking the Money
+
+Up to now, a 500 in [Tally & Trace](/work/tallyandtrace) reached us the same way it reaches
+everyone with a side project: someone notices the app is broken and says so. That's fine at two
+users. It stops being fine the moment the app is the thing we're trusting with the question of
+whether rent clears.
+
+So this pass adds [Sentry](https://sentry.io) to the FastAPI backend and the React web app. Two
+projects — `tally-trace-api` and `tally-trace-web` — one per surface, DSNs set in Render, and a
+deliberately-thrown test error confirmed arriving on both.
+
+It is **groundwork, not a war story**, and I'll be blunt about that up front. Monitoring is live,
+but it's only just live: there's no "and then it caught this bug" payoff, and no error-rate,
+latency, or time-to-fix numbers to show you, because there isn't enough data yet to mean anything.
+
+## What Sentry is, for anyone who doesn't write software
+
+Skip ahead if this is your day job. If it isn't, here's the whole idea in a paragraph.
+
+When an app breaks for you, you see the symptom: a spinner that never stops, a button that does
+nothing, a page gone white. The developer sees none of that. Unless you tell them, they find out
+weeks later, or never. Sentry is a **smoke alarm wired into the software itself**. When something
+fails, the app quietly sends a report — what broke, which exact line of code, which page you were
+on, what the app was doing in the seconds before — to a service the developer watches. It arrives
+in seconds, without anyone filing a bug report.
+
+The other half is speed. Alongside failures, Sentry samples how long things take, so "the accounts
+page feels slow lately" turns into a measurement instead of a vibe. And it groups reports: a hundred
+people hitting the same bug shows up as one issue with a count, not a hundred separate messages.
+
+The benefit is mostly about **which of us finds out first**. Without it, the person who discovers
+the bug is the user, at the worst possible moment, and the fix waits until they're annoyed enough to
+say something. With it, the app reports its own failure, with the diagnostic detail already
+attached — often before anyone has thought to complain.
+
+Sentry isn't the only option. **Rollbar** and **Bugsnag** do broadly the same job in broadly the same
+way; the differences are ergonomics and pricing more than capability. **Datadog** and **New Relic**
+go much wider — application errors alongside server metrics, logs, and infrastructure — which is
+genuinely more powerful and priced for companies with a budget line for it. And **GlitchTip** is an
+open-source alternative you host yourself that deliberately speaks Sentry's protocol, so the same
+code works against either. Sentry won here on a free tier generous enough for a two-person project,
+first-class Python and React support, and the fact that its data-privacy controls are detailed
+enough to actually do what the next section describes.
+
+What's worth writing about is the part you have to decide before any of that: an error monitor is a
+**data-exfiltration vector pointed at your own users**. It sits inside your request handlers, reads
+request bodies and headers, and ships what it finds to a third party. In a finance app, the default
+configuration is the wrong configuration. You wire it defensively from line one or you don't wire
+it at all.
+
+## Two surfaces, one policy
+
+Two Sentry projects rather than one shared project with a tag to tell them apart. `tally-trace-api`
+and `tally-trace-web` fail in different ways, carry different stack traces, and — as you'll see
+below — take different mechanics to enforce the same scrubbing policy. Keeping the issue streams
+separate means a noisy frontend release can't bury a backend regression.
+
+The backend gets a new `app/core/observability.py`, called from `main.py` **before** the
+`FastAPI(...)` constructor:
+
+```python
+# main.py
+init_sentry()          # must run first
+app = FastAPI(...)
+```
+
+Order matters more than it looks. `sentry-sdk[fastapi]` installs ASGI middleware by patching at
+init time, so initialising before the app is constructed means the middleware wraps _every_ route —
+including the ones registered further down the file. Initialise after, and you get partial coverage
+that looks fine until the one router you care about goes quiet. The extra `[fastapi]` bundle also
+auto-enables the Starlette and SQLAlchemy integrations, so DB spans come along for free.
+
+The web app gets `frontend/src/utils/sentry.ts`, initialised at module top in `main.tsx` — before
+React mounts — so a boot-time throw is still reported. The app tree is wrapped in
+`Sentry.ErrorBoundary` with a small fallback: a short message and a **Reload** button. Not a real
+recovery story, but it beats React's white screen, which tells the user nothing and tells us less.
+
+Expo mobile was skipped on purpose. It's scaffolded, not feature-complete, and monitoring a surface
+nobody uses is quota spent on nothing.
+
+## Decision 1: off by default, on only in production
+
+`init_sentry()` is a no-op when `SENTRY_DSN` is unset. The web equivalent keys on
+`VITE_SENTRY_DSN` the same way. Local dev and CI never set either, so they never phone home.
+
+This is partly hygiene — I don't want my own `pytest` run showing up as production incidents, and I
+don't want a deliberately-failing test to page anyone. But it's also just arithmetic. Tally & Trace
+is a free-tier project end to end: Render for hosting, Supabase for Postgres, and Sentry's free tier
+is **5,000 errors and 10,000 spans a month**. The cheapest quota is the quota you never spend on
+your own test suite.
+
+Tracing is on at a `tracesSampleRate` of **0.1**. Errors-only would be `0`, and that was tempting,
+but a 10% sample of transactions is enough to see which endpoints are slow without eating the span
+budget in a week. It stays environment-configurable, so it can be dialled either way without a code
+change.
+
+## Decision 2: scrub the PII, because it's a finance app
+
+`send_default_pii=False` is table stakes and not remotely sufficient. The rest is bespoke.
+
+On the backend, a scrub hook runs on both `before_send` and `before_send_transaction` — errors and
+performance events take separate paths, and forgetting the second one is an easy way to leak
+through the door you thought you'd closed. It:
+
+- **deletes `request.data`** — request bodies here carry transaction amounts, account names, and
+  login credentials
+- **deletes `request.cookies`**
+- **replaces `authorization`, `cookie`, `set-cookie`, and `x-api-key` headers** with `[Filtered]`
+
+```python
+def _scrub(event, _hint):
+    request = event.get("request") or {}
+    request.pop("data", None)
+    request.pop("cookies", None)
+    for header in ("authorization", "cookie", "set-cookie", "x-api-key"):
+        if header in request.get("headers", {}):
+            request["headers"][header] = "[Filtered]"
+    return event
+```
+
+The web side mirrors the same policy rather than inventing a second one. Query strings are stripped
+off URLs and off `fetch`/`xhr` breadcrumbs — a URL like `/transactions?amount=...` is a leak wearing
+a routing costume. Request data is deleted. And **every `ui.input` breadcrumb is dropped outright**,
+because typed input in this app is money amounts and account names. There is no version of that
+breadcrumb worth having.
+
+The line I keep coming back to: **Sentry gets the shape of a failure, never the money.** A stack
+trace, an endpoint, a status code, a timestamp — enough to fix it. Not the balance.
+
+## Decision 3: no Session Replay
+
+Session Replay is Sentry's headline feature, and it's the one I turned down.
+
+Replay records the DOM. In this app the DOM _is_ the user's actual balances — account totals, the
+cash-flow timeline, the exact figure that says whether the 24th is going to hurt. Every scrubbing
+rule above exists to keep numbers like that out of a third-party service; switching on a feature
+that video-records them would make the rest of the work decorative. It's also the fastest known way
+to blow through a free tier.
+
+Worth naming explicitly, because most integration posts just switch it on and move along. It was a
+trade, not an oversight.
+
+## Two small operational notes
+
+The DSNs are declared `sync: false` in `render.yaml`. Render only prompts for their values in this
+account's environment, so a fork of the repo can't accidentally report into — or exhaust — this
+project's quota.
+
+And a footgun worth a sentence: `VITE_*` variables are **inlined at build time**, not read at
+runtime. Changing the backend DSN is a service restart; changing the web DSN needs a full redeploy.
+Easy to forget at 11pm when you're wondering why the frontend still isn't reporting.
+
+## Where this leaves us
+
+Monitoring is wired, scrubbed, and reporting. The last step before calling it done was the one worth
+doing properly: throwing a deliberate error at each surface and reading the event that came back —
+checking the scrubbing against a real payload rather than against the code that's supposed to
+perform it. A `before_send` hook that silently returns the event unmodified looks exactly like one
+that works, right up until it doesn't.
+
+What's left is the part that takes time rather than effort: enough real traffic for the numbers to
+say something. Until then there's nothing to report, which is the best possible thing for a finance
+app to have to say about its error monitor.
+
+This is also the first of a planned Sentry rollout across the rest of the studiosc projects. The
+per-project configuration will differ; the policy — off by default, scrub before send, no replay —
+is meant to travel.

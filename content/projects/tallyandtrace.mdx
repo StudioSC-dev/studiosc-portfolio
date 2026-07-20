@@ -14,6 +14,7 @@ tags:
     "Render",
     "Vite",
     "Expo",
+    "Sentry",
   ]
 qaInProgress: true
 liveUrl: "https://tallyandtrace.studiosc.dev"
@@ -38,6 +39,7 @@ Tally And Trace was developed to solve our own need for a simple, flexible finan
 - Implemented PostgreSQL database with SQLAlchemy ORM
 - Created React Native mobile app foundation (Expo)
 - Deployed on Render with Supabase for database hosting
+- Wired Sentry error and performance monitoring across the API and web app — production-only, with request bodies, cookies, auth headers, and typed-input breadcrumbs scrubbed before send
 
 ## The Break (Christine)
 
@@ -68,6 +70,7 @@ Tally And Trace was developed to solve our own need for a simple, flexible finan
 - **Database**: PostgreSQL (Supabase)
 - **Mobile**: React Native, Expo SDK 52, NativeWind
 - **Deployment**: Render (backend + frontend), Supabase (database)
+- **Monitoring**: Sentry — separate `tally-trace-api` and `tally-trace-web` projects, production-only, PII scrubbed before send
 - **Shared**: TypeScript package for type definitions and utilities
 
 ## Screenshots
