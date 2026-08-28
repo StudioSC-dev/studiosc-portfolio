@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Build output
+*.tsbuildinfo
+next-env.d.ts
+
+# Git internals
+.git/
+
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Vercel
+.vercel/
+
+# Claude worktrees
+.claude/worktrees/
+
+# Local-only session state
+HANDOFF.md
