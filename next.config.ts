@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import createMDX from "@next/mdx";
 
+const isVercel = !!process.env.VERCEL;
+
 const contentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https://plausible.io;
@@ -12,7 +14,7 @@ const contentSecurityPolicy = `
   object-src 'none';
   base-uri 'self';
   form-action 'self';
-  ${process.env.NODE_ENV === "production" ? "upgrade-insecure-requests;" : ""}
+  ${isVercel ? "upgrade-insecure-requests;" : ""}
 `
   .replace(/\s{2,}/g, " ")
   .trim();
@@ -26,9 +28,7 @@ const securityHeaders = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=()",
   },
-  // HSTS is production-only: WebKit/Safari honors it on localhost too,
-  // forcing HTTPS upgrades that fail against the plain-HTTP dev server.
-  ...(process.env.NODE_ENV === "production"
+  ...(isVercel
     ? [
         {
           key: "Strict-Transport-Security",
@@ -39,6 +39,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.0.242"],
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   images: {
     remotePatterns: [
