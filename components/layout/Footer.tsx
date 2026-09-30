@@ -81,9 +81,15 @@ export default function Footer() {
           </div>
         </div>
 
-        <p className="mt-16 border-t border-line pt-8 text-xs text-muted">
-          © {currentYear} StudioSC. All rights reserved.
-        </p>
+        <div className="mt-16 flex flex-col gap-3 border-t border-line pt-8 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>© {currentYear} StudioSC. All rights reserved.</p>
+          <Link
+            href="/privacy/hermes-personal-assistant"
+            className="transition-colors hover:text-ink"
+          >
+            Hermes Personal Assistant Privacy Policy
+          </Link>
+        </div>
       </div>
     </footer>
   );
