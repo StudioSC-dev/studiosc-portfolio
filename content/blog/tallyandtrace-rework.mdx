@@ -68,9 +68,9 @@ left, and a next due date. In the projection, loans are liabilities rather than 
 - Posted payments settle due dates oldest first, and a due date counts as made only when it is
   fully paid.
 - Planned payments cover what is left, and each unit of money leaves cash exactly once. A recurring
-  payment pays its own due date first and only then carries forward. A one-off planned payment pays
-  the oldest open due date within a short lookback window, so a catch-up payment can settle an
-  overdue instalment.
+  payment pays its own due date first and only then carries forward. A one-off planned payment
+  starts at the oldest open due date no more than about a month before its own date and carries
+  forward from there, so a catch-up payment can settle an overdue instalment.
 
 ### The shape of the engine
 
@@ -155,8 +155,8 @@ explicitly. Editing needs edit rights on **every** account the record touches, b
 the change, and the record's creator must still have those rights afterwards. That last clause is
 why an editor cannot move the owner's transaction onto their own private account: the owner would
 lose access to their own record. Two deliberate exceptions keep records from getting stuck. A
-creator can still delete their own unposted record after losing edit rights. The owner of every
-account a record touches can post, revert or delete it when its creator has lost access.
+creator, or the owner of any account it touches, can still delete an unposted record. The owner of
+every account a record touches can post, revert or delete it when its creator has lost access.
 
 The tag share has a firm invariant: **a tag share only ever grants access to records owned by the
 sharer, on accounts owned by the sharer.** Other people's records on the sharer's shared account
@@ -219,13 +219,14 @@ That split is what allows a shared account to show an honest "Card payment, −1
 viewer cannot see, with the right cash amount and nothing else. The Household view then adds
 occurrences for the sharer's Household-tagged bills that sit on accounts outside the viewer's
 scope, such as a private card. They show the bill's amount with no cash effect, appear once, and
-shrink only by the part already paid through accounts in the viewer's scope.
+shrink only by the part covered by posted or planned payments through accounts in the viewer's
+scope.
 
 ## Part 3: Simulating findings before fixing them
 
 Money code is unforgiving, and the access model above is exactly the kind of thing that looks right
-in a diff and is wrong at the edges. So the process was strict, and it was the same for every ticket in
-this epic.
+in a diff and is wrong at the edges. So the process was strict, and it was the same for every ticket
+in this epic.
 
 Plans were reviewed by independent auditors before they were approved, and every pull request was
 audited again before it opened and again before it merged. The auditors did not share context with
