@@ -211,9 +211,10 @@ with no shares the result is exactly the old single-owner output.
 Two kinds of input are kept apart:
 
 - **Disclosed inputs** become events in the response. They are only records the caller may read.
-- **Internal inputs** are used purely to compute amounts, such as a hidden card's full statement or
-  a hidden primary account's complete history for overflow routing. They may read everything on the
-  account, but none of their ids, names or descriptions ever reach the response.
+- **Internal inputs** are used purely to compute amounts, such as a hidden card's full statement.
+  They may read everything on the account, but none of their ids, names or descriptions ever reach
+  the response. When the account that pays a card is itself hidden from the caller, no payment leg
+  or overflow move is computed at all, so nothing about that account can be read from the result.
 
 That split is what allows a shared account to show an honest "Card payment, −100" for a card the
 viewer cannot see, with the right cash amount and nothing else. The Household view then adds
@@ -262,10 +263,11 @@ It also shaped how the tests were written, especially for redaction. Rather than
 named fields, the tests plant unique **sentinel** strings in everything private (descriptions,
 names, ids, receipt URLs, private tag names) and then walk the entire JSON tree of every response
 for a non-owner, including search results, exports and nested projection envelopes. A leak does not
-need to be anticipated, only planted. The same approach covered the cases that are easy to get
-wrong by hand: stranded records after a share is revoked or demoted, a partner's records on a shared
-account seen through a third person's tag share, and exact amounts for a bill funded partly by an
-overflow account (100 is 60 paid elsewhere plus 40 overflow, never 140).
+need to be anticipated, only planted. The same approach covered the cases that are easy to get wrong
+by hand: stranded records after a share is revoked or demoted, a partner's records on a shared
+account seen through a third person's tag share, and exact remainders for a Household bill paid
+partly through the viewer's accounts (a bill of 100 with 60 already paid shows 40 left, never 100 or
+140).
 
 Auditing the _plan_ paid off as much as auditing code. An early design merged per-owner
 projections, and plan audits showed it lost liabilities, double counted card payments and collided
