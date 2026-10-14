@@ -67,8 +67,10 @@ left, and a next due date. In the projection, loans are liabilities rather than 
 - A due date that no transfer covers produces a payment leg on the loan's paying account.
 - Posted payments settle due dates oldest first, and a due date counts as made only when it is
   fully paid.
-- Planned transfers cover what is left, each paying its own due date first and only then carrying
-  forward, so each unit of money leaves cash exactly once.
+- Planned payments cover what is left, and each unit of money leaves cash exactly once. A recurring
+  payment pays its own due date first and only then carries forward. A one-off planned payment pays
+  the oldest open due date within a short lookback window, so a catch-up payment can settle an
+  overdue instalment.
 
 ### The shape of the engine
 
@@ -97,9 +99,9 @@ But it modelled sharing and ownership with the same object, and that turned into
 of our audit findings. Inside one entity, some accounts were private to their creator and some were
 shared, so every read and every write had to answer "is this the caller's, the entity's, or someone
 else's private account that happens to sit in the same entity?" The leaks we kept finding all had
-that shape: a hidden loan whose name surfaced in an error message, a card-funding leg built for an
-account the caller could not see, a co-member editing a transaction that moved a balance they could
-not reach.
+that shape: a hidden loan whose name surfaced in a projection label, a card-funding leg built for
+an account the caller could not see, a co-member editing a transaction that moved a balance they
+could not reach.
 
 We stopped patching and replaced the model.
 
@@ -145,12 +147,16 @@ everywhere: **what is this caller's role on each account this record touches?**
 viewer, or none. Every router and every service goes through it: lists, search, balance history,
 summaries, the projection, loan schedules and exports. There is no second path to forget.
 
-Reading a record then needs any one of four things: the caller created it, or the caller has a
-direct role on an account it touches, or one of the two tag-share rules below applies. Writing needs
-edit rights on **every** account the record touches, both before and after the change, and the
-record's creator must still have those rights afterwards. That last clause is why an editor cannot
-move the owner's transaction onto their own private account: the owner would lose access to their
-own record.
+Reading a record then needs any one of four things: the caller created it, the caller has a direct
+role on an account it touches, or one of two tag-share rules applies. Under the first, the record is
+the sharer's own, every account it touches is the sharer's, and at least one of those accounts
+carries the shared Household tag. Under the second, the sharer tagged the record Household
+explicitly. Editing needs edit rights on **every** account the record touches, both before and after
+the change, and the record's creator must still have those rights afterwards. That last clause is
+why an editor cannot move the owner's transaction onto their own private account: the owner would
+lose access to their own record. Two deliberate exceptions keep records from getting stuck. A
+creator can still delete their own unposted record after losing edit rights. The owner of every
+account a record touches can post, revert or delete it when its creator has lost access.
 
 The tag share has a firm invariant: **a tag share only ever grants access to records owned by the
 sharer, on accounts owned by the sharer.** Other people's records on the sharer's shared account
@@ -163,9 +169,11 @@ flowchart TD
     A -- yes --> OK["Readable"]
     A -- no --> B{"Direct role on any<br/>account it touches?"}
     B -- yes --> OK
-    B -- no --> C{"Tag share: owned by the sharer,<br/>every account the sharer's,<br/>explicit Household tag?"}
+    B -- no --> C{"Sharer's record, every account<br/>the sharer's, one tagged Household?"}
     C -- yes --> LIM["Readable, Limited, read-only"]
-    C -- no --> NF["404, same as an unknown id"]
+    C -- no --> D{"Sharer's record on the sharer's<br/>accounts, tagged Household explicitly?"}
+    D -- yes --> LIM
+    D -- no --> NF["404, same as an unknown id"]
 ```
 
 ### Redaction with explicit Limited shapes
@@ -177,10 +185,10 @@ minus a few things."
 The reasoning is about failure modes. A denylist fails open: add a column next year and it leaks
 until someone remembers. An allowlist fails closed: a new column is invisible to Limited callers
 until someone deliberately adds it. So each Limited shape (transaction, recurring entry, balance
-entry, projection event, loan schedule, card statement) is its own type, and every response carries
-a `view` of full, shared-full or limited plus server-computed permission flags. Clients follow the
-flags and never the model kind, so a creator demoted to viewer still sees their own record in full,
-with every write control off.
+entry, projection event, loan schedule, card statement) is its own type. Transaction and
+recurring-entry responses carry a `view` of full, shared-full or limited plus server-computed
+permission flags. Clients follow the flags and never the model kind, so a creator demoted to viewer
+still sees their own record in full, with the edit controls off.
 
 A few rules fall out of that:
 
@@ -211,14 +219,15 @@ That split is what allows a shared account to show an honest "Card payment, −1
 viewer cannot see, with the right cash amount and nothing else. The Household view then adds
 occurrences for the sharer's Household-tagged bills that sit on accounts outside the viewer's
 scope, such as a private card. They show the bill's amount with no cash effect, appear once, and
-shrink only by the payments the viewer can actually read.
+shrink only by the part already paid through accounts in the viewer's scope.
 
 ## Part 3: Simulating findings before fixing them
 
 Money code is unforgiving, and the access model above is exactly the kind of thing that looks right
-in a diff and is wrong at the edges. So the process was strict, and it was the same for every ticket.
+in a diff and is wrong at the edges. So the process was strict, and it was the same for every ticket in
+this epic.
 
-Every plan was reviewed by independent auditors before it was approved, and every pull request was
+Plans were reviewed by independent auditors before they were approved, and every pull request was
 audited again before it opened and again before it merged. The auditors did not share context with
 whoever wrote the change. The rule that mattered was about what happened to a finding:
 
@@ -262,7 +271,7 @@ projections, and plan audits showed it lost liabilities, double counted card pay
 on overdue occurrences. That is why the final design reuses the single scoped engine, and why the
 first idea was cheap to throw away.
 
-## What's next
+## What came after
 
 Multi-currency projections followed the rework: totals are now partitioned by account currency
 rather than added together, with foreign figures estimated at a cached daily rate until the actual
@@ -275,4 +284,4 @@ Partner" who can sign in to see the shared account and the read-only Household v
 The engine was always meant to answer "can this account cover this bill on the day it's due." The
 rework keeps that answer correct as more kinds of money, and more than one person, are
 involved: one owner per record, one access function, explicit shapes for what others may see, and a
-test that failed first for every fix.
+test that failed first for each fix in this epic.
