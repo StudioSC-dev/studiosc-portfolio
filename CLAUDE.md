@@ -175,3 +175,5 @@ At the end of every Claude Code session, create or overwrite `HANDOFF.md` in the
 - **Next steps** — actionable TODOs
 
 `HANDOFF.md` is ephemeral — it gets overwritten each session so it always reflects the current state. Read it at the start of every session.
+
+**Audits (manual sessions):** plan and PR audits and merge gates follow the machine-wide audit policy in the harness plugin (`/harness:audit`, explained in the plugin's `docs/audit-autonomy.md`).
