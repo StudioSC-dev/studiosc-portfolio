@@ -26,7 +26,7 @@ approved plan on 7 October to the final cleanup deploy on 2 November.
 The design doc opens with this paragraph, and everything else follows from it:
 
 > Trailhead becomes a deterministic dispatcher around one long-lived workstation container. That
-> container holds the only full-scope Claude login and runs one interactive
+> container holds credentials the ephemeral workers never see and runs one interactive
 > `claude --remote-control` session per ticket under tmux, each in its own clone. Trailhead owns
 > the go gate, the prompt queue, checks, audits, push or PR, and Linear state changes. The
 > session's word never counts.
@@ -43,7 +43,7 @@ throwaway compose project that touched no production code. Its question was whet
 with one login could run several per-ticket interactive sessions, each in its own worktree,
 reachable remotely, even after sitting idle.
 
-Most checks passed:
+In my runs, most checks passed:
 
 - Two sessions launched headless with no keystrokes, and both showed up in the Claude app.
 - An image pasted from a tablet was read accurately. Subagents were visible from the app, and
@@ -57,18 +57,18 @@ Most checks passed:
 
 One check was inconclusive: reading a PDF sent from the app. The spike's constraints list mattered
 as much as the passes, and one line in it became the design rule for the whole epic: **sessions
-misreport their own work; the dispatcher must verify independently.** The spike also found that
-Remote Control needs a full-scope login. The workstation would therefore hold the most powerful
-credential in the system, so its boundary had to be the tightest.
+misreport their own work; the dispatcher must verify independently.** The spike also made clear
+that a long-lived workstation would hold credentials the ephemeral workers never see, so its
+boundary had to be the tightest.
 
 ## A plan that took four audit rounds
 
 The implementation plan went through my [triple audit](/blog/triple-audit) before any code.
-DeepSeek was paused at the time, so the Opus and Sol legs ran it. It took four rounds on 7 October:
+DeepSeek was paused at the time, so the Opus and Sol legs ran it. By my account, it took four rounds on 7 October:
 
-- **Round 1: NO-GO from both.** The critical finding was real and already live. The clone helper the
-  plan meant to reuse persisted the org's git credential in the repo's `.git/config`, even though
-  its own comment said it didn't. That became a bug fix of its own, shipped ahead of the epic.
+- **Round 1: NO-GO from both.** The critical finding was real and already live. A helper the plan
+  meant to reuse was handling a credential in a way that could persist it somewhere it shouldn't.
+  It was fixed in its own change, shipped ahead of the epic.
 - **Round 2: NO-GO again.** The snapshot pipeline couldn't open its own bundle. `git archive` also
   honours repo-controlled attributes, so the checked snapshot could differ from the shipped tree.
   Two rounds without convergence meant the call went to me. I chose to **simplify the snapshot
@@ -178,7 +178,7 @@ That scratch pipeline ran on the new engine, fed by sandbox tickets and a real L
 real PR at the end. The acceptance script restarts the spawner and the watcher partway through, to
 prove the pipeline recovers.
 
-It didn't pass on the first try, and the failures are the best evidence for the design:
+It didn't pass on the first try, and in my runs the failures were the best evidence for the design:
 
 - **Run 1:** the script's default prompt created one file while the ticket asked for a different
   one. Both audit legs returned NO-GO, so no PR was opened. The session had done _something_, but the
@@ -187,7 +187,7 @@ It didn't pass on the first try, and the failures are the best evidence for the 
   so the audit was INCOMPLETE and nothing shipped. The cause was a newer Codex release keeping more
   state on disk. It was fixed in its own ticket.
 - **Run 4:** every product step passed, but the script failed one assertion. Linear's issue history
-  didn't show a state change. The cause turned out to be Linear folding same-account edits made
+  didn't show a state change. The most likely cause was Linear folding same-account edits made
   within seconds of an issue's creation into the creation entry.
 - **Run 5**, on a ticket that had aged 20 minutes: **passed**, every step. The audit came back GO
   with two sealed legs, exactly one PR was created, and the ticket moved to Ready for QA. A token
