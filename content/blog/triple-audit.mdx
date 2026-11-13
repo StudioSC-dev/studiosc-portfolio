@@ -13,9 +13,10 @@ hands it out, other agents write it, and I review what comes back. That raises a
 who checks the agents?
 
 As of today the answer is fixed. **"Audit" always means a triple audit, on every plan and every pull
-request.** Three independent reviewers from three different model families read the same brief,
-none of them can see the others or the writer, and the main session puts their findings side by side
-before anything moves forward. This post covers why one reviewer isn't enough, how the reviewers are
+request.** Three independent reviewers from three different model families read the same brief. The
+brief leaves out the writer's conversation and the other auditors' answers, every auditor is told not to
+go looking for them, and the main session puts their findings side by side before anything moves
+forward. This post covers why one reviewer isn't enough, how the reviewers are
 kept blind, what it costs, and the rules that keep it from growing without limit.
 
 ## Where it started: the web UI sweep
@@ -80,8 +81,10 @@ flowchart TD
 
 ## How blindness is kept
 
-Independence only means something if it is enforced, so the audit is a fixed runbook rather than a
-habit.
+Independence only means something if it holds every time, so the audit is a fixed runbook rather
+than a habit. Blindness comes from what the brief contains and what the auditors are told, not from a
+hard wall: the Opus auditor can read files, so it is kept away from other answers and transcripts by
+instruction.
 
 **One brief, written once.** The main session writes a single brief file: the full target (the plan
 text or the pull request diff), the criteria it is judged against, and a fixed preamble. All three
@@ -189,6 +192,7 @@ request.
 ## Update (November 2026)
 
 Running three full audits on every change turned out to be expensive, and not every change needs the
-same scrutiny. Audits are now routed by risk and trimmed for cost, with a smaller review for low-risk
-work and the full triple audit kept for what needs it. That is its own story:
+same scrutiny. Routing audits by risk is being trialled in shadow: the router records what it would
+choose, while the triple audit stays the rule until that routing is admitted. Cost also led me to
+approve a single auditor on some projects for now. That is its own story:
 [letting an agent route the audits](/blog/jev-audit-autonomy).
