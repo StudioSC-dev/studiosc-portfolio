@@ -177,10 +177,11 @@ Nothing is absorbed. A difference is either a failure or an **approved differenc
 its month, its amount and its reason, and applies cumulatively to the months after it. An honest,
 written reason is fine. A silent fudge factor isn't possible.
 
-The test I trust most is the dullest one. It loads a fixture with **one** row changed, a deposit
-typed as 1,050 instead of 1,000, and runs the check against unchanged frozen figures. The check
-must fail, fail in `checkpoints` only, and name the account, the date, the expected and actual
-balance, and the 50 between them. A check that can't find one wrong row isn't proving anything.
+The test I trust most is the dullest one. It loads a fixture with **one** deposit changed and runs
+the check against unchanged frozen figures. The check must fail, fail in `checkpoints` only, and
+name the account, the date, the expected and actual balance, and the difference. For example, if a
+deposit of 1,000 were changed to 1,050, the check would report the 50 difference on that account
+and nothing else. A check that can't find one wrong row isn't proving anything.
 
 ### The shape of it
 
