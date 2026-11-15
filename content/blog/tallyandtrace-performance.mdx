@@ -61,7 +61,7 @@ Saving no longer blocks the page. Changes go into an outbox and sync in the back
 
 ### 6. Stored closed credit-card statements
 
-A closed card statement never changes unless someone edits a transaction inside it. So we stopped recomputing it. Closed statements are now stored, and kept current by write-through: when a transaction changes, the affected statements are updated in the same transaction. A per-card advisory lock serialises those writers.
+A closed card statement never changes unless someone edits a transaction inside it or changes the card's billing settings. So we stopped recomputing it. Closed statements are now stored, and kept current by write-through: when a transaction or a card's billing settings change, the affected statements are rebuilt in the same transaction. A per-card advisory lock serialises those writers.
 
 Readers take a short shared lock, scoped to a savepoint. That keeps a read consistent with in-flight writes without deadlocking against them.
 
@@ -81,13 +81,13 @@ The snapshot went from 344 to about 61 statements, and CPU time from 217 to 92 m
 
 ### 9. A lean endpoint for the Due card
 
-The Due card only needs a few fields, but it was getting them through the full snapshot path. It now has its own `/dashboard/due` endpoint. For the main test user, that replaces 4 requests. Statements dropped from 93 to 59, and the payload from 224 KB to 158 KB.
+The Due card only needs a few fields, but it fetched them with 4 separate requests. It now has its own `/dashboard/due` endpoint, which answers in one. For the main test user, statements dropped from 93 to 59, and the payload from 224 KB to 158 KB.
 
 ### 10. The Due card on the new endpoint
 
-The card now calls the lean endpoint. Request counts on page open and after a save will go here.
+The card now calls the lean endpoint and refreshes on its own cache tag, so a save only refetches what it actually changed. Opening the Transactions page went from 11 requests to 8, and the card's own share went from 7 to 3. After saving a transaction, the follow-up requests went from 9 to 4.
 
-{/* TODO PERF-8 numbers */}
+We aimed for 6 on page open and stopped at 8. Each request that's left draws something on the first screen: account and category names, schedule labels, or tab badges. Deferring them would make labels pop in after the page appears, which is worse than one more request. An older server that doesn't have the endpoint still works: the card falls back to the old queries.
 
 ## Before and after
 
@@ -102,6 +102,8 @@ All figures are from the synthetic fixture.
 | Transactions page open at 10% CPU         | 7.9 s        | 4.4 s    |
 | Due card: statements                      | 93           | 59       |
 | Due card: payload                         | 224 KB       | 158 KB   |
+| Transactions page open: requests          | 11           | 8        |
+| Requests after one save                   | 9            | 4        |
 
 The two snapshot rows are different steps in the series, so they are not one continuous run. The table shows each step against its own baseline.
 
