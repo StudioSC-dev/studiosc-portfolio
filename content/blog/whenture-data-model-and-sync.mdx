@@ -30,7 +30,7 @@ A trip is a pile of small things: days, stops, trains, bookings, costs, comments
 
 **Plan times and real moments are different.** "Dinner at 7 pm in Tokyo" is a local time in a place. "The flight leaves at this exact moment" is a point in time. They are stored differently on purpose, so a time zone change cannot move your dinner.
 
-**Calculated, not stored.** Day timelines and totals are worked out from the pieces each time, by one shared set of rules. There is no second copy that can drift out of date.
+**Calculated, not stored.** Day timelines and totals are worked out from the pieces each time, by one shared set of rules. Apart from one summary row per trip, which is rebuilt automatically, there is no second copy that can drift out of date.
 
 **Nothing is truly deleted right away.** Removed items are marked as removed. That powers undo, and it lets a deletion travel to the phone like any other change.
 
@@ -46,7 +46,7 @@ The key idea is one policy, written once, that **denies by default**. If no rule
 
 Two details worth naming:
 
-- A document with no owner and no trip is visible to nobody but its owner. Membership does not unlock it.
+- A document that has not been classified yet is visible only to the person who owns it. Being on the trip does not unlock it.
 - A read-only share link is a separate kind of grant. It does not make someone a member.
 
 ## Part 3: The phone keeps its own copy
@@ -85,7 +85,7 @@ Both passed with plenty of room. The other checks passed too:
 
 - Each person got exactly the rows they should, and nothing extra.
 - When someone was removed from a trip, or demoted from admin, the data they could no longer see disappeared from their copy.
-- Bad sign-in tokens were rejected, and good short-lived ones kept the connection up across renewals.
+- Bad sign-in tokens were rejected. Short-lived tokens were renewed every 30 seconds for a minute and a half; each renewal caused a reconnect of a few hundredths of a second, and no change was missed.
 - An offline edit the person was not allowed to make was refused, and the phone's local copy reverted.
 - Replaying an upload with the same key changed things once, not twice.
 
