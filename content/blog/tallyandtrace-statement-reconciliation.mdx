@@ -146,12 +146,18 @@ The second rehearsal passed. A production dry run then matched the rehearsal lin
 
 The rehearsal caught one smaller thing too. Reconciling before fixing the closing day gave a vague "not a closed statement" refusal when the bank's close was a day **later** than the app's. The code only handled a day earlier. Now a near miss on either side says what to do: change the closing day first.
 
+## Two more pieces
+
+The same epic shipped two related pieces after the card work.
+
+**Bank and e-wallet statements.** These have no cycle to compare against. The statement carries a period, a closing balance and, when the bank prints one, an opening balance. The verify step checks two things: the period's rows add up to the closing balance, and the app's own balance on the last day of the period equals it. A transfer between two of our accounts is matched on each account's statement and is never created twice. Changing a transfer from one side's statement is refused, because it would change the other account too.
+
+**Changing the closing day from the app.** The account form runs the dry run first. If installments or due dates would move, it shows a confirm step that lists them, and it applies only on Confirm. A card with nothing to move saves the way it always did.
+
 ## What is not done
 
 - Unposting a charge that belongs to an installment plan, through a reconcile, is refused for now. Nothing in the app lowers a plan's paid count, and schedules only move forward. That deserves its own follow-up, not a quiet workaround.
 - There is no upload screen yet.
-
-Two related pieces are being built in the same epic and have not shipped: bank and e-wallet statements, which compare opening and closing balance instead of a card cycle, and a closing-day change from inside the app.
 
 ## Lessons
 
