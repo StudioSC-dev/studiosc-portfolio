@@ -27,31 +27,32 @@ The document has a header and a list of lines:
 {
   "header": {
     "close_date": "2026-10-15",
-    "total_due": 5000,
-    "min_due": 500,
-    "previous_balance": 3000,
-    "payments_and_credits": 3000
+    "total_due": "5000.00",
+    "minimum_due": "500.00",
+    "previous_balance": "3000.00",
+    "payments_and_credits": "3000.00"
   },
   "lines": [
     {
-      "line": 1,
-      "date": "2026-09-20",
+      "line_no": 1,
+      "transaction_date": "2026-09-20",
       "description": "Groceries",
-      "amount": 2500,
+      "amount": "2500.00",
       "kind": "charge"
     },
     {
-      "line": 2,
-      "date": "2026-10-02",
+      "line_no": 2,
+      "transaction_date": "2026-10-02",
+      "posting_date": "2026-10-03",
       "description": "Online order",
-      "amount": 2500,
+      "amount": "2500.00",
       "kind": "charge"
     },
     {
-      "line": 3,
-      "date": "2026-10-05",
+      "line_no": 3,
+      "transaction_date": "2026-10-05",
       "description": "Payment, thank you",
-      "amount": 3000,
+      "amount": "3000.00",
       "kind": "payment"
     }
   ]
@@ -75,8 +76,8 @@ One more rule matters. If the app has a row on the statement's cycle that the ba
 The matching itself is a pure function. It takes the statement and the app's rows, touches no database, and returns a list of explicit actions:
 
 - **matched**: the line and the row already agree.
-- **update**: same transaction, but the amount, a date or the posted status differs.
-- **move**: the row belongs on this statement's cycle but sits on another one.
+- **update**: the row is on this statement's cycle, but its amount or a date differs.
+- **move**: the row exists but is off the cycle (not posted yet, or on a neighbouring statement), so it is posted and dated onto this one.
 - **create**: the bank lists it and the app has nothing.
 - **unpost**: the app has it on this cycle and the bank does not.
 - **missing**: a payment line with no payment recorded in the app.
@@ -106,10 +107,10 @@ A dry run report is short and has no amounts in it:
 ```text
 dry run: card statement closing 2026-10-15
   line 1  matched   row 101
-  line 2  update    row 102  reason: posted date differs
+  line 2  update    row 102  reason: posting date differs
   line 3  missing   no payment recorded
   row 107 unpost    reason: not on the statement
-balanced: true
+balanced: yes
 fingerprint: 9f3a...c1
 ```
 
