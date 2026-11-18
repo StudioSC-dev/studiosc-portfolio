@@ -62,7 +62,8 @@ So we wrote a seed script that fills the database with invented prices. It follo
 Two safety rules matter more than the maths:
 
 - **Everything is labelled.** Each made-up row is marked as mock data, so it can never be mistaken for a real observation.
-- **Real data always wins.** The script never changes or deletes a real row. If a real price exists for a day, the invented one steps aside. When enough real history arrives, the mock rows will fade out on their own.
+- **Real data always wins.** The script never changes or deletes a real row. If a real price exists for a day, the invented one steps aside.
+- **It only runs on a development copy.** The script refuses to run anywhere but a development database on the same machine, so invented prices never reach the database that holds the real ones.
 
 With that in place, the screens had a full, realistic year to draw, and the tests could assert exact outcomes, because the numbers never change between runs.
 
