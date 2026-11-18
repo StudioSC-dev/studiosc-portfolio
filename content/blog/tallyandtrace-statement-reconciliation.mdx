@@ -1,0 +1,161 @@
+---
+title: "Checking the Statement Against the App: Reconciliation in Tally & Trace"
+description: "How Tally & Trace reconciles a credit card statement without the server ever seeing the PDF: a small JSON document, a pure diff function, a fingerprinted apply that verifies itself, and the closing-day detour that a rehearsal on real-shaped data found."
+date: "2026-11-18"
+author: "Seth"
+category: "technical"
+projectSlug: "tallyandtrace"
+---
+
+# Checking the Statement Against the App: Reconciliation in Tally & Trace
+
+Every month the bank sends a statement, and every month someone has to check it against the app. Does each charge on the PDF exist in [Tally & Trace](/work/tallyandtrace)? Is the amount the same? Did the bank post it on the day we think it did? Doing that by hand, row by row, is slow, and it is exactly the sort of job where you stop looking after the first twenty lines.
+
+This post is about the feature that does it for us, and about one detour that turned out to be the most useful part.
+
+_All figures, dates and examples below are made up. None of them are real numbers._
+
+## The rule that shaped everything
+
+**The server never sees a PDF.**
+
+Something else reads the statement. Today that is a human-driven session. Later it could be an assistant talking to the app over MCP. Either way, it sends the server a small JSON document, and the server only ever sees that.
+
+The document has a header and a list of lines:
+
+```json
+{
+  "header": {
+    "close_date": "2026-10-15",
+    "total_due": 5000,
+    "min_due": 500,
+    "previous_balance": 3000,
+    "payments_and_credits": 3000
+  },
+  "lines": [
+    {
+      "line": 1,
+      "date": "2026-09-20",
+      "description": "Groceries",
+      "amount": 2500,
+      "kind": "charge"
+    },
+    {
+      "line": 2,
+      "date": "2026-10-02",
+      "description": "Online order",
+      "amount": 2500,
+      "kind": "charge"
+    },
+    {
+      "line": 3,
+      "date": "2026-10-05",
+      "description": "Payment, thank you",
+      "amount": 3000,
+      "kind": "payment"
+    }
+  ]
+}
+```
+
+The header carries the close date, the total due, an optional due date, the minimum due, the previous balance, and the payments and credits. Each line has a number, a transaction date, an optional posting date, a description, a positive amount, and a kind: charge, credit or payment.
+
+That is the whole contract. There is no PDF library on the server, no file storage, and nothing to delete later. The messy part, reading a bank's layout, stays outside, where it can change without a deploy.
+
+## Who wins when they disagree
+
+The statement does. Amount, dates, posted status and whether the row exists all follow the bank, because the bank is the one the card is owed to.
+
+The app keeps what the bank does not know: the description, the category and the tags. Reconciling a row never rewrites those.
+
+One more rule matters. If the app has a row on the statement's cycle that the bank does not list, we do not delete it and we do not move it. We **unpost** it. It stays in the app, marked as not yet posted. Deleting someone's record because a PDF did not mention it is the kind of "fix" you only get to make once.
+
+## A pure function in the middle
+
+The matching itself is a pure function. It takes the statement and the app's rows, touches no database, and returns a list of explicit actions:
+
+- **matched**: the line and the row already agree.
+- **update**: same transaction, but the amount, a date or the posted status differs.
+- **move**: the row belongs on this statement's cycle but sits on another one.
+- **create**: the bank lists it and the app has nothing.
+- **unpost**: the app has it on this cycle and the bank does not.
+- **missing**: a payment line with no payment recorded in the app.
+
+Matching is deterministic. Exact amount and kind come first. Candidates are ranked globally, so one early pairing cannot steal a better match from a later one: rows already on the statement's cycle before rows that are not, then the closest date, then the row id as the final tie-break. A pair whose amounts differ is only accepted when the line and the row are each other's only remaining counterpart, within one day of each other. Anything looser is left alone rather than guessed.
+
+It also returns two things that make the rest safe.
+
+The first is a **fingerprint**: a hash over the statement, the app's view of the cycle, and every row that was read.
+
+The second is a `balanced` flag. It is true only when a simulated apply of the actions reproduces the statement's line balance. A seeded property test checks that over hundreds of generated cases, built on purpose to be awkward: duplicate amounts, rows on the same day, near misses. The simulated result has to equal the statement every time, or the test fails.
+
+## One endpoint, three jobs
+
+A single endpoint does the dry run, the apply and the verification.
+
+A **dry run** returns the actions and the fingerprint and writes nothing. It is the default. You read what it would do before it does anything.
+
+An **apply** has to send the fingerprint back. If anything changed between the dry run and the apply, the fingerprint no longer matches and the apply is refused. You never apply a plan that was made against data that has since moved.
+
+An accepted apply goes through the app's existing write paths, in one transaction. Then it **verifies**: the app's own statement computation, the same code that shows the statement on screen, must now equal the bank's total. If it does not, everything is rolled back and the response says how big the gap is.
+
+That last step is easy to write and easy to fake, so we checked that it does something. We removed it and ran the test that forces a mismatch. The test failed. Put the step back, and it passes. The verify step is load-bearing, not decoration.
+
+A dry run report is short and has no amounts in it:
+
+```text
+dry run: card statement closing 2026-10-15
+  line 1  matched   row 101
+  line 2  update    row 102  reason: posted date differs
+  line 3  missing   no payment recorded
+  row 107 unpost    reason: not on the statement
+balanced: true
+fingerprint: 9f3a...c1
+```
+
+The scripts we run ourselves print ids, dates and reasons, and never an amount. That means their output can be pasted into a ticket without a second thought.
+
+## The detour: the first real statement would not reconcile
+
+The first real statement we tried could not be reconciled at all.
+
+The bank had moved the card's statement day one day later. The app keeps one closing day for a card's whole history, so its cycles no longer lined up with the bank's. The diff was not wrong. The statement just described a cycle the app did not have.
+
+Changing the closing day was refused, for two good reasons. The card had installment plans with payments left, and installments are charged on the close, so moving the close would strand them. And printed due dates were keyed to the old close.
+
+So the epic grew a **closing-day change**. It is one transaction that:
+
+1. sets the new day,
+2. moves each installment plan and its linked charges, and
+3. moves the printed due dates and minimum dues.
+
+It checks itself before and after. The total of the statement lines must be unchanged. Stored statements must still verify. A guard refuses to change past statements unless you explicitly accept that. And like the reconcile, it is a dry run by default.
+
+It passed its tests.
+
+## Where the tests were wrong
+
+Then we rehearsed it on a restored copy of production, and it refused.
+
+The spec had assumed that every installment charge sits on the old closing day. The real charges did not. They were dated the day after it, which is exactly because the bank had already moved the day. Under the old day they belonged to next month's statement. Under the new day they belong to this month's.
+
+So the fix is different from what the spec said. Such a charge keeps its dates. Its installment occurrence moves to the statement it now lands on, and the plan's remaining schedule moves one cycle earlier.
+
+The second rehearsal passed. A production dry run then matched the rehearsal line for line. Finally, an end-to-end rehearsal, closing-day change first and then reconcile, ended with the statement reconciled and its total equal to the bank's.
+
+The rehearsal caught one smaller thing too. Reconciling before fixing the closing day gave a vague "not a closed statement" refusal when the bank's close was a day **later** than the app's. The code only handled a day earlier. Now a near miss on either side says what to do: change the closing day first.
+
+## What is not done
+
+- Unposting a charge that belongs to an installment plan, through a reconcile, is refused for now. Nothing in the app lowers a plan's paid count, and schedules only move forward. That deserves its own follow-up, not a quiet workaround.
+- There is no upload screen yet.
+
+Two related pieces are being built in the same epic and have not shipped: bank and e-wallet statements, which compare opening and closing balance instead of a card cycle, and a closing-day change from inside the app.
+
+## Lessons
+
+**Keeping the PDF out of the server made the feature small.** What is left is a pure function and a guarded apply. Both can be tested without a file, a parser or a database.
+
+**A rehearsal on real-shaped data finds what spec-derived tests cannot.** Our tests passed because they shared the spec's wrong assumption. They were never going to disagree with it. Restored data had no such loyalty.
+
+**Dry run by default, and "refuse and say why", made it safe to find that out.** The change that failed on the rehearsal copy failed by refusing, with a reason, before it wrote anything. Finding a wrong assumption that way costs an afternoon. Finding it on the live card would have cost a lot more.
