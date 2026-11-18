@@ -1,0 +1,81 @@
+---
+title: "Whenture on the Web: Two Screens That Tell You When to Go"
+description: "Whenture's main idea is timing: when is a good time to go somewhere, and what will it cost. This post covers the first two screens, a year view and a month view in the browser, why the web came first, and how made-up prices let us build them before any real history existed."
+date: "2026-11-18"
+author: "Seth"
+category: "technical"
+---
+
+# Whenture on the Web: Two Screens That Tell You When to Go
+
+Whenture is a personal travel app for two people. Most trip planners start after you have decided where and when to go. Whenture starts one step earlier and asks a question those tools skip: is now a good time to go there at all?
+
+An earlier post covered the foundation underneath the app: how trips are stored and how a phone keeps its own copy. This post is about the first things you can actually look at: two screens in the browser, one for the whole year and one for a single month.
+
+Every price in this post is made up. The real prices we collect stay private, and the screens described here were built on invented ones, for a reason covered below.
+
+## The year view: a shortlist, scored month by month
+
+Picture a grid. Down the side is a short list of places we might like to visit. Across the top are the next twelve months. Each square says how good that month looks for that place.
+
+A square has one of three scores: good, okay or avoid. A square with no score yet is drawn muted, with a dashed outline, so a gap looks like a gap and not like a bad month. Some squares carry a small marker meaning "early estimate": the number rests on only a little history, so treat it gently.
+
+The point is that you open the page with nothing planned and still learn something. You might see that Seoul is green in March and red in August, while another city is the other way around. Clicking a square takes you into that month.
+
+## The month view: a price calendar
+
+The month view is a calendar for one place and one month. Each day shows the cheapest flight price we have seen for leaving on that day, for the stay length we track.
+
+Reading dozens of numbers is tiring, so every priced day is also sorted into one of three groups: cheaper, typical or pricier. The rule is simple and fixed. Take the cheapest and the dearest day of the month. Split the gap between them into thirds. A day in the bottom third is cheaper, the middle third is typical, and the top third is pricier. If every day costs the same, they are all typical.
+
+Two details we care about:
+
+- **Money is exact.** Prices are whole numbers of the smallest unit, such as centavos, and the comparisons use exact integer maths. No rounding drift.
+- **A mixed-up currency is not guessed at.** The groups only appear when every day in the month uses the same currency. Otherwise the calendar shows plain prices and no colours.
+
+You can then pick a departure date and a return date, and the page shows a trip total for two people. For example, with an invented flight price of 10,000 per person, the total shown would be 20,000. This is where the page is most honest about its limits. Our data stores prices for a departure date and a stay length. If you pick a return date that does not match a stay length we have priced, the page does not work one out. It simply says it cannot show a total for that range, instead of showing a number it cannot back up.
+
+The page is also built to be used without a mouse. You can move between days with the keyboard, Escape cancels a half-picked departure, and focus stays where you expect when you flip to the previous or next month.
+
+## Why the web came first
+
+We plan to build an iPhone app, and that is where Whenture will mostly live. So why start in a browser?
+
+1. **Speed of trying things.** A web page reloads in a blink. Changing how a grid looks and seeing it right away is far cheaper than rebuilding a phone app each time.
+2. **The idea is mostly a question about data.** Whether the year view is useful depends on the scores and prices behind it, not on phone features. A browser is the quickest way to find out if the idea works.
+3. **Automated checks are easier.** A browser can be driven by a test script, which clicks through the screens the way a person would. We run those tests on every change.
+4. **It forces the interface to be clean.** The screens talk to the server through one documented interface (an API), the same one the iPhone app will use later. Building the web app first meant that interface had to be good before a second client depended on it.
+
+That last point has a safety net worth naming. The server's interface is described in a single published file. On every proposed change, a script compares the new version of that file against the one on the main line and fails if the change would break an existing client, for example by removing a field that something still reads. It runs automatically alongside our other checks. That way the web app and the future iPhone app stay in step, and a change that would strand one of them is caught before it lands.
+
+## How made-up data let us build the screens first
+
+Here is the awkward part of building a timing app. Timing needs history. To say "March is cheap for Seoul" you need many weeks of real prices, and our collection only started recently. If we had waited for enough history, we would have built nothing for months.
+
+So we wrote a seed script that fills the database with invented prices. It follows a few simple rules, chosen to look like the real shape of airfares:
+
+- Each place gets its own base price.
+- Prices swing with the seasons: dearest around mid-December, cheapest around mid-June, within about twenty percent either way.
+- Friday, Saturday and Sunday departures cost a little more.
+- A small amount of noise is added, but it comes from a fixed formula based on the place and the date, so the same day always gets the same price. Running the script twice gives identical results.
+
+Two safety rules matter more than the maths:
+
+- **Everything is labelled.** Each made-up row is marked as mock data, so it can never be mistaken for a real observation.
+- **Real data always wins.** The script never changes or deletes a real row. If a real price exists for a day, the invented one steps aside. When enough real history arrives, the mock rows will fade out on their own.
+
+With that in place, the screens had a full, realistic year to draw, and the tests could assert exact outcomes, because the numbers never change between runs.
+
+## What is not finished
+
+- **The screens run on made-up data.** That will stay true until we have enough real history. Today, a green square is a demonstration of how the screen behaves, not advice about a trip.
+- **Colour is the only cue for price groups.** In the month view, cheaper, typical and pricier are told apart by colour alone. That is a real accessibility gap, since some people cannot tell the colours apart. It is on the list as a follow-up: add a word or a shape next to each price.
+- **The year grid needs work on a phone.** The destination column should stay visible when the grid scrolls sideways. Also on the list.
+- **The interface has gaps.** Some things are fixed for now: two travelers, one departure city, one cabin class. Hotel prices are not in yet, and the month view does not yet explain why a month scored the way it did.
+- **Nothing is hosted.** All of this runs on our own machines. No public version exists.
+
+## What this gives us
+
+We now have two working screens that answer "when should we go?" in a way you can read at a glance. They sit on a documented interface, they have automated tests that drive them like a person would, and they were built without waiting for history, because the invented data was clearly marked and always yields to the real thing.
+
+Next up: closing the colour gap, then connecting the real price history as it grows, and then the iPhone app that uses the same interface.
