@@ -46,7 +46,7 @@ The audit also checked the good news. Contrast was fine. Nothing was inaccessibl
 
 Instead of fixing things one at a time, we drew up two complete directions and rendered both against the same made-up data. Each had a palette, a typeface, spacing, corner radius, shadows, icons and motion rules. A few rules were shared: colours come only from a short list of named values, selection never looks like an action, and lists are one surface with ruled rows.
 
-Each direction was also put through its own critique. The first draft of both looked like a generic software kit, so both were revised until they had one memorable idea.
+Each direction was also put through its own critique. The first folder draft, with cool greys, a blue button and soft white cards, read as the generic software kit that any finance app gets from the same request. It was revised around the folder tab. The first ledger draft read as a newspaper default: thin lines everywhere, square corners and dense columns. It was revised by keeping lines only on rows, adding small rounded corners, and spending all the boldness in one place, the green band.
 
 **Manila folder.** Filipino households keep bills and receipts in manila folders, so the memorable part was a folder tab that marks the selected item. Actions turned ink-dark. It was warm, friendly and a little paper-craft.
 
@@ -76,7 +76,7 @@ We tested candidate faces in a real browser for two things. First, does the face
 
 Money out is now plain dark ink. Money in is green, with a plus sign. Red appears for three things only: an overdue bill, a negative balance and a failed action.
 
-The effect is easiest to see in a made-up list. Say a made-up household has a ₱1,200 grocery run, a ₱450 coffee order and one ₱3,000 bill that is a week late (all three figures are invented). Before, all three were red. Now the two normal expenses are dark and only the late bill is red, so it is the first thing you see. The budget bars follow the same rule: they turn red only when an envelope goes over its limit.
+The effect is easiest to see in a made-up list. Say a made-up household has a ₱1,200 grocery run, a ₱450 coffee order and one ₱3,000 bill that is a week late (all three figures are invented). Before, all three were red. Now the two normal expenses are dark and only the late bill is red, so it is the first thing you see. The budget bars follow the same rule: they turn amber when an envelope is nearly full and red only once it goes over its limit.
 
 ### Selection cannot be mistaken for a button
 
@@ -86,11 +86,11 @@ A selected tab or toggle used to share the main button's dark fill. Now a select
 
 Lists are now one light sheet with thin lines between rows, not a stack of boxes. Rows keep an even height: 56 pixels on a desktop and 64 on a phone. The dashboard lost its boxes inside boxes too, and the quick balances became plain figures on their panel, separated by a line.
 
-Alongside this, each fact now appears once per row. The repeated tags are gone, the "by" line only shows when the person who made a record is not the person looking at it, and everything that is not a tag is plain text instead of a pill.
+Alongside this, each fact now appears once per row. The repeated tags are gone, the "by" line only shows when the person who made a record is not the person looking at it, or when the account is shared, and everything that is not a tag is plain text instead of a pill.
 
 ### One icon set
 
-Every icon in the app is now from one family, Phosphor Regular, at one size. Before, the app mixed emoji for account types, text characters such as a warning sign and a tick used as icons, and two different sets of hand-copied drawings. Screen readers also announced the emoji out loud, which was noise.
+Every icon in the app is now from one family, Phosphor Regular, at one size. Before, the app mixed emoji for account types, text characters such as a warning sign and a tick used as icons, and inline drawings from two sources. Screen readers also announced the emoji out loud, which was noise.
 
 ## How each change was proved
 
@@ -108,7 +108,7 @@ A few examples of what a check can assert:
 - No interactive element sits inside another interactive element.
 - Every glyph on screen, peso sign included, is drawn by the one typeface.
 
-Passing the suite was not the last step. A separate, read-only reviewer then looked at the results and the screenshots against the written criteria for each change. It cannot edit anything. It reports pass, flagged for a human look, or fail. Its citations were checked before anything counted as done. The person who wrote a change was never the one who signed it off.
+Passing the suite was not the last step. A separate, read-only reviewer then looked at the results and the screenshots against the written criteria for each change. It cannot edit anything. It reports pass, flagged for a human look, or fail. Every test line it cited was checked before anything counted as done. The writer of a change did not sign it off.
 
 ## What is left
 
