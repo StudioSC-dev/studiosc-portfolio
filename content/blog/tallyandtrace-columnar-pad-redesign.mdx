@@ -1,0 +1,117 @@
+---
+title: "Redesigning Tally & Trace So It Stops Looking Generated"
+description: "An audit of why a working, accessible money app still looked like every other app made with an AI helper, the two directions we drew up, why we picked the green ledger pad, and how every change was measured in a browser instead of judged by eye."
+date: "2026-11-19"
+author: "Seth"
+category: "technical"
+projectSlug: "tallyandtrace"
+---
+
+[Tally & Trace](/work/tallyandtrace) worked. It was fast, it was accessible, and the numbers were right. It still looked like it had been made by a machine.
+
+Nobody could point at one broken thing. The problem was a pile of small, safe choices that every generated app makes. This post is about how we found them, how we picked a different look, and how we proved each fix without trusting our own eyes.
+
+Every peso figure in the examples below is made up. No real household data appears in this post.
+
+## What looks generated
+
+"Looks generated" is vague, so we wrote down what it meant. When an AI helper designs an interface and nobody steers it, it reaches for the same handful of moves. Tally & Trace had most of them:
+
+- A grainy paper texture behind every number. It was meant to feel warm. It made digits harder to read.
+- Three typefaces in one app: a default sans-serif for text, a serif for the logo and big figures, and a monospace for small labels.
+- Tiny labels in capital letters with wide gaps between the letters, such as "MONTH TO DATE". A count of 18 on one of those badges read like "1 8".
+- A box around every row. A list of forty transactions was forty boxes, so nothing in the list looked more important than anything else.
+- A dark button colour used for the main action, and the same dark fill used for "this tab is selected". You could not tell "this is chosen" from "press this".
+- Red on every expense. When all spending is red, red stops meaning "there is a problem".
+- Arrows on links, dots between bits of small print, and emoji standing in for icons.
+
+None of this is wrong on its own. Together it is the look of an app that nobody made decisions about.
+
+## How the audit measured it
+
+We did not want a taste argument, so the audit was a written document with measurements. A browser test suite loaded the app with a made-up household and recorded what it saw.
+
+The numbers were blunt:
+
+- On a phone-sized screen, eleven controls in the first screenful were shorter than 44 pixels. That is the usual minimum for a thumb. "Mark paid" and "Change date" were 26 pixels tall.
+- The transactions list started below the fold on a phone. You scrolled past two control panels before you saw a single transaction.
+- The month's income, spending and available cash sat far down the dashboard. The first screen showed account tiles and a chart instead.
+- Rows carried four to seven small grey tags. The same fact often appeared twice on one row, and "by a second person" was printed on every row of a one-person ledger.
+- The recurring-entry rows were buttons that contained other buttons. A person using a keyboard or a screen reader gets a confusing result from that, and a click on the inner button could also open the row.
+- The budget bars were solid red at fifty or seventy percent spent, even for a calm household.
+
+The audit also checked the good news. Contrast was fine. Nothing was inaccessible. The work was about hierarchy and honesty, not rescue.
+
+## Two directions
+
+Instead of fixing things one at a time, we drew up two complete directions and rendered both against the same made-up data. Each had a palette, a typeface, spacing, corner radius, shadows, icons and motion rules. A few rules were shared: colours come only from a short list of named values, selection never looks like an action, and lists are one surface with ruled rows.
+
+Each direction was also put through its own critique. The first folder draft, with cool greys, a blue button and soft white cards, read as the generic software kit that any finance app gets from the same request. It was revised around the folder tab. The first ledger draft read as a newspaper default: thin lines everywhere, square corners and dense columns. It was revised by keeping lines only on rows, adding small rounded corners, and spending all the boldness in one place, the green band.
+
+**Manila folder.** Filipino households keep bills and receipts in manila folders, so the memorable part was a folder tab that marks the selected item. Actions turned ink-dark. It was warm, friendly and a little paper-craft.
+
+**Columnar pad.** An accountant's green ledger pad. Flat, ruled, and calm. The memorable part is a bottle-green band across the top of the app, like the cloth spine of a ledger book, plus a red pencil that only comes out when something is in the red.
+
+## Why the ledger pad
+
+We picked the ledger pad. The reasons were practical.
+
+The app's whole job is to answer three questions at a glance: how much can we spend, what is due, and where did it go. Rows and columns of figures are the point. A ledger look makes the numbers the hero, and it keeps colour for meaning.
+
+The folder tab was charming, but it spent its boldness on decoration. The green band spends boldness in exactly one place, the top of the screen, and leaves the rest quiet. That gave us a rule we could enforce: everything below the band is flat tone and thin lines.
+
+The ledger pad also had a clear answer to the "red on everything" problem. Red is reserved. It means overdue, below zero or failed, and nothing else.
+
+## Five decisions
+
+The redesign touched about twenty areas of the app. Five decisions did most of the work.
+
+### One typeface, with a peso sign and aligned digits
+
+The app now speaks in one voice: IBM Plex Sans, served from the app's own site rather than from a font company's server. That also means one less outside request.
+
+We tested candidate faces in a real browser for two things. First, does the face have its own peso sign, or does the browser quietly borrow one from another font? Two of the five we tried had no peso sign. Second, are the digits "tabular", meaning every digit is the same width? That is what makes a column of amounts line up on the right. Another candidate failed that test. Plex passed both.
+
+### Red only means "in the red"
+
+Money out is now plain dark ink. Money in is green, with a plus sign. Red appears for three things only: an overdue bill, a negative balance and a failed action.
+
+The effect is easiest to see in a made-up list. Say a made-up household has a ₱1,200 grocery run, a ₱450 coffee order and one ₱3,000 bill that is a week late (all three figures are invented). Before, all three were red. Now the two normal expenses are dark and only the late bill is red, so it is the first thing you see. The budget bars follow the same rule: they turn amber when an envelope is nearly full and red only once it goes over its limit.
+
+### Selection cannot be mistaken for a button
+
+A selected tab or toggle used to share the main button's dark fill. Now a selected item gets a light background, bolder text and a thin green line under it. It never gets a fill. The only filled shape on a screen is the thing you can press.
+
+### One list surface with ruled rows
+
+Lists are now one light sheet with thin lines between rows, not a stack of boxes. Rows keep an even height: 56 pixels on a desktop and 64 on a phone. The dashboard lost its boxes inside boxes too, and the quick balances became plain figures on their panel, separated by a line.
+
+Alongside this, each fact now appears once per row. The repeated tags are gone, the "by" line only shows when the person who made a record is not the person looking at it, or when the account is shared, and everything that is not a tag is plain text instead of a pill.
+
+### One icon set
+
+Every icon in the app is now from one family, Phosphor Regular, at one size. Before, the app mixed emoji for account types, text characters such as a warning sign and a tick used as icons, and inline drawings from two sources. Screen readers also announced the emoji out loud, which was noise.
+
+## How each change was proved
+
+We did not review this by squinting at screenshots. Each change shipped with checks in a browser test suite, built on Playwright, an open-source tool that drives a real browser.
+
+The checks load the app against mocked, made-up data and then measure things. They read the real size of a button, the real colour of an amount, and the real position of a row. They do this at two sizes, a desktop window and a phone window.
+
+A few examples of what a check can assert:
+
+- Every control a thumb would use is at least 44 pixels tall and wide on the phone size.
+- An expense amount is ink-coloured, and only an overdue item is red.
+- A selected tab does not have the same fill colour as the main button.
+- The first transaction row is above the fold.
+- The four Allocations tabs sit on one row on a narrow phone, with no sideways scrolling.
+- No interactive element sits inside another interactive element.
+- Every glyph on screen, peso sign included, is drawn by the one typeface.
+
+Passing the suite was not the last step. A separate, read-only reviewer then looked at the results and the screenshots against the written criteria for each change. It cannot edit anything. It reports pass, flagged for a human look, or fail. Every test line it cited was checked before anything counted as done. The writer of a change did not sign it off.
+
+## What is left
+
+The web app is finished. The phone app, built with Expo, still has the old look, and the same ideas need to move across: one typeface, reserved red, ruled rows and one icon set. That is a follow-up.
+
+The design rules now live in one written document that the checks are tied to, so the next screen starts from the same decisions instead of from a blank page. The other thing we took from this: the fix for "looks generated" is not more decoration. It is deciding what each colour, size and line is for, then measuring that the app agrees.
