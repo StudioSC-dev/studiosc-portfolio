@@ -114,6 +114,20 @@ function chromiumOnly() {
 /** A hit as text that names the file, line and rule, never the match. */
 const describeHit = (h: DenyHit) => `${h.file}:${h.line} ${h.rule}`;
 
+/**
+ * next.config.ts source without its allowedDevOrigins property: the property
+ * line, its indented continuation lines and the comment lines right above.
+ */
+function withoutDevOrigins(source: string): string {
+  const lines = source.split("\n");
+  let start = lines.findIndex((l) => /^ {2}allowedDevOrigins:/.test(l));
+  expect(start, "allowedDevOrigins not found").toBeGreaterThan(-1);
+  let end = start + 1;
+  while (end < lines.length && !/^ {0,2}\S/.test(lines[end])) end++;
+  while (start > 0 && /^ {2}\/\//.test(lines[start - 1])) start--;
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+
 /** The steps of one job in a GitHub Actions workflow, as raw text blocks. */
 function workflowSteps(workflow: string, job: string): string[] {
   const lines = workflow.split("\n");
@@ -251,6 +265,30 @@ test.describe("guards", () => {
       expect(icoFrameHashes(before)).toEqual(expected);
     }
 
+    // The next.config.ts comparison drops only allowedDevOrigins: another
+    // property added next to it still shows up.
+    const before = [
+      "const nextConfig = {",
+      '  allowedDevOrigins: ["198.51.100.7"],',
+      '  pageExtensions: ["ts"],',
+      "};",
+    ].join("\n");
+    const after = [
+      "const nextConfig = {",
+      "  // From DEV_ORIGINS.",
+      '  allowedDevOrigins: (process.env.DEV_ORIGINS ?? "")',
+      '    .split(",")',
+      "    .filter(Boolean),",
+      '  pageExtensions: ["ts"],',
+      "};",
+    ].join("\n");
+    const sneaked = after.replace(
+      "  pageExtensions",
+      '  output: "export",\n  pageExtensions'
+    );
+    expect(withoutDevOrigins(after)).toBe(withoutDevOrigins(before));
+    expect(withoutDevOrigins(sneaked)).not.toBe(withoutDevOrigins(before));
+
     // allowedDevOrigins comes from DEV_ORIGINS and is empty without it.
     const unset = loadConfig("next.config.ts", { DEV_ORIGINS: undefined });
     expect(unset.allowedDevOrigins).toEqual([]);
@@ -287,15 +325,6 @@ test.describe("guards", () => {
     }
 
     // In next.config.ts only the allowedDevOrigins property changes.
-    const withoutDevOrigins = (source: string) => {
-      const lines = source.split("\n");
-      let start = lines.findIndex((l) => /^ {2}allowedDevOrigins:/.test(l));
-      const end = lines.findIndex((l) => /^ {2}pageExtensions:/.test(l));
-      expect(start).toBeGreaterThan(-1);
-      expect(end).toBeGreaterThan(start);
-      while (start > 0 && /^ {2}\/\//.test(lines[start - 1])) start--;
-      return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
-    };
     expect(withoutDevOrigins(git(["show", `${head}:next.config.ts`]))).toBe(
       withoutDevOrigins(git(["show", `${base}:next.config.ts`]))
     );
