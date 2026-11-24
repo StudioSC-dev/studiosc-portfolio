@@ -980,6 +980,49 @@ test.describe("Range design system", () => {
     }
   });
 
+  test("LCP within budget at the measured sha", async () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    const perf = perfRecord();
+    expect(perf.measured_sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(perf.route).toBe("/");
+    expect(perf.lighthouse_version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(perf.runs).toHaveLength(3);
+    for (const run of perf.runs) {
+      for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
+        expect(typeof run[key], `run ${key}`).toBe("number");
+      }
+    }
+    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
+    for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
+      expect(perf.median[key], `median ${key}`).toBeCloseTo(
+        median(perf.runs.map((r) => r[key])),
+        6
+      );
+    }
+    expect(perf.median.lcp_ms, "median LCP on /").toBeLessThanOrEqual(3800);
+
+    const head = process.env.PR_HEAD_SHA;
+    if (head) {
+      // The PR binds the record: measured at an ancestor, with no code change since.
+      execFileSync(
+        "git",
+        ["merge-base", "--is-ancestor", perf.measured_sha, head],
+        { cwd: ROOT }
+      );
+      const changed = git("diff", "--name-only", perf.measured_sha, head)
+        .split("\n")
+        .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+      expect(changed, `code changed since ${perf.measured_sha}`).toEqual([]);
+    } else {
+      testInfo.annotations.push({
+        type: "not bound",
+        description:
+          "PR_HEAD_SHA is unset (not a pull_request run), so only the thresholds are asserted.",
+      });
+    }
+  });
+
   test("board motion rules are present", async () => {
     const testInfo = test.info();
     chromiumOnly(testInfo);
