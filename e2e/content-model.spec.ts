@@ -242,7 +242,13 @@ async function snapshotMain(page: Page, url: string) {
             .filter((child) => !skip.has(child.tagName))
             .map(walk)
             .join(",")}]`;
+        // Project cards in order: title and case destination together.
+        const cards = [...root.querySelectorAll('a[aria-label^="View "]')].map(
+          (link) =>
+            `${link.getAttribute("aria-label")} -> ${link.getAttribute("href")}`
+        );
         return {
+          cards,
           text: (root as HTMLElement).innerText.replace(/[ \t]+/g, " "),
           skeleton: walk(root),
         };
@@ -918,6 +924,10 @@ RANGE_CATEGORIES.push({
         .join("\n");
       expect(after.text, `${route} text`).toBe(renamed);
       expect(after.skeleton, `${route} structure`).toBe(before.skeleton);
+      expect(after.cards, `${route} card destinations`).toEqual(before.cards);
+      if (route === "/" || route === "/work") {
+        expect(after.cards.length, `${route} has cards`).toBeGreaterThan(0);
+      }
       expect(
         after.text
           .split("\n")
