@@ -2,12 +2,13 @@
  * Pre-push privacy scan. Before a push, it scans every commit the push makes
  * newly reachable on the destination. For each commit it takes the files that
  * commit adds or changes against its first parent (a root commit against the
- * empty tree) and scans their full content as that commit leaves it, so a
- * value added and removed within one push is still caught, and so is one that
- * line wrapping or two commits split across lines. Text is checked against
- * the generic denylist (e2e/support/denylist.ts) and the owner's private
- * list, read from the file PREFLIGHT_PRIVATE_LIST names; binary content
- * against the private list.
+ * empty tree), reads both versions and judges only the text the commit adds:
+ * added lines against the generic denylist (e2e/support/denylist.ts), and
+ * runs of added lines, line wrapping folded, against the owner's private
+ * list, read from the file PREFLIGHT_PRIVATE_LIST names. A value added and
+ * removed within one push is still caught. Editing a file that already holds
+ * a private value is never refused for that value; only a new occurrence is.
+ * A value split across two commits is not caught (a known gap).
  *
  *   .husky/pre-push runs: tsx scripts/privacy-scan.ts --pre-push <remote> <url>
  *   with git's "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
@@ -20,12 +21,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import {
-  DENYLIST,
-  isBinary,
-  scanLine,
-  scanText,
-} from "../e2e/support/denylist";
+import { DENYLIST, isBinary, scanLine } from "../e2e/support/denylist";
 
 export class Refusal extends Error {}
 
@@ -187,33 +183,151 @@ export function findPrivate(
   return hits;
 }
 
+/** Non-overlapping occurrences of a private entry in a text, after folding. */
+function countPrivate(text: string, entry: PrivateEntry): number {
+  const haystack = fold(text).folded;
+  const needle = fold(entry.value).folded;
+  if (!needle) return 0;
+  let count = 0;
+  for (
+    let at = haystack.indexOf(needle);
+    at !== -1;
+    at = haystack.indexOf(needle, at + needle.length)
+  ) {
+    count++;
+  }
+  return count;
+}
+
+const DIFF_CELL_LIMIT = 4_000_000;
+
 /**
- * Hits in one file's content as a commit leaves it. Text is scanned whole:
- * every line against the denylist and the full text against the private list,
- * so a value split across lines or between commits is still found. Binary
- * content is checked against the private list only.
+ * The 1-based numbers of the lines `after` adds to `before`: a line diff
+ * (longest common subsequence) after trimming the common start and end. When
+ * the changed middle is too large for that, a line counts as added unless an
+ * identical line in the old middle is still unmatched.
  */
-export function scanContent(
+export function addedLineNumbers(before: string[], after: string[]): number[] {
+  let start = 0;
+  while (
+    start < before.length &&
+    start < after.length &&
+    before[start] === after[start]
+  ) {
+    start++;
+  }
+  let endBefore = before.length;
+  let endAfter = after.length;
+  while (
+    endBefore > start &&
+    endAfter > start &&
+    before[endBefore - 1] === after[endAfter - 1]
+  ) {
+    endBefore--;
+    endAfter--;
+  }
+  const a = before.slice(start, endBefore);
+  const b = after.slice(start, endAfter);
+  const added: number[] = [];
+  if (a.length * b.length > DIFF_CELL_LIMIT) {
+    const unmatched = new Map<string, number>();
+    for (const line of a) unmatched.set(line, (unmatched.get(line) ?? 0) + 1);
+    b.forEach((line, j) => {
+      const left = unmatched.get(line) ?? 0;
+      if (left > 0) unmatched.set(line, left - 1);
+      else added.push(start + j + 1);
+    });
+    return added;
+  }
+  // lcs[i][j]: the LCS length of a[i..] and b[j..], row-major.
+  const width = b.length + 1;
+  const lcs = new Uint32Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i * width + j] =
+        a[i] === b[j]
+          ? lcs[(i + 1) * width + j + 1] + 1
+          : Math.max(lcs[(i + 1) * width + j], lcs[i * width + j + 1]);
+    }
+  }
+  let i = 0;
+  let j = 0;
+  while (j < b.length) {
+    if (i < a.length && a[i] === b[j]) {
+      i++;
+      j++;
+    } else if (
+      i < a.length &&
+      lcs[(i + 1) * width + j] >= lcs[i * width + j + 1]
+    ) {
+      i++;
+    } else {
+      added.push(start + j + 1);
+      j++;
+    }
+  }
+  return added;
+}
+
+const splitLines = (text: string) => text.split(/\r?\n/);
+
+/**
+ * Hits in the text one commit adds to one file, given the file before (null
+ * when the commit creates it) and after. Only added lines are judged: each
+ * against the denylist, and each run of consecutive added lines against the
+ * private list with line wrapping folded, so a value wrapped across added
+ * lines is caught. A private value only counts when the file holds more of it
+ * than before, so editing near, or on, a value the destination already has is
+ * never refused. Binary content, new or changed, is checked whole against the
+ * private list on the same terms.
+ */
+export function scanAdded(
   file: string,
-  content: Buffer,
+  before: Buffer | null,
+  after: Buffer,
   privateList: PrivateEntry[]
 ): ScanHit[] {
-  const text = content.toString("utf8");
-  if (isBinary(content)) {
-    const lower = content.toString("latin1").toLowerCase();
+  const oldText = before ? before.toString("utf8") : "";
+  const oldLatin = before ? before.toString("latin1") : "";
+  const grew = (entry: PrivateEntry, text: string, latin: string) =>
+    Math.max(countPrivate(text, entry), countPrivate(latin, entry)) >
+    Math.max(countPrivate(oldText, entry), countPrivate(oldLatin, entry));
+
+  if (isBinary(after)) {
+    const text = after.toString("utf8");
+    const latin = after.toString("latin1");
     return privateList
-      .filter(
-        (e) =>
-          lower.includes(e.value.toLowerCase()) ||
-          text.toLowerCase().includes(e.value.toLowerCase())
-      )
-      .map((e) => ({
+      .filter((entry) => grew(entry, text, latin))
+      .map((entry) => ({
         file,
         line: 0,
-        rule: `private list entry on line ${e.line} (binary file)`,
+        rule: `private list entry on line ${entry.line} (binary file)`,
       }));
   }
-  return [...scanText(file, text), ...findPrivate(file, text, privateList)];
+
+  const text = after.toString("utf8");
+  const lines = splitLines(text);
+  const added = addedLineNumbers(
+    before && !isBinary(before) ? splitLines(oldText) : [],
+    lines
+  );
+  const hits: ScanHit[] = [];
+  for (const n of added) hits.push(...scanLine(file, lines[n - 1], n));
+
+  const runs: number[][] = [];
+  for (const n of added) {
+    const run = runs[runs.length - 1];
+    if (run && run[run.length - 1] === n - 1) run.push(n);
+    else runs.push([n]);
+  }
+  const newPrivate = privateList.filter((entry) => grew(entry, text, ""));
+  for (const run of runs) {
+    const runText = run.map((n) => lines[n - 1]).join("\n");
+    for (const hit of findPrivate(file, runText, newPrivate)) {
+      hits.push({ ...hit, line: hit.line + run[0] - 1 });
+    }
+  }
+  return hits;
 }
 
 /** Hits in a file's path itself: a name can publish a value too. */
@@ -248,7 +362,11 @@ export function redactPath(file: string, privateList: PrivateEntry[]): string {
 
 export interface ChangedFile {
   path: string;
+  /** The blob before the commit; null when the commit creates the file. */
+  oldBlob: string | null;
   blob: string;
+  /** Whether the commit adds this path. */
+  created: boolean;
 }
 
 /**
@@ -285,9 +403,15 @@ export function changedFiles(commit: string, emptyTree: string): ChangedFile[] {
       fields[i]
     );
     if (!m) throw new Refusal(`cannot read the diff of ${short}`);
-    const [, , newMode, , newBlob, status] = m;
+    const [, oldMode, newMode, oldBlob, newBlob, status] = m;
     if (status === "D" || newMode === "160000") continue;
-    files.push({ path: fields[i + 1], blob: newBlob });
+    const hadBlob = !/^0+$/.test(oldBlob) && oldMode !== "160000";
+    files.push({
+      path: fields[i + 1],
+      oldBlob: hadBlob ? oldBlob : null,
+      blob: newBlob,
+      created: status === "A",
+    });
   }
   return files;
 }
@@ -411,13 +535,19 @@ export function scanPush(
   const hits: PrivacyHit[] = [];
   for (const commit of commits) {
     const files = changedFiles(commit, emptyTree);
-    const blobs = readBlobs(files.map((f) => f.blob));
+    const blobs = readBlobs(
+      files.flatMap((f) => (f.oldBlob ? [f.oldBlob, f.blob] : [f.blob]))
+    );
     for (const file of files) {
-      for (const hit of scanName(file.path, privateList)) {
-        hits.push({ commit, ...hit });
+      // A name is judged when a commit creates it.
+      if (file.created) {
+        for (const hit of scanName(file.path, privateList)) {
+          hits.push({ commit, ...hit });
+        }
       }
-      for (const hit of scanContent(
+      for (const hit of scanAdded(
         file.path,
+        file.oldBlob ? blobs.get(file.oldBlob)! : null,
         blobs.get(file.blob)!,
         privateList
       )) {

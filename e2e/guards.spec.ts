@@ -42,6 +42,7 @@ import {
   xmpSegment,
 } from "./support/dirty-images";
 import { checkIco, isImageCandidate } from "../scripts/image-metadata";
+import { addedLineNumbers } from "../scripts/privacy-scan";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, nextHop, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
@@ -1140,24 +1141,15 @@ test.describe("guards", () => {
       refusedFor(addRemove, `${added.slice(0, 12)} content/post.mdx:1`);
       expect(addRemove.output).not.toContain(removed.slice(0, 12));
 
-      // A value split by line wrapping, within one commit or across two,
-      // and a wrapped value added then removed within one push.
+      // A value split by line wrapping across a commit's added lines, and a
+      // wrapped value added then removed within one push. (A value split
+      // across two commits is a known gap: only added text is judged.)
       const [head1, tail1] = literals[1].split(" ");
       repo.git(["checkout", "-q", "-b", "wrapped", "main"]);
       commit("content/wrapped.mdx", `We met the ${head1}\n  ${tail1} team.\n`);
       refusedFor(
         push("origin", "wrapped"),
         "content/wrapped.mdx:1 private list entry on line 3"
-      );
-      repo.git(["checkout", "-q", "-b", "split-commits", "main"]);
-      commit("content/split.mdx", `Thanks to ${head1}\n`);
-      const completes = commit(
-        "content/split.mdx",
-        `Thanks to ${head1}\n${tail1} for the data.\n`
-      );
-      refusedFor(
-        push("origin", "split-commits"),
-        `${completes.slice(0, 12)} content/split.mdx:1 private list entry`
       );
       repo.git(["checkout", "-q", "-b", "wrap-remove", "main"]);
       const wrappedIn = commit("content/gone.mdx", `${head1}\n${tail1}\n`);
@@ -1304,6 +1296,44 @@ test.describe("guards", () => {
       const reached = push("origin", "topic");
       expect(reached.status, reached.output).toBe(0);
       expect(reached.output).toContain("scanned 1 commit(s)");
+
+      // Only added text counts. Editing a file the destination already holds
+      // a private value in passes, even on the value's own line; adding a
+      // value to it, or another copy of the same one, is refused.
+      repo.git(["checkout", "-q", "-b", "tainted", published]);
+      commit("content/archive.mdx", `${literals[0]}\nA clean new line.\n`);
+      commit(
+        "content/archive.mdx",
+        `${literals[0]} (edited)\nA clean new line.\n`
+      );
+      const tainted = push("origin", "tainted");
+      expect(tainted.status, tainted.output).toBe(0);
+      expect(tainted.output).toContain("scanned 2 commit(s)");
+      for (const [branch, extra, needle] of [
+        [
+          "tainted-new",
+          `Met ${literals[1]}.`,
+          "content/archive.mdx:3 private list entry on line 3",
+        ],
+        [
+          "tainted-copy",
+          `Again ${literals[0]}.`,
+          "content/archive.mdx:3 private list entry on line 2",
+        ],
+      ]) {
+        repo.git(["checkout", "-q", "-b", branch, "tainted"]);
+        commit(
+          "content/archive.mdx",
+          `${literals[0]} (edited)\nA clean new line.\n${extra}\n`
+        );
+        refusedFor(push("origin", branch), needle);
+      }
+
+      // The line diff marks inserted lines only.
+      expect(
+        addedLineNumbers(["a", "b", "c"], ["a", "x", "b", "c", "y"])
+      ).toEqual([2, 5]);
+      expect(addedLineNumbers(["a", "b"], ["b", "a"])).toEqual([2]);
 
       // One remote, separate fetch and push URLs: a commit the fetch side
       // already has is still new to the push side.
