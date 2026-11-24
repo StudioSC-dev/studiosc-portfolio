@@ -166,7 +166,9 @@ export function isAllowedPrv3Path(path: string): boolean {
 test.describe("content model", () => {
   // Node-only checks need one run, not one per browser project.
   test.beforeEach(async ({}, testInfo) => {
-    const nodeOnly = !testInfo.title.includes("status words from the set");
+    const nodeOnly = !/status words from the set|portfolio repo link/.test(
+      testInfo.title
+    );
     test.skip(
       nodeOnly && testInfo.project.name !== "chromium",
       "node-only check runs once"
@@ -397,7 +399,7 @@ test.describe("content model", () => {
     }
   });
 
-  test("portfolio repo link", async () => {
+  test("portfolio repo link", async ({ page }) => {
     const portfolio = await getProject("portfolio-site");
     expect(portfolio?.githubUrl).toBe(
       "https://github.com/StudioSC-dev/studiosc-portfolio"
@@ -409,9 +411,29 @@ test.describe("content model", () => {
         file
       ).not.toMatch(oldLink);
     }
-    // A fixture still carrying the old link is caught by the same pattern.
-    expect(projectFile({ githubUrl: "https://github.com/studiosc" })).toMatch(
-      oldLink
+
+    // A fixture still carrying the old link is rejected by the loader, by name.
+    const dir = tempDir("old-link");
+    try {
+      writeFileSync(
+        join(dir, "old-link.mdx"),
+        projectFile({ githubUrl: "https://github.com/studiosc" })
+      );
+      await expect(getProjects(dir)).rejects.toThrow(/old-link\.mdx/);
+      await expect(getProject("old-link", dir)).rejects.toThrow(
+        /old-link\.mdx/
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    // The rendered case page links to the right repository.
+    await page.goto("/work/portfolio-site");
+    await expect(
+      page.getByRole("link", { name: /GitHub/ }).first()
+    ).toHaveAttribute(
+      "href",
+      "https://github.com/StudioSC-dev/studiosc-portfolio"
     );
   });
 
