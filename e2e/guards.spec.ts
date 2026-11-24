@@ -293,6 +293,18 @@ test.describe("guards", () => {
     const head = git(["rev-parse", "HEAD"]).trim();
     expect(prRange({ CI: "true", PR_HEAD_SHA: "" })).toBeNull();
     expect(
+      prRange({ CI: "true", GITHUB_EVENT_NAME: "push", PR_HEAD_SHA: "" })
+    ).toBeNull();
+    // A pull request run missing either SHA fails loudly instead.
+    for (const missing of [
+      { PR_HEAD_SHA: "", PR_BASE_SHA: head },
+      { PR_HEAD_SHA: head, PR_BASE_SHA: " " },
+    ]) {
+      expect(() =>
+        prRange({ CI: "true", GITHUB_EVENT_NAME: "pull_request", ...missing })
+      ).toThrow("a pull request build must set");
+    }
+    expect(
       prRange({ CI: "true", PR_HEAD_SHA: head, PR_BASE_SHA: head })
     ).toEqual({ base: head, head });
 

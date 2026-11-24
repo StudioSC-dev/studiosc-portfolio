@@ -84,8 +84,9 @@ export interface PrRange {
 }
 
 /**
- * The pull request under test. In CI that is PR_BASE_SHA..PR_HEAD_SHA, and a
- * build without PR_HEAD_SHA (a push to main or develop) has none, so checks
+ * The pull request under test. In CI that is PR_BASE_SHA..PR_HEAD_SHA, a
+ * pull_request run without both fails, and a push build (no PR_HEAD_SHA,
+ * a push to main or develop) has none, so checks
  * that judge a PR's own changes do not run there. Locally it is
  * PR_BASE_SHA (or the merge base with origin/main) to PR_HEAD_SHA (or HEAD).
  */
@@ -93,6 +94,15 @@ export function prRange(
   env: Env = process.env,
   opts: GitOpts = {}
 ): PrRange | null {
+  // GitHub Actions names the event; a pull request run must carry both
+  // SHAs, or its PR checks would quietly not run.
+  if (env.CI && env.GITHUB_EVENT_NAME?.startsWith("pull_request")) {
+    for (const name of ["PR_HEAD_SHA", "PR_BASE_SHA"]) {
+      if (!env[name]?.trim()) {
+        throw new Error(`a pull request build must set ${name}`);
+      }
+    }
+  }
   if (env.CI && !env.PR_HEAD_SHA?.trim()) return null;
   return { base: baseSha(env, opts), head: headSha(env, opts) };
 }
