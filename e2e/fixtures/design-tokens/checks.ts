@@ -178,6 +178,11 @@ export interface RingSample {
   name: string;
   /** Whether the element holds focus and matches :focus-visible. */
   focused: boolean;
+  /**
+   * Whether the element is drawn at all: rendered, not visibility-hidden,
+   * and neither it nor an ancestor at opacity 0.
+   */
+  painted: boolean;
   outlineStyle: string;
   outlineWidth: string;
   ring: string;
@@ -185,8 +190,8 @@ export interface RingSample {
 }
 
 /**
- * Focus rings that are not painted (no focus, no outline, under 2px) or are
- * below `min` against the surface behind them.
+ * Focus rings that are not painted (no focus, an invisible control, no
+ * outline, under 2px) or are below `min` against the surface behind them.
  */
 export function ringProblems(
   samples: readonly RingSample[],
@@ -195,6 +200,7 @@ export function ringProblems(
   const problems: string[] = [];
   for (const s of samples) {
     if (!s.focused) problems.push(`${s.name}: not focused`);
+    else if (!s.painted) problems.push(`${s.name}: not painted`);
     else if (s.outlineStyle === "none" || s.outlineStyle === "hidden")
       problems.push(`${s.name}: no outline`);
     else if (parseFloat(s.outlineWidth) < 2)

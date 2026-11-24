@@ -1252,6 +1252,10 @@ test.describe("Range design system", () => {
             name: `${root?.dataset.fixture}: ${el.textContent?.trim()}`,
             focused:
               document.activeElement === el && el.matches(":focus-visible"),
+            painted: el.checkVisibility({
+              checkOpacity: true,
+              checkVisibilityCSS: true,
+            }),
             outlineStyle: style.outlineStyle,
             outlineWidth: style.outlineWidth,
             ring: style.outlineColor,
@@ -1276,12 +1280,14 @@ test.describe("Range design system", () => {
         []
       );
 
-      // A ring below 3:1 and a removed outline both fail the same check.
+      // A ring below 3:1, a removed outline and a control at opacity 0 (its
+      // own or its parent's) all fail the same check.
       const broken = await sampleRings("[data-fragment='low-ring-fixture']");
-      expect(broken).toHaveLength(2);
+      expect(broken).toHaveLength(4);
       const problems = ringProblems(broken);
-      expect(problems).toHaveLength(2);
+      expect(problems).toHaveLength(4);
       expect(problems.some((p) => p.includes("no outline"))).toBe(true);
+      expect(problems.filter((p) => p.includes("not painted"))).toHaveLength(2);
     }
   });
 
