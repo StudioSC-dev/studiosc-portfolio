@@ -1510,6 +1510,9 @@ test.describe("Range design system", () => {
       "PRV2 hidden probe"
     );
     await probe.close();
+    expect(normalizeDestination("mailto:hello@studiosc.dev", [])).not.toBe(
+      normalizeDestination("sms:hello@studiosc.dev", [])
+    );
     expect(
       normalizeDestination("https://elsewhere.example/work?x=1#a", [
         "http://localhost:1",

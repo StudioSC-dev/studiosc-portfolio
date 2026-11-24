@@ -356,16 +356,19 @@ export function finalWithFragment(finalUrl: string, requested: string): string {
 }
 
 /**
- * A destination, comparable across the two test servers: a URL on either
- * server's origin is rewritten to "<origin>"; any other origin is kept.
+ * A destination, comparable across the two test servers: an HTTP URL on
+ * either server's origin is rewritten to "<origin>"; any other link is kept
+ * whole.
  */
 export function normalizeDestination(
   url: string,
   origins: readonly string[]
 ): string {
   const u = new URL(url);
-  const origin = origins.includes(u.origin) ? "<origin>" : u.origin;
-  return `${origin}${u.pathname}${u.search}${u.hash}`;
+  // Only HTTP links on a test server are rewritten; anything else (another
+  // site, mailto:, sms:, tel:) is compared exactly as written.
+  if (!/^https?:$/.test(u.protocol) || !origins.includes(u.origin)) return url;
+  return `<origin>${u.pathname}${u.search}${u.hash}`;
 }
 
 // ---------------------------------------------------------------------------
