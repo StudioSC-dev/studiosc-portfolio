@@ -1471,6 +1471,17 @@ test.describe("Range design system", () => {
     expect(
       docGaps(inSection("Lab tag", (b) => b.replace("dashed", "solid")))
     ).toContain('Components: Lab tag says "dashed"');
+    // A changed dimension fails too, with the heading and citation kept.
+    expect(
+      docGaps(
+        inSection("Lab tag", (b) =>
+          b.replace("0 0.375rem padding", "0 0.5rem padding")
+        )
+      )
+    ).toContain('Components: Lab tag says "0 0.375rem padding"');
+    expect(
+      docGaps(inSection("Lab tag", (b) => b.replace("a 4px", "a 6px")))
+    ).toContain('Components: Lab tag says "a 4px radius"');
     // A component that cites an unrelated board instead of its own.
     const recited = inSection("Chip row", (b) =>
       b.replace("`range-phone`", "`pages-404-desktop`")

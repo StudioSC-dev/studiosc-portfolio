@@ -220,7 +220,8 @@ export const COMPONENTS = [
 
 /**
  * What each component entry must say, and the boards it must cite: the details
- * a later ticket builds from. Checked with whitespace collapsed.
+ * a later ticket builds from, including every size, radius and padding a
+ * later ticket would build to. Checked with whitespace collapsed.
  */
 export const COMPONENT_DETAILS: Record<
   (typeof COMPONENTS)[number],
@@ -233,6 +234,10 @@ export const COMPONENT_DETAILS: Record<
       "aria-pressed",
       '"3D & motion"',
       "pill shadow",
+      "0.3125rem padding",
+      "0.25rem gap",
+      "overlaps the top of the stage by 1.5rem",
+      "15/20, 2.5rem tall",
     ],
   },
   "Chip row": {
@@ -241,6 +246,8 @@ export const COMPONENT_DETAILS: Record<
       "Scroll the categories back",
       "Scroll the categories forward",
       "2.75rem pills",
+      "round 2.75rem scroll buttons",
+      "15/20",
     ],
   },
   Plate: {
@@ -250,15 +257,33 @@ export const COMPONENT_DETAILS: Record<
       'aria-roledescription="slide"',
       "text-section-phone",
       "n of 7",
+      "padding 3.25rem 2.5rem 2.5rem",
+      "two columns (19rem and the fragment)",
+      "32/40, -0.015em",
+      "6px frame",
+      "13/20",
+      "pads 1rem",
     ],
   },
   Peek: {
     boards: ["range-light-desktop"],
-    details: ["aria-hidden", "12px radius", "plate-fade"],
+    details: [
+      "aria-hidden",
+      "12px radius",
+      "plate-fade",
+      "inset 9% top and bottom",
+      "18/24",
+      "0.75 opacity",
+    ],
   },
   "Credit line": {
     boards: ["range-light-desktop"],
-    details: ["Built by Seth · Tested by Christine", "#seth", "#christine"],
+    details: [
+      "Built by Seth · Tested by Christine",
+      "#seth",
+      "#christine",
+      "15/24",
+    ],
   },
   "Christine line": {
     boards: ["range-light-desktop"],
@@ -266,11 +291,20 @@ export const COMPONENT_DETAILS: Record<
       "Checked by Christine.",
       "40-character sha",
       "Illustrative wording",
+      "1px `--rule` rule, 14/22",
     ],
   },
   "Lab tag": {
     boards: ["range-light-desktop"],
-    details: ["Lab demo", "dashed", "Nobody's hired us for one of these yet."],
+    details: [
+      "Lab demo",
+      "dashed",
+      "Nobody's hired us for one of these yet.",
+      "0 0.375rem padding",
+      "a 4px radius",
+      "Red Hat Text 500, 12/18",
+      "14/22 `--muted`",
+    ],
   },
   "Person frame": {
     boards: [
@@ -282,6 +316,11 @@ export const COMPONENT_DETAILS: Record<
       "1px `--ink` border",
       "text-person-phone",
       "Or hire us both for your project or idea",
+      "14px radius",
+      "pads 2.5rem",
+      "7rem photo",
+      "36/44, -0.02em",
+      "20/28",
     ],
   },
   "Holly's pile": {
@@ -291,11 +330,22 @@ export const COMPONENT_DETAILS: Record<
       "12rem on a phone",
       "Chief Morale Officer",
       "Give Holly a treat",
+      "a 2.5rem radius",
+      "4° and -3°",
+      "44/48",
+      "20/28",
     ],
   },
   "Ruled list": {
     boards: ["range-light-desktop"],
-    details: ["list-style: none", "Never cards"],
+    details: [
+      "list-style: none",
+      "Never cards",
+      "0.875rem",
+      "0.625rem",
+      "18/24",
+      "3rem apart",
+    ],
   },
   Buttons: {
     boards: ["range-light-desktop"],
@@ -303,6 +353,9 @@ export const COMPONENT_DETAILS: Record<
       "Start a project",
       "No arrow glyph",
       "Lucide is the only icon set",
+      "6px radius, 15/24 600, 3rem tall with 1.375rem padding",
+      "2.75rem square",
+      "offset 0.2em",
     ],
   },
 };
