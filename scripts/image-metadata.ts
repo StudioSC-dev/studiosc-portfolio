@@ -422,9 +422,7 @@ export function checkSvg(buf: Buffer): string[] {
   if (encoding && !/^utf-?8$/i.test(encoding[1])) {
     return ["SVG declares an encoding other than UTF-8"];
   }
-  const prolog =
-    /^(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
-  if (!prolog.test(text)) {
+  if (!SVG_PROLOG.test(text)) {
     return ["not an SVG document (its root element is not <svg>)"];
   }
   return /<(?:[\w.-]+:)?metadata[\s>/]/i.test(text)
@@ -432,11 +430,14 @@ export function checkSvg(buf: Buffer): string[] {
     : [];
 }
 
+/**
+ * An SVG's start: declarations, comments and a doctype (an internal subset
+ * included), of any length, then the <svg> root.
+ */
+const SVG_PROLOG =
+  /^\uFEFF?(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?\s*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
 const IMAGE_EXTENSION =
   /\.(jpe?g|jfif|png|apng|webp|gif|avif|hei[cf]|tiff?|ico|cur|bmp|svgz?)$/i;
-
-const SVG_PROLOG =
-  /^\uFEFF?(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
 
 /**
  * Whether a file is an image, judged by its bytes first and its name
@@ -472,12 +473,15 @@ export function isImageCandidate(file: string, buf: Buffer): boolean {
   ) {
     return true;
   }
-  // SVG text in UTF-8 or UTF-16 (either byte order).
-  const head = buf.subarray(0, 2048);
-  const swapped = Buffer.from(head.subarray(0, head.length & ~1)).swap16();
+  // SVG text in UTF-8 or UTF-16 (either byte order), however long its
+  // prolog: the whole file is read.
+  // UTF-16 is decoded from an aligned, even-length copy: decoding a slice at
+  // an odd offset and of odd length aborts Node 26.
+  const even = Buffer.from(buf.subarray(0, buf.length & ~1));
+  const swapped = Buffer.from(even).swap16();
   return [
-    head.toString("utf8"),
-    head.toString("utf16le"),
+    buf.toString("utf8"),
+    even.toString("utf16le"),
     swapped.toString("utf16le"),
   ].some((text) => SVG_PROLOG.test(text));
 }

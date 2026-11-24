@@ -437,6 +437,17 @@ test.describe("guards", () => {
       ["public/a/b/Photo.JpEg", Buffer.from("anything")],
       ["public/icon.txt", utf16Svg],
       ["public/drawing", Buffer.from('<?xml version="1.0"?>\n<svg/>')],
+      // A prolog of any length, and a doctype with an internal subset.
+      [
+        "public/drawing.dat",
+        Buffer.from(
+          `<?xml version="1.0"?>\n<!-- ${"x".repeat(5000)} -->\n<svg/>`
+        ),
+      ],
+      [
+        "public/subset.dat",
+        Buffer.from('<!DOCTYPE svg [ <!ENTITY a "b"> ]>\n<svg/>'),
+      ],
     ] as const) {
       expect(isImageCandidate(file, bytes), file).toBe(true);
     }
