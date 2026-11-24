@@ -6,6 +6,7 @@
 
 import {
   BOARD_IDS,
+  BOARD_WEIGHTS,
   COMPONENT_DETAILS,
   COMPONENTS,
   CONTEXT_TOKENS,
@@ -265,6 +266,67 @@ export function firstFamily(fontFamily: string): string {
     .split(",")[0]
     .trim()
     .replace(/^["']|["']$/g, "");
+}
+
+export type RedHat = "Red Hat Display" | "Red Hat Text";
+
+export interface FontConfig {
+  /** The face headings compute to. */
+  headingFace: RedHat;
+  /** Heading weights allowed, [min, max]. */
+  headingWeights: readonly [number, number];
+  /** The `display` each Red Hat face must declare. */
+  display: Record<RedHat, "swap" | "optional">;
+  /** The weights step 1 may trim each Red Hat face to. */
+  weights: Record<RedHat, readonly string[]>;
+}
+
+/**
+ * The Red Hat configuration the fallback steps in force imply. Step 2 moves
+ * headings to Red Hat Text at 600 to 700; step 3 makes the heading face,
+ * whichever it is, `optional`; step 1 trims each face to the weights in use.
+ */
+export function expectedFontConfig(steps: readonly number[]): FontConfig {
+  const headingFace: RedHat = steps.includes(2)
+    ? "Red Hat Text"
+    : "Red Hat Display";
+  const display: Record<RedHat, "swap" | "optional"> = {
+    "Red Hat Display": "swap",
+    "Red Hat Text": "swap",
+  };
+  if (steps.includes(3)) display[headingFace] = "optional";
+  const textWeights = [...BOARD_WEIGHTS["Red Hat Text"]];
+  if (steps.includes(2)) textWeights.push("700");
+  return {
+    headingFace,
+    headingWeights: steps.includes(2) ? [600, 700] : [400, 700],
+    display,
+    weights: {
+      "Red Hat Display": BOARD_WEIGHTS["Red Hat Display"],
+      "Red Hat Text": textWeights,
+    },
+  };
+}
+
+export interface FontLoadLike {
+  family: string;
+}
+
+/**
+ * Fragment-face loads a page should not make: a face is expected only where a
+ * fragment that uses it renders. `faces` maps a `data-fragment` value to its
+ * CSS family; `families` is every fragment family.
+ */
+export function unexpectedFragmentFonts(
+  loads: readonly FontLoadLike[],
+  rendered: readonly string[],
+  faces: Record<string, string>,
+  families: readonly string[]
+): string[] {
+  const expected = new Set(rendered.map((f) => faces[f]).filter(Boolean));
+  return loads
+    .filter((l) => families.includes(l.family) && !expected.has(l.family))
+    .map((l) => l.family);
 }
 
 // ---------------------------------------------------------------------------

@@ -15,7 +15,9 @@ import {
 
 import {
   docGaps,
+  expectedFontConfig,
   ringProblems,
+  unexpectedFragmentFonts,
   failingPairings,
   firstFamily,
   fontOptions,
@@ -509,6 +511,17 @@ test.describe("Range design system", () => {
     expect(Array.isArray(steps), `${PERF} font_fallback_steps`).toBe(true);
     for (const s of steps) expect([1, 2, 3]).toContain(s);
 
+    // What the steps in force imply. Control: steps 2 and 3 make Red Hat Text
+    // the heading face, `optional`, with 700 available.
+    const config = expectedFontConfig(steps);
+    const stepped = expectedFontConfig([2, 3]);
+    expect(stepped.headingFace).toBe("Red Hat Text");
+    expect(stepped.display).toEqual({
+      "Red Hat Display": "swap",
+      "Red Hat Text": "optional",
+    });
+    expect(stepped.weights["Red Hat Text"]).toContain("700");
+
     // The font declarations, read from lib/fonts.ts.
     const source = read(FONTS);
     const display = fontOptions(source, "redHatDisplay");
@@ -531,13 +544,12 @@ test.describe("Range design system", () => {
           `step 1 trims ${name} to listed weights`
         ).toBe(true);
         for (const w of weights as string[])
-          expect(BOARD_WEIGHTS[name]).toContain(w);
+          expect(config.weights[name]).toContain(w);
       }
+      expect(optionValue(opts, "display"), `${name} display`).toBe(
+        config.display[name]
+      );
     }
-    expect(optionValue(display, "display")).toBe(
-      steps.includes(3) ? "optional" : "swap"
-    );
-    expect(optionValue(text, "display")).toBe("swap");
 
     const mono = fontOptions(source, "jetbrainsMono");
     expect(optionValue(mono, "weight")).toBe("400");
@@ -620,6 +632,7 @@ test.describe("Range design system", () => {
         };
       };
       const fontDisplay: Record<string, string> = {};
+      const fontWeights: Record<string, string[]> = {};
       for (const sheet of Array.from(document.styleSheets)) {
         for (const rule of Array.from(sheet.cssRules)) {
           if (rule instanceof CSSFontFaceRule) {
@@ -627,54 +640,91 @@ test.describe("Range design system", () => {
               .getPropertyValue("font-family")
               .replace(/["']/g, "");
             fontDisplay[fam] = rule.style.getPropertyValue("font-display");
+            (fontWeights[fam] ??= []).push(
+              rule.style.getPropertyValue("font-weight")
+            );
           }
         }
       }
+      // Site typography only: a fragment draws in its product's face.
+      const site = (selector: string) =>
+        Array.from(document.querySelectorAll(selector)).filter(
+          (el) => !el.closest("[data-fragment]")
+        );
       return {
-        headings: Array.from(
-          document.querySelectorAll("main h1, main h2, main h3")
-        ).map(pick),
+        headings: site("main h1, main h2, main h3").map(pick),
         body: pick(document.body),
-        paragraphs: Array.from(document.querySelectorAll("main p"))
-          .slice(0, 5)
-          .map(pick),
+        paragraphs: site("main p").slice(0, 5).map(pick),
         fontDisplay,
+        fontWeights,
       };
     });
     expect(faces.headings.length).toBeGreaterThan(0);
+    // The weight range each emitted Red Hat face covers ("400 900" or "600").
+    const covers = (family: string, weight: number) =>
+      (faces.fontWeights[family] ?? []).some((range) => {
+        const [lo, hi = lo] = range.split(/\s+/).map(Number);
+        return weight >= lo && weight <= hi;
+      });
     for (const h of faces.headings) {
-      if (steps.includes(2)) {
-        expect(firstFamily(h.family), `${h.tag} family`).toBe("Red Hat Text");
-        expect(Number(h.weight)).toBeGreaterThanOrEqual(600);
-        expect(Number(h.weight)).toBeLessThanOrEqual(700);
-      } else {
-        expect(firstFamily(h.family), `${h.tag} family`).toBe(
-          "Red Hat Display"
-        );
-        expect(BOARD_WEIGHTS["Red Hat Display"], `${h.tag} weight`).toContain(
-          h.weight
-        );
-      }
+      expect(firstFamily(h.family), `${h.tag} family`).toBe(config.headingFace);
+      const weight = Number(h.weight);
+      expect(weight, `${h.tag} weight`).toBeGreaterThanOrEqual(
+        config.headingWeights[0]
+      );
+      expect(weight, `${h.tag} weight`).toBeLessThanOrEqual(
+        config.headingWeights[1]
+      );
+      expect(
+        covers(config.headingFace, weight),
+        `${config.headingFace} serves ${weight}`
+      ).toBe(true);
     }
     expect(firstFamily(faces.body.family)).toBe("Red Hat Text");
     for (const p of faces.paragraphs)
       expect(firstFamily(p.family)).toBe("Red Hat Text");
-    expect(faces.fontDisplay["Red Hat Display"]).toBe(
-      steps.includes(3) ? "optional" : "swap"
-    );
-    expect(faces.fontDisplay["Red Hat Text"]).toBe("swap");
+    for (const face of ["Red Hat Display", "Red Hat Text"] as const) {
+      expect(faces.fontDisplay[face], `${face} font-display`).toBe(
+        config.display[face]
+      );
+    }
 
-    // No fragment face and no code face on any page without a fragment or code.
+    // A fragment face loads only where a fragment that uses it renders, so a
+    // route that later renders a fragment (the Range home) stays green.
+    const fragmentFaces: Record<string, string> = { ...FRAGMENT_FACES };
     for (const route of new Set([...BUDGET_ROUTES, ...SCOPE_ROUTES])) {
-      if (route === "/blog/tallyandtrace-performance") continue; // a post: checked for code below
       const watch = watchFonts(page);
       await page.goto(route);
       const loads = await watch();
+      const rendered = await page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll<HTMLElement>("[data-fragment]")
+        ).map((el) => el.dataset.fragment ?? "")
+      );
       expect(
-        loads.filter((l) => FRAGMENT_FAMILIES.includes(l.family)),
-        `fragment faces on ${route}`
+        unexpectedFragmentFonts(
+          loads,
+          rendered,
+          fragmentFaces,
+          FRAGMENT_FAMILIES
+        ),
+        `fragment faces on ${route}, which renders [${rendered.join(", ")}]`
       ).toEqual([]);
     }
+    // Control: Manrope is expected beside a Central Command fragment, and
+    // unexpected without one.
+    const manropeLoad = [{ family: FRAGMENT_FAMILY.Manrope }];
+    expect(
+      unexpectedFragmentFonts(
+        manropeLoad,
+        ["central-command"],
+        fragmentFaces,
+        FRAGMENT_FAMILIES
+      )
+    ).toEqual([]);
+    expect(
+      unexpectedFragmentFonts(manropeLoad, [], fragmentFaces, FRAGMENT_FAMILIES)
+    ).toEqual([FRAGMENT_FAMILY.Manrope]);
 
     // Fixture fragments on `/`: each fragment computes to its face, and each
     // face stays within 40 KiB unless an owner-accepted deviation covers it.
