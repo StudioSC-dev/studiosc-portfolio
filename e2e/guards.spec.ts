@@ -1,7 +1,19 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT, treeFiles, type TreeFile } from "./support/git";
+import {
+  ROOT,
+  baseSha,
+  existsAt,
+  git,
+  gitBuffer,
+  gitOk,
+  headSha,
+  treeFiles,
+  type TreeFile,
+} from "./support/git";
+import { icoFrameHashes, type FrameHash } from "./support/ico";
+import faviconPixels from "./fixtures/favicon-pixels.json";
 import { loadConfig } from "./support/config";
 import {
   DENYLIST,
@@ -163,5 +175,74 @@ test.describe("guards", () => {
     nodeOnly();
     // Every tracked text file, except the three that define the patterns.
     expect(denylistHits(() => true).map(describeHit)).toEqual([]);
+  });
+
+  test("only intended application changes", () => {
+    nodeOnly();
+    // The favicon keeps every frame, its dimensions and its decoded pixels.
+    const favicon = readFileSync(path.join(ROOT, faviconPixels.file));
+    const expected = faviconPixels.frames as FrameHash[];
+    expect(icoFrameHashes(favicon)).toEqual(expected);
+    if (gitOk(["cat-file", "-e", `${faviconPixels.sha}^{commit}`])) {
+      const before = gitBuffer([
+        "show",
+        `${faviconPixels.sha}:${faviconPixels.file}`,
+      ]);
+      expect(icoFrameHashes(before)).toEqual(expected);
+    }
+
+    // allowedDevOrigins comes from DEV_ORIGINS and is empty without it.
+    const unset = loadConfig("next.config.ts", { DEV_ORIGINS: undefined });
+    expect(unset.allowedDevOrigins).toEqual([]);
+    const two = loadConfig("next.config.ts", {
+      DEV_ORIGINS: "https://one.example,https://two.example",
+    });
+    expect(two.allowedDevOrigins).toEqual([
+      "https://one.example",
+      "https://two.example",
+    ]);
+
+    // The scope check is PRV-1's own: it applies while the base branch does
+    // not carry these guards yet, and compares the PR head with that base.
+    const base = baseSha();
+    if (existsAt(base, "e2e/guards.spec.ts")) return;
+    const head = headSha();
+    const isApplication = (file: string) =>
+      /^(app|components|content|lib|public|types)\//.test(file) ||
+      /^(next\.config\.ts|middleware\.ts|proxy\.ts|instrumentation\.ts|postcss\.config\.mjs)$/.test(
+        file
+      );
+    const changed = git(["diff", "--name-only", "--no-renames", base, head])
+      .split("\n")
+      .filter(Boolean)
+      .filter(isApplication);
+    const allowed = [
+      "app/favicon.ico",
+      "components/blog/SocialPost.tsx",
+      "content/blog/first-marathon.mdx",
+      "next.config.ts",
+    ];
+    for (const file of changed) {
+      expect(allowed, `out of scope: ${file}`).toContain(file);
+    }
+
+    // In next.config.ts only the allowedDevOrigins property changes.
+    const withoutDevOrigins = (source: string) => {
+      const lines = source.split("\n");
+      let start = lines.findIndex((l) => /^ {2}allowedDevOrigins:/.test(l));
+      const end = lines.findIndex((l) => /^ {2}pageExtensions:/.test(l));
+      expect(start).toBeGreaterThan(-1);
+      expect(end).toBeGreaterThan(start);
+      while (start > 0 && /^ {2}\/\//.test(lines[start - 1])) start--;
+      return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+    };
+    expect(withoutDevOrigins(git(["show", `${head}:next.config.ts`]))).toBe(
+      withoutDevOrigins(git(["show", `${base}:next.config.ts`]))
+    );
+
+    // No runtime dependency is added, removed or changed.
+    const deps = (sha: string) =>
+      JSON.parse(git(["show", `${sha}:package.json`])).dependencies;
+    expect(deps(head)).toEqual(deps(base));
   });
 });
