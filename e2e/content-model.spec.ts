@@ -612,22 +612,33 @@ RANGE_CATEGORIES.push({
     test.skip(!BASE, NEEDS_BASE);
     test.setTimeout(240_000);
 
-    // The actual diff against the PR base (committed and working tree).
+    // The committed diff, base to head. No renames, so a move into the
+    // allowed directory still lists its out-of-scope source; NUL-separated, so
+    // any file name is safe. Nothing is excluded: tracked report files count.
     const base = baseSha();
-    const changed = execFileSync("git", ["diff", "--name-only", base], {
-      cwd: ROOT,
-      encoding: "utf8",
-    })
-      .split("\n")
-      .concat(
-        execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
-          cwd: ROOT,
-          encoding: "utf8",
-        }).split("\n")
-      )
-      // Generated test-run output is not part of the change.
-      .filter((f) => f && !/^(playwright-report|test-results)\//.test(f));
+    const changed = execFileSync(
+      "git",
+      ["diff", "--name-only", "--no-renames", "-z", base, "HEAD"],
+      { cwd: ROOT, encoding: "utf8" }
+    )
+      .split("\0")
+      .filter(Boolean);
     expect(changed.filter((f) => !isAllowedPrv3Path(f))).toEqual([]);
+
+    // next.config.ts may only change to invoke content validation.
+    if (changed.includes("next.config.ts")) {
+      const lines = execFileSync(
+        "git",
+        ["diff", "-U0", base, "HEAD", "--", "next.config.ts"],
+        { cwd: ROOT, encoding: "utf8" }
+      )
+        .split("\n")
+        .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+      expect(
+        lines.filter((l) => !/validat/i.test(l)),
+        "next.config.ts changes beyond content validation"
+      ).toEqual([]);
+    }
 
     // Routes from the base: every one still returns 200 with the same shared
     // navigation destinations.
