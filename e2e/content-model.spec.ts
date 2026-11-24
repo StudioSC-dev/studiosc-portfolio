@@ -266,6 +266,14 @@ async function navHrefs(page: Page, url: string) {
   };
 }
 
+/** The visible element reading exactly `word`; a hidden copy is ignored. */
+function visibleText(page: Page, word: string) {
+  return page
+    .getByText(word, { exact: true })
+    .filter({ visible: true })
+    .first();
+}
+
 /** The old status words, and what the new set calls them. */
 const STATUS_RENAMES: [RegExp, string][] = [
   [/^QA Verified$/i, "Live"],
@@ -800,6 +808,14 @@ RANGE_CATEGORIES.push({
     }
   });
 
+  test("status label lookup ignores hidden copies", async ({ page }) => {
+    await page.setContent(
+      '<span hidden>Live</span><span style="display:none">Live</span><p>Live</p>'
+    );
+    await expect(visibleText(page, "Live")).toHaveText("Live");
+    await expect(visibleText(page, "Live")).toBeVisible();
+  });
+
   test("status words from the set", async ({ page }) => {
     // Literal words, so a change to the set itself is caught here.
     expect(STATUSES).toEqual({
@@ -816,7 +832,7 @@ RANGE_CATEGORIES.push({
       await page.goto(path);
       for (const word of present) {
         await expect(
-          page.getByText(word, { exact: true }).first(),
+          visibleText(page, word),
           `${path} shows ${word}`
         ).toBeVisible();
       }
