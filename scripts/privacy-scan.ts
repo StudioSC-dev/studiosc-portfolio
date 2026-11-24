@@ -127,26 +127,48 @@ export function readPrivateList(): PrivateEntry[] {
   return entries;
 }
 
-/** Lowercases and folds every whitespace run, newlines included, to one space. */
+/**
+ * Unicode case folding for whole strings: compatibility forms unified
+ * (NFKC, so fullwidth letters match), then upper- and lowercased as whole
+ * strings so ß matches SS and dotless or dotted i match i, with every Greek
+ * sigma made the same letter.
+ */
+export function foldCase(text: string): string {
+  return text
+    .normalize("NFKC")
+    .toUpperCase()
+    .toLowerCase()
+    .normalize("NFKC")
+    .replace(/ς/g, "σ")
+    .replace(/i\u0307/g, "i");
+}
+
+/**
+ * Case-folds each line as a whole string, then folds every whitespace run,
+ * newlines included, to one space, remembering each character's line.
+ */
 function fold(text: string): { folded: string; lines: number[] } {
   let folded = "";
   const lines: number[] = [];
-  let line = 1;
-  let inSpace = false;
-  for (const char of text) {
-    if (/\s/.test(char)) {
-      if (!inSpace && folded) {
-        folded += " ";
-        lines.push(line);
+  // A whitespace run becomes one space, written only when text follows it.
+  let spaceLine = 0;
+  text.split("\n").forEach((raw, i) => {
+    for (const char of foldCase(raw)) {
+      if (/\s/.test(char)) {
+        spaceLine ||= i + 1;
+      } else {
+        if (spaceLine && folded) {
+          folded += " ";
+          lines.push(spaceLine);
+        }
+        spaceLine = 0;
+        folded += char;
+        // A folded character can be several UTF-16 units; each maps here.
+        for (let k = 0; k < char.length; k++) lines.push(i + 1);
       }
-      inSpace = true;
-    } else {
-      folded += char.toLowerCase();
-      lines.push(line);
-      inSpace = false;
     }
-    if (char === "\n") line++;
-  }
+    spaceLine ||= i + 1;
+  });
   return { folded, lines };
 }
 

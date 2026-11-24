@@ -42,7 +42,7 @@ import {
   xmpSegment,
 } from "./support/dirty-images";
 import { checkIco, isImageCandidate } from "../scripts/image-metadata";
-import { addedLineNumbers } from "../scripts/privacy-scan";
+import { addedLineNumbers, findPrivate } from "../scripts/privacy-scan";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, nextHop, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
@@ -1327,6 +1327,31 @@ test.describe("guards", () => {
           `${literals[0]} (edited)\nA clean new line.\n${extra}\n`
         );
         refusedFor(push("origin", branch), needle);
+      }
+
+      // Case-insensitive matching survives Unicode case changes: whole-string
+      // folding, so ß matches SS, İ and ı match i, Greek sigmas match
+      // whatever their position, and fullwidth letters match.
+      const unicodeList = [
+        { line: 1, value: "Straße Zephyr" },
+        { line: 2, value: "İzmir Kuyu" },
+        { line: 3, value: "οδυσσευς" },
+        { line: 4, value: "quokka" },
+        { line: 5, value: "ΚΟΣΜΟΣ" },
+      ];
+      for (const [text, line] of [
+        ["At STRASSE ZEPHYR today", 1],
+        ["izmir kuyu", 2],
+        ["IZMIR KUYU", 2],
+        ["ızmir kuyu", 2],
+        ["ΟΔΥΣΣΕΥΣ", 3],
+        ["ＱＵＯＫＫＡ", 4],
+        ["κοσμος", 5],
+      ] as const) {
+        expect(
+          findPrivate("a.md", text, unicodeList).map((h) => h.rule),
+          text
+        ).toContain(`private list entry on line ${line}`);
       }
 
       // The line diff marks inserted lines only.
