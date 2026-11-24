@@ -485,6 +485,14 @@ test.describe("content model", () => {
           VALID_PROJECT.replace("\n---\n\n# Fixture", "\n# Fixture"),
         ],
         ["noopen", VALID_PROJECT.replace(/^---\n/, "")],
+        // `---typo` must not close the block, even with a real fence later.
+        [
+          "typo",
+          VALID_PROJECT.replace(
+            "\n---\n\n# Fixture",
+            "\n---typo\n\n# Fixture\n\n---\n"
+          ),
+        ],
         ["yaml", VALID_PROJECT.replace('title: "Fixture"', 'title: "Fixture')],
       ] as const) {
         const broken = tempDir(`loader-${name}`);

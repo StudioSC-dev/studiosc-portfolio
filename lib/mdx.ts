@@ -84,12 +84,23 @@ export async function getBlogPost(slug: string) {
   }
 }
 
-/** Both `---` delimiter lines must be present, or gray-matter reads to end of file. */
-const FRONTMATTER_BLOCK =
-  /^\uFEFF?---[ \t]*\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
+/**
+ * Both fences must be a line that is exactly `---`. A line that merely starts
+ * with `---` (such as `---typo`) closes the block for gray-matter, so it is
+ * rejected rather than skipped over.
+ */
+function hasFrontmatterFences(fileContents: string): boolean {
+  const lines = fileContents.replace(/^\uFEFF/, "").split("\n");
+  const exact = (line: string) => line.replace(/\r$/, "") === "---";
+  if (!exact(lines[0])) return false;
+  const closing = lines.findIndex(
+    (line, index) => index > 0 && line.startsWith("---")
+  );
+  return closing > 0 && exact(lines[closing]);
+}
 
 function parseProject(file: string, fileContents: string) {
-  if (!FRONTMATTER_BLOCK.test(fileContents)) {
+  if (!hasFrontmatterFences(fileContents)) {
     throw new Error(
       `Invalid project frontmatter in ${file}: missing opening or closing --- delimiter`
     );
