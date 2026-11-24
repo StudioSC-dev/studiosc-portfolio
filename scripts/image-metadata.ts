@@ -422,9 +422,17 @@ export function checkSvg(buf: Buffer): string[] {
   if (encoding && !/^utf-?8$/i.test(encoding[1])) {
     return ["SVG declares an encoding other than UTF-8"];
   }
-  if (!SVG_PROLOG.test(text)) {
+  const root = SVG_PROLOG.exec(text);
+  if (!root) {
     return ["not an SVG document (its root element is not <svg>)"];
   }
+  // The root must be closed: "</svg>" ending the document, or a root that
+  // closes itself, so a cut-short file is refused.
+  const rest = text.slice(root[0].length - 1);
+  const closed =
+    new RegExp(`</(?:[\\w.-]+:)?svg\\s*>${SVG_TAIL}`, "i").test(rest) ||
+    new RegExp(`^[^<>]*/>${SVG_TAIL}`).test(rest);
+  if (!closed) return ["SVG root element is not closed (cut short)"];
   return /<(?:[\w.-]+:)?metadata[\s>/]/i.test(text)
     ? ["<metadata> element"]
     : [];
@@ -436,6 +444,9 @@ export function checkSvg(buf: Buffer): string[] {
  */
 const SVG_PROLOG =
   /^\uFEFF?(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*(?:\[[\s\S]*?\])?\s*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
+/** What may follow the closed root: whitespace and comments. */
+const SVG_TAIL = String.raw`(?:\s|<!--[\s\S]*?-->)*$`;
+
 const IMAGE_EXTENSION =
   /\.(jpe?g|jfif|png|apng|webp|gif|avif|hei[cf]|tiff?|ico|cur|bmp|svgz?)$/i;
 

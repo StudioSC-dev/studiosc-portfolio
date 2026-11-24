@@ -44,6 +44,7 @@ import {
 import {
   checkIco,
   checkPng,
+  checkSvg,
   isImageCandidate,
 } from "../scripts/image-metadata";
 import { addedLineNumbers, findPrivate } from "../scripts/privacy-scan";
@@ -460,7 +461,7 @@ test.describe("guards", () => {
       expect(isImageCandidate(file, bytes), file).toBe(false);
     }
 
-    // Correctly sized chunks pass.
+    // Correctly sized chunks and closed roots pass.
     const cleanPng = readFileSync(
       path.join(ROOT, "e2e/fixtures/images/clean.png")
     );
@@ -472,6 +473,12 @@ test.describe("guards", () => {
     expect(
       checkPng(pngWithChunk(cleanPng, pngChunk("bKGD", Buffer.alloc(6))))
     ).toEqual([]);
+    for (const svg of [
+      '<svg xmlns="http://www.w3.org/2000/svg"/>\n',
+      '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>\n<!-- end -->\n',
+    ]) {
+      expect(checkSvg(Buffer.from(svg)), svg).toEqual([]);
+    }
 
     // The cleaned favicon keeps all four frames.
     const favicon = readFileSync(path.join(ROOT, "app/favicon.ico"));
@@ -703,6 +710,19 @@ test.describe("guards", () => {
           "trns.png",
           pngWithChunk(png, pngChunk("tRNS", Buffer.from(PAYLOAD))),
           [/chunk tRNS is \d+ bytes, not valid for colour type 6/],
+        ],
+        // A cut-short SVG: its root is never closed.
+        [
+          "cut.svg",
+          Buffer.from(
+            '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/>'
+          ),
+          [/SVG root element is not closed/],
+        ],
+        [
+          "cut-open.svg",
+          Buffer.from('<?xml version="1.0"?>\n<svg '),
+          [/SVG root element is not closed/],
         ],
         [
           "anmf.webp",
