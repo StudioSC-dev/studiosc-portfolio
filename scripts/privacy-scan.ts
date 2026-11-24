@@ -1,10 +1,13 @@
 /**
  * Pre-push privacy scan. Before a push, it scans every commit the push makes
- * newly reachable on the destination, each against its first parent (a root
- * commit against the empty tree), so a value added and removed within one
- * push is still caught. It checks the added lines of every text file against
- * the generic denylist (e2e/support/denylist.ts) and the owner's private list,
- * read from the file PREFLIGHT_PRIVATE_LIST names.
+ * newly reachable on the destination. For each commit it takes the files that
+ * commit adds or changes against its first parent (a root commit against the
+ * empty tree) and scans their full content as that commit leaves it, so a
+ * value added and removed within one push is still caught, and so is one that
+ * line wrapping or two commits split across lines. Text is checked against
+ * the generic denylist (e2e/support/denylist.ts) and the owner's private
+ * list, read from the file PREFLIGHT_PRIVATE_LIST names; binary content
+ * against the private list.
  *
  *   .husky/pre-push runs: tsx scripts/privacy-scan.ts --pre-push <remote> <url>
  *   with git's "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
@@ -17,7 +20,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { scanLine } from "../e2e/support/denylist";
+import { isBinary, scanText } from "../e2e/support/denylist";
 
 export class Refusal extends Error {}
 
@@ -27,10 +30,10 @@ export interface PrivateEntry {
   value: string;
 }
 
-export interface AddedLine {
+export interface ScanHit {
   file: string;
   line: number;
-  text: string;
+  rule: string;
 }
 
 export interface PrivacyHit {
@@ -123,18 +126,55 @@ export function readPrivateList(): PrivateEntry[] {
   return entries;
 }
 
-/** Denylist and private-list hits in one added line. */
-export function scanAddedLine(
-  added: AddedLine,
+/** Lowercases and folds every whitespace run, newlines included, to one space. */
+function fold(text: string): { folded: string; lines: number[] } {
+  let folded = "";
+  const lines: number[] = [];
+  let line = 1;
+  let inSpace = false;
+  for (const char of text) {
+    if (/\s/.test(char)) {
+      if (!inSpace && folded) {
+        folded += " ";
+        lines.push(line);
+      }
+      inSpace = true;
+    } else {
+      folded += char.toLowerCase();
+      lines.push(line);
+      inSpace = false;
+    }
+    if (char === "\n") line++;
+  }
+  return { folded, lines };
+}
+
+/**
+ * Private-list hits in a text, case-insensitive. A value matches even when
+ * line wrapping or extra spaces split it at whitespace; the hit names the
+ * line the value starts on.
+ */
+export function findPrivate(
+  file: string,
+  text: string,
   privateList: PrivateEntry[]
-): { file: string; line: number; rule: string }[] {
-  const hits = scanLine(added.file, added.text, added.line);
-  const lower = added.text.toLowerCase();
+): ScanHit[] {
+  const { folded, lines } = fold(text);
+  const hits: ScanHit[] = [];
   for (const entry of privateList) {
-    if (lower.includes(entry.value.toLowerCase())) {
+    const needle = fold(entry.value).folded;
+    if (!needle) continue;
+    const seen = new Set<number>();
+    for (
+      let at = folded.indexOf(needle);
+      at !== -1;
+      at = folded.indexOf(needle, at + 1)
+    ) {
+      if (seen.has(lines[at])) continue;
+      seen.add(lines[at]);
       hits.push({
-        file: added.file,
-        line: added.line,
+        file,
+        line: lines[at],
         rule: `private list entry on line ${entry.line}`,
       });
     }
@@ -142,64 +182,108 @@ export function scanAddedLine(
   return hits;
 }
 
-function unquotePath(raw: string): string {
-  const name = raw.replace(/\t$/, "");
-  if (!name.startsWith('"')) return name;
-  try {
-    return JSON.parse(name) as string;
-  } catch {
-    return name;
+/**
+ * Hits in one file's content as a commit leaves it. Text is scanned whole:
+ * every line against the denylist and the full text against the private list,
+ * so a value split across lines or between commits is still found. Binary
+ * content is checked against the private list only.
+ */
+export function scanContent(
+  file: string,
+  content: Buffer,
+  privateList: PrivateEntry[]
+): ScanHit[] {
+  const text = content.toString("utf8");
+  if (isBinary(content)) {
+    const lower = content.toString("latin1").toLowerCase();
+    return privateList
+      .filter(
+        (e) =>
+          lower.includes(e.value.toLowerCase()) ||
+          text.toLowerCase().includes(e.value.toLowerCase())
+      )
+      .map((e) => ({
+        file,
+        line: 0,
+        rule: `private list entry on line ${e.line} (binary file)`,
+      }));
   }
+  return [...scanText(file, text), ...findPrivate(file, text, privateList)];
 }
 
-/** The lines a commit adds to its text files, against its first parent. */
-export function addedLines(commit: string, emptyTree: string): AddedLine[] {
-  const parents = git(["rev-list", "--parents", "-n", "1", commit])
-    .trim()
-    .split(" ")
-    .slice(1);
-  const base = parents[0] ?? emptyTree;
-  let diff: string;
+export interface ChangedFile {
+  path: string;
+  blob: string;
+}
+
+/**
+ * The files a commit adds or changes against its first parent (a root commit
+ * against the empty tree), read from git's NUL-delimited raw output so no
+ * path or line can be misparsed. Submodule entries carry no content.
+ */
+export function changedFiles(commit: string, emptyTree: string): ChangedFile[] {
+  const short = commit.slice(0, 12);
+  let raw: string;
   try {
-    diff = git([
-      "-c",
-      "core.quotePath=false",
-      "diff",
-      "--no-color",
+    const parents = git(["rev-list", "--parents", "-n", "1", commit])
+      .trim()
+      .split(" ")
+      .slice(1);
+    raw = git([
+      "diff-tree",
+      "-r",
+      "-z",
+      "--raw",
+      "--no-renames",
       "--no-ext-diff",
       "--no-textconv",
-      "--no-renames",
-      "--unified=0",
-      "--src-prefix=a/",
-      "--dst-prefix=b/",
-      base,
+      parents[0] ?? emptyTree,
       commit,
     ]);
-  } catch (error) {
-    throw new Refusal(
-      `cannot diff commit ${commit.slice(0, 12)}: ${(error as Error).message}`
+  } catch {
+    throw new Refusal(`cannot diff commit ${short}`);
+  }
+  const fields = raw.split("\0");
+  const files: ChangedFile[] = [];
+  for (let i = 0; i + 1 < fields.length; i += 2) {
+    const m = /^:(\d{6}) (\d{6}) ([0-9a-f]+) ([0-9a-f]+) ([A-Z])\d*$/.exec(
+      fields[i]
     );
+    if (!m) throw new Refusal(`cannot read the diff of ${short}`);
+    const [, , newMode, , newBlob, status] = m;
+    if (status === "D" || newMode === "160000") continue;
+    files.push({ path: fields[i + 1], blob: newBlob });
   }
-  const added: AddedLine[] = [];
-  let file: string | null = null;
-  let line = 0;
-  for (const text of diff.split("\n")) {
-    if (text.startsWith("diff --git ")) {
-      file = null;
-    } else if (text.startsWith("+++ ")) {
-      const name = unquotePath(text.slice(4));
-      file = name === "/dev/null" ? null : name.replace(/^b\//, "");
-    } else if (text.startsWith("@@ ")) {
-      const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
-      if (!match)
-        throw new Refusal(`cannot read the diff of ${commit.slice(0, 12)}`);
-      line = Number(match[1]);
-    } else if (text.startsWith("+") && file) {
-      added.push({ file, line, text: text.slice(1) });
-      line++;
+  return files;
+}
+
+/** Reads blobs by id. Any blob that cannot be read refuses the push. */
+export function readBlobs(ids: string[]): Map<string, Buffer> {
+  const blobs = new Map<string, Buffer>();
+  const unique = [...new Set(ids)];
+  if (!unique.length) return blobs;
+  let out: Buffer;
+  try {
+    out = execFileSync("git", ["cat-file", "--batch"], {
+      input: unique.join("\n") + "\n",
+      maxBuffer: 1024 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    throw new Refusal("cannot read the pushed files");
+  }
+  let pos = 0;
+  for (const id of unique) {
+    const eol = out.indexOf(0x0a, pos);
+    const header = out.toString("utf8", pos, eol).split(" ");
+    if (eol === -1 || header[0] !== id || header[1] !== "blob") {
+      throw new Refusal("cannot read the pushed files");
     }
+    const size = Number(header[2]);
+    blobs.set(id, out.subarray(eol + 1, eol + 1 + size));
+    pos = eol + 1 + size + 1;
   }
-  return added;
+  return blobs;
 }
 
 interface RefUpdate {
@@ -297,8 +381,14 @@ export function scanPush(
   const emptyTree = git(["hash-object", "-t", "tree", "--stdin"], "").trim();
   const hits: PrivacyHit[] = [];
   for (const commit of commits) {
-    for (const added of addedLines(commit, emptyTree)) {
-      for (const hit of scanAddedLine(added, privateList)) {
+    const files = changedFiles(commit, emptyTree);
+    const blobs = readBlobs(files.map((f) => f.blob));
+    for (const file of files) {
+      for (const hit of scanContent(
+        file.path,
+        blobs.get(file.blob)!,
+        privateList
+      )) {
         hits.push({ commit, ...hit });
       }
     }

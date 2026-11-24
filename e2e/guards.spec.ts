@@ -858,6 +858,62 @@ test.describe("guards", () => {
       refusedFor(addRemove, `${added.slice(0, 12)} content/post.mdx:1`);
       expect(addRemove.output).not.toContain(removed.slice(0, 12));
 
+      // A value split by line wrapping, within one commit or across two,
+      // and a wrapped value added then removed within one push.
+      const [head1, tail1] = literals[1].split(" ");
+      repo.git(["checkout", "-q", "-b", "wrapped", "main"]);
+      commit("content/wrapped.mdx", `We met the ${head1}\n  ${tail1} team.\n`);
+      refusedFor(
+        push("origin", "wrapped"),
+        "content/wrapped.mdx:1 private list entry on line 3"
+      );
+      repo.git(["checkout", "-q", "-b", "split-commits", "main"]);
+      commit("content/split.mdx", `Thanks to ${head1}\n`);
+      const completes = commit(
+        "content/split.mdx",
+        `Thanks to ${head1}\n${tail1} for the data.\n`
+      );
+      refusedFor(
+        push("origin", "split-commits"),
+        `${completes.slice(0, 12)} content/split.mdx:1 private list entry`
+      );
+      repo.git(["checkout", "-q", "-b", "wrap-remove", "main"]);
+      const wrappedIn = commit("content/gone.mdx", `${head1}\n${tail1}\n`);
+      commit("content/gone.mdx", "Gone.\n");
+      refusedFor(
+        push("origin", "wrap-remove"),
+        `${wrappedIn.slice(0, 12)} content/gone.mdx:1`
+      );
+
+      // Added text the patch format could hide: a line that starts with
+      // "++ ", a text file git attributes mark binary, and binary content.
+      for (const [branch, file, content, needle] of [
+        [
+          "plus",
+          "content/plus.mdx",
+          `++ ${literals[0]}\n`,
+          "content/plus.mdx:1",
+        ],
+        [
+          "attr",
+          "content/attr.mdx",
+          `Hello ${literals[0]}\n`,
+          "content/attr.mdx:1",
+        ],
+        [
+          "binary",
+          "public/data.bin",
+          `\0\0${literals[0]}\0`,
+          "public/data.bin:0 private list entry on line 2 (binary file)",
+        ],
+      ]) {
+        repo.git(["checkout", "-q", "-b", branch, "main"]);
+        if (branch === "attr") commit(".gitattributes", "*.mdx binary\n");
+        commit(file, content);
+        refusedFor(push("origin", branch), needle);
+        expect(hasRef(remote, `refs/heads/${branch}`)).toBe(false);
+      }
+
       // Without a readable private list every push is refused.
       repo.git(["checkout", "-q", "-b", "clean", "main"]);
       commit("content/clean.mdx", "Nothing private here.\n");
