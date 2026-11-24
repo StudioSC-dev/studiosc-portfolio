@@ -270,14 +270,43 @@ function gitOk(...args: string[]): boolean {
 }
 
 /** The PR base: PR_BASE_SHA when CI passes it, else the merge base with origin/main. */
-function prBase(): string {
-  return process.env.PR_BASE_SHA || git("merge-base", "origin/main", "HEAD");
+function prBase(env: Env = process.env): string {
+  const fromEnv = env.PR_BASE_SHA?.trim();
+  return fromEnv
+    ? git("rev-parse", "--verify", `${fromEnv}^{commit}`)
+    : git("merge-base", "origin/main", "HEAD");
 }
 
 /** The commit under test: PR_HEAD_SHA when CI passes it, else HEAD. */
-function prHead(): string {
-  return git("rev-parse", process.env.PR_HEAD_SHA || "HEAD");
+function prHead(env: Env = process.env): string {
+  return git(
+    "rev-parse",
+    "--verify",
+    `${env.PR_HEAD_SHA?.trim() || "HEAD"}^{commit}`
+  );
 }
+
+type Env = Record<string, string | undefined>;
+
+interface PrRange {
+  base: string;
+  head: string;
+}
+
+/**
+ * The pull request under test, as PRV-1 defines it: in CI, PR_BASE_SHA to
+ * PR_HEAD_SHA, and none for a build without PR_HEAD_SHA (a push to main or
+ * develop), so checks that judge a PR's own changes do not run there.
+ * Locally, PR_BASE_SHA (or the merge base with origin/main) to PR_HEAD_SHA
+ * (or HEAD).
+ */
+function prRange(env: Env = process.env): PrRange | null {
+  if (env.CI && !env.PR_HEAD_SHA?.trim()) return null;
+  return { base: prBase(env), head: prHead(env) };
+}
+
+/** A push build: no PR, so the PR-only checks skip with this reason. */
+const NO_PR = "a CI build without PR_HEAD_SHA (a push) has no PR to judge";
 
 const SPEC_FILE = "e2e/design-tokens.spec.ts";
 
@@ -798,8 +827,9 @@ test.describe("Range design system", () => {
     }
     const withFragments = await fragmentWatch();
     // An exception counts only if the owner accepted it before this PR: it
-    // is read from the PR base, never from this branch.
-    const base = prBase();
+    // is read from the PR base, never from this branch. A push build has no
+    // PR, so what it carries is already merged.
+    const base = prRange()?.base ?? prHead();
     const deviations = gitOk("cat-file", "-e", `${base}:${DEVIATIONS}`)
       ? fragmentFontDeviations(git("show", `${base}:${DEVIATIONS}`))
       : [];
@@ -1239,9 +1269,23 @@ test.describe("Range design system", () => {
     // PRV-1's rule: the record binds only the PR that changes it. A later PR
     // that leaves it alone is checked against the thresholds above, never
     // against PRV-2's measured commit.
-    const [base, head] = [prBase(), prHead()];
-    // Control: a PR whose base already holds this record does not bind it.
-    expect(changedBetween(head, head, PERF)).toBe(false);
+    // Controls: a push build has no PR, and a PR whose base already holds
+    // this record does not bind it.
+    const sha = prHead();
+    expect(prRange({ CI: "true", PR_HEAD_SHA: "" })).toBeNull();
+    expect(prRange({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })).toEqual(
+      { base: sha, head: sha }
+    );
+    expect(changedBetween(sha, sha, PERF)).toBe(false);
+    const range = prRange();
+    if (!range) {
+      testInfo.annotations.push({
+        type: "not bound",
+        description: `${NO_PR}, so only the thresholds are asserted.`,
+      });
+      return;
+    }
+    const { base, head } = range;
     if (!changedBetween(base, head, PERF)) {
       testInfo.annotations.push({
         type: "not bound",
@@ -1326,17 +1370,20 @@ test.describe("Range design system", () => {
 
     // The diff checks belong to PRV-2's own PR (PRV-1's rule): a later PR,
     // whose base already holds this suite, skips them.
-    const base = prBase();
     expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
       false
     );
-    if (!introducesSuite(base)) {
+    const range = prRange();
+    if (!range || !introducesSuite(range.base)) {
       testInfo.annotations.push({
         type: "skip",
-        description: `${base} already holds ${SPEC_FILE}: PRV-2's icon diff checks ran on its own PR.`,
+        description: range
+          ? `${range.base} already holds ${SPEC_FILE}: PRV-2's icon diff checks ran on its own PR.`
+          : `${NO_PR}: PRV-2's icon diff checks run on its own PR.`,
       });
       return;
     }
+    const base = range.base;
 
     // The diff adds no dependency and no icon source.
     const deps = (json: string) => {
@@ -1427,13 +1474,14 @@ test.describe("Range design system", () => {
   test("changes stay within PRV-2 scope", async ({ browser }, testInfo) => {
     chromiumOnly(testInfo);
     test.setTimeout(420_000);
-    const base = prBase();
-
     // PRV-1's rule: PRV-2's scope binds PRV-2's own PR, the one whose base
-    // has no copy of this suite. Every later PR skips it.
+    // has no copy of this suite. Every later PR, and every push build, skips it.
     expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
       false
     );
+    const range = prRange();
+    test.skip(!range, `${NO_PR}: PRV-2's scope is checked on its own PR.`);
+    const base = range!.base;
     test.skip(
       !introducesSuite(base),
       `${base} already holds ${SPEC_FILE}: PRV-2's scope was checked on its own PR.`
