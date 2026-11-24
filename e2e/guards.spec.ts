@@ -37,6 +37,7 @@ import { checkIco } from "../scripts/image-metadata";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
+import urlsFixture from "./fixtures/urls.json";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
 import {
@@ -85,6 +86,18 @@ function checkImages(files: string[]) {
     { cwd: ROOT, encoding: "utf8" }
   );
   return { status: run.status, stderr: run.stderr };
+}
+
+const URLS: string[] = urlsFixture.urls;
+/** The content pages: every project and every blog post. */
+const CONTENT_URLS = URLS.filter((u) => /^\/(work|blog)\/[^/]+$/.test(u));
+
+/** Only one browser project needs to check server responses and markup. */
+function chromiumOnly() {
+  test.skip(
+    test.info().project.name !== "chromium",
+    "server-side check; runs once, in the chromium project"
+  );
 }
 
 /** A hit as text that names the file, line and rule, never the match. */
@@ -570,5 +583,84 @@ test.describe("guards", () => {
     }
     expect(socialRequests).toEqual([]);
     expect(errors).toEqual([]);
+  });
+
+  test("every URL resolves", async ({ request }) => {
+    chromiumOnly();
+    // urls.json is exactly the page URLs of the pre-change tree.
+    const at = urlsFixture.sha;
+    const files = git(["ls-tree", "-r", "--name-only", at]).split("\n");
+    const staticPages = files
+      .filter((f) => /^app\/(.*\/)?page\.tsx$/.test(f) && !f.includes("["))
+      .map((f) => "/" + f.replace(/^app\/?/, "").replace(/\/?page\.tsx$/, ""));
+    const slugs = (dir: string) =>
+      files
+        .filter((f) => f.startsWith(`content/${dir}/`) && f.endsWith(".mdx"))
+        .map((f) => path.basename(f, ".mdx"));
+    const expected = [
+      ...staticPages,
+      ...slugs("projects").map((s) => `/work/${s}`),
+      ...slugs("blog").map((s) => `/blog/${s}`),
+    ];
+    expect(staticPages).toHaveLength(6);
+    expect(slugs("projects")).toHaveLength(4);
+    expect(slugs("blog")).toHaveLength(22);
+    expect(new Set(URLS).size).toBe(URLS.length);
+    expect([...URLS].sort()).toEqual(expected.sort());
+
+    // Each answers 200, or a 308 that leads to a 200. The first status is
+    // read before any redirect is followed.
+    const failures: string[] = [];
+    for (const url of URLS) {
+      let target = url;
+      const statuses: number[] = [];
+      for (let hop = 0; hop < 5; hop++) {
+        const res = await request.get(target, { maxRedirects: 0 });
+        statuses.push(res.status());
+        if (res.status() !== 308) break;
+        target = new URL(res.headers()["location"], new URL(target, "http://x"))
+          .pathname;
+      }
+      const last = statuses[statuses.length - 1];
+      const ok = last === 200 && statuses.slice(0, -1).every((s) => s === 308);
+      if (!ok) failures.push(`${url}: ${statuses.join(" -> ")}`);
+    }
+    expect(failures).toEqual([]);
+  });
+
+  test("every content page has one h1", async ({ page }) => {
+    chromiumOnly();
+    expect(CONTENT_URLS).toHaveLength(26);
+    await stubVercelInsights(page);
+    const counts: string[] = [];
+    for (const url of CONTENT_URLS) {
+      await page.goto(url);
+      const h1 = await page.locator("h1").count();
+      if (h1 !== 1) counts.push(`${url}: ${h1} h1`);
+    }
+    expect(counts).toEqual([]);
+  });
+
+  test("every route renders without a console error", async ({ context }) => {
+    test.setTimeout(10 * 60_000);
+    const failures: string[] = [];
+    for (const width of [1440, 390]) {
+      for (const url of URLS) {
+        // A fresh page per URL: leaving a page cancels its prefetches, and
+        // WebKit reports those as errors against the page being left.
+        const page = await context.newPage();
+        await page.setViewportSize({ width, height: 900 });
+        await stubVercelInsights(page);
+        const errors = collectErrors(page);
+        const res = await page.goto(url);
+        expect(res?.status(), url).toBe(200);
+        await page.waitForLoadState("networkidle");
+        for (const error of [...errors]) {
+          failures.push(`${width}px ${url}: ${error}`);
+        }
+        await page.close();
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });
