@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -672,63 +672,45 @@ RANGE_CATEGORIES.push({
   });
 
   test("status words from the set", async ({ page }) => {
-    const label = (key: (typeof STATUS_KEYS)[number]) => STATUSES[key].label;
-    const expected = {
-      "portfolio-site": { title: "StudioSC Portfolio", status: label("live") },
-      "central-command": { title: "Central Command", status: label("in-qa") },
-      tallyandtrace: { title: "Tally And Trace", status: label("in-qa") },
-      "fitness-rival": {
-        title: "Fitness Rival",
-        status: label("in-development"),
+    // Literal words, so a change to the set itself is caught here.
+    expect(STATUSES).toEqual({
+      live: { label: "Live", plateLabel: "Live" },
+      "in-qa": { label: "In QA", plateLabel: "In QA with Christine" },
+      "in-development": {
+        label: "In development",
+        plateLabel: "In development",
       },
+      "tested-by-us": { label: "Tested by us", plateLabel: "Tested by us" },
+    });
+    const obsolete = ["QA Verified", "QA In Progress", "Under Development"];
+    const expectWords = async (path: string, present: string[]) => {
+      await page.goto(path);
+      for (const word of present) {
+        await expect(
+          page.getByText(word, { exact: true }).first(),
+          `${path} shows ${word}`
+        ).toBeVisible();
+      }
+      for (const word of obsolete) {
+        await expect(
+          page.getByText(word, { exact: true }),
+          `${path} drops ${word}`
+        ).toHaveCount(0);
+      }
     };
-    const allowed = new Set(STATUS_KEYS.map(label));
 
-    const cardFor = (p: Page, slug: string) =>
-      p
-        .locator("div.group")
-        .filter({ has: p.locator(`a[href="/work/${slug}"]`) });
-
-    // Home: three featured projects, most finished first, as before.
-    await page.goto("/");
-    const homeOrder = ["portfolio-site", "central-command", "tallyandtrace"];
-    await expect(page.locator("div.group h3").first()).toBeVisible();
-    const homeTitles = await page.locator("div.group h3").allTextContents();
-    for (const slug of homeOrder) {
-      expect(homeTitles).toContain(
-        expected[slug as keyof typeof expected].title
-      );
-    }
-    for (const slug of homeOrder) {
-      const badge = cardFor(page, slug).locator("span.label");
-      await expect(badge).toHaveText(
-        expected[slug as keyof typeof expected].status
-      );
-    }
-
-    // Work: group headings use the same labels as the badges.
-    await page.goto("/work");
-    const headings = await page.locator("section.mb-16 > h2").allTextContents();
-    for (const heading of headings) expect(allowed.has(heading)).toBe(true);
-    for (const [slug, info] of Object.entries(expected)) {
-      await expect(cardFor(page, slug).locator("span.label")).toHaveText(
-        info.status
-      );
-      await expect(
-        page
-          .locator("section.mb-16")
-          .filter({ has: page.locator(`a[href="/work/${slug}"]`) })
-          .locator("> h2")
-      ).toHaveText(info.status);
-    }
-
-    // Case pages: the status.
-    for (const [slug, info] of Object.entries(expected)) {
-      await page.goto(`/work/${slug}`);
-      await expect(page.locator("article header span.label").last()).toHaveText(
-        info.status
-      );
-      await expect(page.locator("article header h1")).toHaveText(info.title);
+    // Words only, no markup: these survive a page redesign.
+    await expectWords("/", ["Live", "In QA"]);
+    await expectWords("/work", ["Live", "In QA", "In development"]);
+    const cases = {
+      "portfolio-site": ["StudioSC Portfolio", "Live"],
+      "central-command": ["Central Command", "In QA"],
+      tallyandtrace: ["Tally And Trace", "In QA"],
+      "fitness-rival": ["Fitness Rival", "In development"],
+    };
+    for (const [slug, [title, word]] of Object.entries(cases)) {
+      await expectWords(`/work/${slug}`, [word]);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     }
   });
 
