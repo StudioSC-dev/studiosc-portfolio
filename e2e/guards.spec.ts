@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -116,6 +117,32 @@ function checkImages(files: string[]) {
 const URLS: string[] = urlsFixture.urls;
 /** A content page: a project or a blog post. */
 const CONTENT_URL = /^\/(work|blog)\/[^/]+$/;
+
+/** Every project and post route the checkout under test has, from content/. */
+function contentRoutes(root = ROOT): string[] {
+  return [
+    ["blog", "blog"],
+    ["projects", "work"],
+  ].flatMap(([dir, route]) =>
+    readdirSync(path.join(root, "content", dir))
+      .filter((file) => file.endsWith(".mdx"))
+      .map((file) => `/${route}/${file.replace(/\.mdx$/, "")}`)
+  );
+}
+
+/**
+ * The pages the one-h1 check visits: every content route in the checkout,
+ * whether or not urls.json lists it, every content URL urls.json lists, and
+ * every route added to urls.json after it was locked.
+ */
+function headingPages(
+  urls: string[],
+  original: Set<string>,
+  content: string[]
+): string[] {
+  const listed = urls.filter((u) => CONTENT_URL.test(u) || !original.has(u));
+  return [...new Set([...listed, ...content])].sort();
+}
 
 /**
  * Why urls.json is wrong. On the PR that introduces it, it must hold exactly
@@ -1090,11 +1117,17 @@ test.describe("guards", () => {
 
   test("every content page has one h1", async ({ page }) => {
     chromiumOnly();
-    // Every project and post, and every route added after urls.json was
-    // locked; the original static pages are covered elsewhere.
+    // Every project and post in the tree, and every route added after
+    // urls.json was locked; the original static pages are covered elsewhere.
     const original = new Set(originalUrls());
-    const pages = URLS.filter((u) => CONTENT_URL.test(u) || !original.has(u));
+    const content = contentRoutes();
+    const pages = headingPages(URLS, original, content);
     expect(pages.filter((u) => original.has(u))).toHaveLength(26);
+    // A post in the tree but missing from urls.json is still visited.
+    expect(content).toEqual(expect.arrayContaining(["/blog/first-marathon"]));
+    expect(
+      headingPages(URLS, original, [...content, "/blog/a-new-post"])
+    ).toContain("/blog/a-new-post");
     await stubVercelInsights(page);
     const counts: string[] = [];
     for (const url of pages) {
