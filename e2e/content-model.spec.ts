@@ -554,6 +554,31 @@ test.describe("content model", () => {
       rmSync(dir, { recursive: true, force: true });
     }
 
+    // Every equivalent form of the old account is rejected; other hosts are not.
+    const parse = (githubUrl: string) =>
+      projectFrontmatterSchema.safeParse({
+        ...matter(projectFile()).data,
+        githubUrl,
+      }).success;
+    for (const old of [
+      "https://github.com/studiosc",
+      "https://GitHub.com/StudioSC",
+      "https://www.github.com/studiosc/",
+      "https://github.com/studiosc.git",
+      "https://github.com:443/studiosc/some-repo",
+      "http://github.com/STUDIOSC/some-repo.git",
+    ]) {
+      expect(parse(old), old).toBe(false);
+    }
+    for (const fine of [
+      "https://github.com/StudioSC-dev/studiosc-portfolio",
+      "https://github.com/studiosc-dev",
+      "https://notgithub.com/studiosc",
+      "https://gitlab.com/studiosc/repo",
+    ]) {
+      expect(parse(fine), fine).toBe(true);
+    }
+
     // The rendered case page links to the right repository.
     await page.goto("/work/portfolio-site");
     await expect(

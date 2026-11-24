@@ -1,8 +1,19 @@
 import { z } from "zod";
 import { STATUS_KEYS } from "./statuses";
 
-/** The old, wrong account: github.com/studiosc (not StudioSC-dev). */
-const OBSOLETE_GITHUB_ACCOUNT = /github\.com\/studiosc(?![\w-])/i;
+/** True for any form of github.com/studiosc (our account is StudioSC-dev). */
+function pointsAtObsoleteAccount(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (host !== "github.com") return false;
+  const account = url.pathname.split("/").filter(Boolean)[0] ?? "";
+  return account.toLowerCase().replace(/\.git$/, "") === "studiosc";
+}
 
 /**
  * Project frontmatter. Strict, so a leftover key (for example one of the old
@@ -19,7 +30,7 @@ export const projectFrontmatterSchema = z.strictObject({
   thumbnail: z.string().optional(),
   githubUrl: z
     .string()
-    .refine((url) => !OBSOLETE_GITHUB_ACCOUNT.test(url), {
+    .refine((url) => !pointsAtObsoleteAccount(url), {
       message:
         "githubUrl points at github.com/studiosc, which is not our account",
     })
