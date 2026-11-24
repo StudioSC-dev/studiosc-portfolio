@@ -3,6 +3,8 @@ import { join } from "path";
 import matter from "gray-matter";
 import type { BlogPost, Project } from "@/types";
 import { calculateReadingTime } from "./utils";
+import { projectFrontmatterSchema } from "./projects-schema";
+import { RANGE_CATEGORIES, validateRange } from "../content/range";
 
 const blogDirectory = join(process.cwd(), "content/blog");
 const projectsDirectory = join(process.cwd(), "content/projects");
@@ -82,64 +84,70 @@ export async function getBlogPost(slug: string) {
   }
 }
 
-export async function getProjects(): Promise<Project[]> {
-  try {
-    const files = await readdir(projectsDirectory);
-    const mdxFiles = files.filter((file) => file.endsWith(".mdx"));
-
-    const projects = await Promise.all(
-      mdxFiles.map(async (file) => {
-        const filePath = join(projectsDirectory, file);
-        const fileContents = await readFile(filePath, "utf8");
-        const { data } = matter(fileContents);
-
-        return {
-          slug: file.replace(/\.mdx$/, ""),
-          title: data.title || "Untitled",
-          description: data.description || "",
-          tags: data.tags || [],
-          qaVerified: data.qaVerified || false,
-          qaInProgress: data.qaInProgress || false,
-          underDevelopment: data.underDevelopment || false,
-          githubUrl: data.githubUrl,
-          liveUrl: data.liveUrl,
-          date: data.date || new Date().toISOString(),
-          thumbnail: data.thumbnail,
-        } as Project;
-      })
-    );
-
-    return projects.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  } catch (error) {
-    console.error("Error reading projects:", error);
-    return [];
+function parseProject(file: string, fileContents: string) {
+  const { data, content } = matter(fileContents);
+  const parsed = projectFrontmatterSchema.safeParse(data);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
+    throw new Error(`Invalid project frontmatter in ${file}: ${issues}`);
   }
+  return {
+    project: {
+      slug: file.replace(/\.mdx$/, ""),
+      ...parsed.data,
+    } satisfies Project,
+    content,
+  };
 }
 
-export async function getProject(slug: string) {
-  try {
-    const filePath = join(projectsDirectory, `${slug}.mdx`);
-    const fileContents = await readFile(filePath, "utf8");
-    const { data, content } = matter(fileContents);
+/**
+ * Read every project. Malformed frontmatter throws, naming the file, so a bad
+ * file fails the build instead of quietly disappearing from the site.
+ */
+export async function getProjects(
+  directory: string = projectsDirectory
+): Promise<Project[]> {
+  const files = await readdir(directory);
+  const mdxFiles = files.filter((file) => file.endsWith(".mdx"));
 
-    return {
-      slug,
-      title: data.title || "Untitled",
-      description: data.description || "",
-      tags: data.tags || [],
-      qaVerified: data.qaVerified || false,
-      qaInProgress: data.qaInProgress || false,
-      underDevelopment: data.underDevelopment || false,
-      githubUrl: data.githubUrl,
-      liveUrl: data.liveUrl,
-      date: data.date || new Date().toISOString(),
-      thumbnail: data.thumbnail,
-      content: stripLeadingH1(content),
-    };
+  const projects = await Promise.all(
+    mdxFiles.map(async (file) => {
+      const fileContents = await readFile(join(directory, file), "utf8");
+      return parseProject(file, fileContents).project;
+    })
+  );
+
+  return projects.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+}
+
+/** One project by slug: `null` when there is no such file, a throw when it is malformed. */
+export async function getProject(
+  slug: string,
+  directory: string = projectsDirectory
+) {
+  const file = `${slug}.mdx`;
+  let fileContents: string;
+  try {
+    fileContents = await readFile(join(directory, file), "utf8");
   } catch (error) {
-    console.error(`Error reading project ${slug}:`, error);
-    return null;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
   }
+  const { project, content } = parseProject(file, fileContents);
+  return { ...project, content: stripLeadingH1(content) };
+}
+
+/** Build-time check of the shipped Range against the project files. */
+export async function validateShippedRange(): Promise<void> {
+  const projects = await getProjects();
+  validateRange(
+    RANGE_CATEGORIES,
+    projects.map((project) => project.slug)
+  );
 }
