@@ -34,6 +34,7 @@ import {
   xmpSegment,
 } from "./support/dirty-images";
 import { checkIco } from "../scripts/image-metadata";
+import { throwawayRepo } from "./support/throwaway";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
 import {
@@ -454,6 +455,52 @@ test.describe("guards", () => {
       expect(clean.status).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("pre-commit blocks metadata", () => {
+    nodeOnly();
+    const repo = throwawayRepo(
+      [
+        ".husky/pre-commit",
+        ".lintstagedrc.json",
+        "scripts/image-metadata.ts",
+        "e2e/support/ico.ts",
+      ],
+      "pre-commit-"
+    );
+    try {
+      expect(repo.git(["remote"]).trim()).toBe("");
+      const jpeg = readFileSync(
+        path.join(ROOT, "e2e/fixtures/images/clean.jpg")
+      );
+      const commits = () => repo.git(["rev-list", "--count", "HEAD"]).trim();
+
+      // A staged dirty JPEG blocks the commit, naming the file and the fix.
+      repo.write("photos/dirty.jpg", jpegWithSegment(jpeg, exifGpsSegment()));
+      repo.git(["add", "photos/dirty.jpg"]);
+      const blocked = repo.run("git", ["commit", "-m", "add a dirty photo"]);
+      expect(blocked.status).not.toBe(0);
+      expect(blocked.output).toContain("photos/dirty.jpg");
+      expect(blocked.output).toContain("APP1 segment (Exif)");
+      expect(blocked.output).toContain("npm run photos");
+      expect(commits()).toBe("1");
+
+      // Left unstaged, the dirty JPEG does not block a clean one.
+      repo.git(["reset", "-q", "--", "photos/dirty.jpg"]);
+      repo.write("photos/clean.jpg", jpeg);
+      repo.git(["add", "photos/clean.jpg"]);
+      const passed = repo.run("git", ["commit", "-m", "add a clean photo"]);
+      expect(passed.status, passed.output).toBe(0);
+      expect(commits()).toBe("2");
+      expect(
+        repo.git(["show", "--name-only", "--format=", "HEAD"]).trim()
+      ).toBe("photos/clean.jpg");
+      expect(repo.git(["status", "--porcelain"])).toContain(
+        "?? photos/dirty.jpg"
+      );
+    } finally {
+      repo.remove();
     }
   });
 });
