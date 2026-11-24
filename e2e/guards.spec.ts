@@ -57,6 +57,7 @@ import { detectCards } from "./support/cards";
 import {
   BUDGET_ROUTES,
   baselineProblems,
+  MAX_BUDGET_BYTES,
   firstLoadJs,
   layoutShift,
 } from "./support/perf";
@@ -1556,7 +1557,8 @@ test.describe("guards", () => {
     const current = perfBaseline.current as Routes;
     const routes = [...BUDGET_ROUTES].sort();
     // The baseline is well formed: exactly the six routes, each value a
-    // positive whole number of bytes (a string or NaN would void the check).
+    // positive whole number of bytes (a string or NaN would void the check),
+    // and no larger than the cap (a huge value makes the threshold infinite).
     expect(baselineProblems(perfBaseline)).toEqual([]);
     const valid = {
       measured_sha: "a".repeat(40),
@@ -1564,7 +1566,18 @@ test.describe("guards", () => {
       current: Object.fromEntries(routes.map((r) => [r, 1000])),
     };
     expect(baselineProblems(valid)).toEqual([]);
-    for (const bad of ["1000", Number.NaN, 0, -5, 10.5, null]) {
+    for (const bad of [
+      "1000",
+      Number.NaN,
+      0,
+      -5,
+      10.5,
+      null,
+      Number.MAX_VALUE,
+      1e308,
+      2 ** 53,
+      MAX_BUDGET_BYTES + 1,
+    ]) {
       const broken = {
         ...valid,
         current: { ...valid.current, "/": bad },
@@ -1572,6 +1585,12 @@ test.describe("guards", () => {
       };
       expect(baselineProblems(broken), String(bad)).not.toEqual([]);
     }
+    expect(
+      baselineProblems({
+        ...valid,
+        current: { ...valid.current, "/": MAX_BUDGET_BYTES },
+      })
+    ).toEqual([]);
     expect(
       baselineProblems({ ...valid, current: { ...valid.current, "/x": 1 } })
     ).not.toEqual([]);

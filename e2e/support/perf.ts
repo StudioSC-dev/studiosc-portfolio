@@ -90,9 +90,16 @@ export async function layoutShift(
 }
 
 /**
+ * The largest budget a route may have: far above any real first load, and
+ * small enough that the 3% threshold stays a finite, meaningful number.
+ */
+export const MAX_BUDGET_BYTES = 10 * 1024 * 1024;
+
+/**
  * Why a perf baseline is invalid: `measured_sha` must be a commit id, and
  * `original` and `current` must each hold exactly the budget routes, every
- * value a positive whole number of bytes. Empty when it is valid.
+ * value a positive whole number of bytes no more than MAX_BUDGET_BYTES.
+ * Empty when it is valid.
  */
 export function baselineProblems(baseline: unknown): string[] {
   const problems: string[] = [];
@@ -115,8 +122,15 @@ export function baselineProblems(baseline: unknown): string[] {
       problems.push(`${key} does not hold exactly the budget routes`);
     }
     for (const [route, value] of Object.entries(map)) {
-      if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
-        problems.push(`${key} ${route} is not a positive whole number`);
+      if (
+        typeof value !== "number" ||
+        !Number.isSafeInteger(value) ||
+        value <= 0 ||
+        value > MAX_BUDGET_BYTES
+      ) {
+        problems.push(
+          `${key} ${route} is not a whole number of bytes from 1 to ${MAX_BUDGET_BYTES}`
+        );
       }
     }
   }
