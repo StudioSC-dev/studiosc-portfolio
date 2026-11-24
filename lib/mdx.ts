@@ -84,8 +84,24 @@ export async function getBlogPost(slug: string) {
   }
 }
 
+/** Both `---` delimiter lines must be present, or gray-matter reads to end of file. */
+const FRONTMATTER_BLOCK =
+  /^\uFEFF?---[ \t]*\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
+
 function parseProject(file: string, fileContents: string) {
-  const { data, content } = matter(fileContents);
+  if (!FRONTMATTER_BLOCK.test(fileContents)) {
+    throw new Error(
+      `Invalid project frontmatter in ${file}: missing opening or closing --- delimiter`
+    );
+  }
+  let parsedFile: ReturnType<typeof matter>;
+  try {
+    parsedFile = matter(fileContents);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid project frontmatter in ${file}: ${reason}`);
+  }
+  const { data, content } = parsedFile;
   const parsed = projectFrontmatterSchema.safeParse(data);
   if (!parsed.success) {
     const issues = parsed.error.issues

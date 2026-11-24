@@ -357,6 +357,29 @@ test.describe("content model", () => {
       await expect(getProjects(dir)).rejects.toThrow(/bad\.mdx/);
       await expect(getProject("bad", dir)).rejects.toThrow(/bad\.mdx/);
 
+      // Unclosed frontmatter and YAML syntax errors also name the file.
+      for (const [name, text] of [
+        [
+          "unclosed",
+          VALID_PROJECT.replace("\n---\n\n# Fixture", "\n# Fixture"),
+        ],
+        ["noopen", VALID_PROJECT.replace(/^---\n/, "")],
+        ["yaml", VALID_PROJECT.replace('title: "Fixture"', 'title: "Fixture')],
+      ] as const) {
+        const broken = tempDir(`loader-${name}`);
+        try {
+          writeFileSync(join(broken, `${name}.mdx`), text);
+          await expect(getProjects(broken), name).rejects.toThrow(
+            new RegExp(`${name}\\.mdx`)
+          );
+          await expect(getProject(name, broken), name).rejects.toThrow(
+            new RegExp(`${name}\\.mdx`)
+          );
+        } finally {
+          rmSync(broken, { recursive: true, force: true });
+        }
+      }
+
       const good = await getProject("good", dir);
       expect(good?.slug).toBe("good");
       expect(good?.status).toBe("live");
