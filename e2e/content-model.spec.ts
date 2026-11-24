@@ -482,51 +482,80 @@ test.describe("content model", () => {
     }
 
     test("build rejects invalid content", async () => {
+      // Fixtures are injected as new content, never by editing shipped text,
+      // so they stay valid as the shipped Range and projects grow.
+      const fixtures: {
+        name: string;
+        inject: (dir: string) => void;
+        diagnostics: string[];
+      }[] = [
+        {
+          name: "bad-status",
+          inject: (dir) =>
+            writeFileSync(
+              join(dir, "content/projects/zz-build-bad-status.mdx"),
+              projectFile({ status: "bogus" })
+            ),
+          diagnostics: [
+            "Invalid project frontmatter in zz-build-bad-status.mdx",
+          ],
+        },
+        {
+          name: "unclosed",
+          inject: (dir) =>
+            writeFileSync(
+              join(dir, "content/projects/zz-build-unclosed.mdx"),
+              VALID_PROJECT.replace("\n---\n\n# Fixture", "\n# Fixture")
+            ),
+          diagnostics: ["Invalid project frontmatter in zz-build-unclosed.mdx"],
+        },
+        {
+          name: "bad-range",
+          inject: (dir) => {
+            const rangePath = join(dir, "content/range.ts");
+            const before = readFileSync(rangePath, "utf8");
+            const after = `${before}
+RANGE_CATEGORIES.push({
+  id: "broken-category",
+  tab: "X",
+  word: "X",
+  plate: {
+    kind: "lab",
+    name: "X",
+    fragmentId: "not-registered",
+    description: "X",
+    builtWith: ["X"],
+    labLine: "X",
+  },
+});
+`;
+            writeFileSync(rangePath, after);
+            expect(readFileSync(rangePath, "utf8")).toContain(
+              "broken-category"
+            );
+          },
+          diagnostics: ["Invalid range in content/range.ts", "broken-category"],
+        },
+      ];
+
       const shipped = copyRepo("build-ok");
-      const badProject = copyRepo("build-bad-project");
-      const badRange = copyRepo("build-bad-range");
       try {
         const ok = build(shipped);
         expect(ok.status, ok.output.slice(-3000)).toBe(0);
-
-        writeFileSync(
-          join(badProject, "content/projects/fitness-rival.mdx"),
-          readFileSync(
-            join(badProject, "content/projects/fitness-rival.mdx"),
-            "utf8"
-          ).replace('status: "in-development"', 'status: "bogus"')
-        );
-        const project = build(badProject);
-        expect(project.status).not.toBe(0);
-        expect(project.output).toContain("fitness-rival.mdx");
-
-        const rangePath = join(badRange, "content/range.ts");
-        writeFileSync(
-          rangePath,
-          readFileSync(rangePath, "utf8").replace(
-            "export const RANGE_CATEGORIES: RangeCategory[] = [];",
-            `export const RANGE_CATEGORIES: RangeCategory[] = [
-  {
-    id: "broken-category",
-    tab: "X",
-    word: "X",
-    plate: {
-      kind: "lab",
-      name: "X",
-      fragmentId: "not-registered",
-      description: "X",
-      builtWith: ["X"],
-      labLine: "X",
-    },
-  },
-];`
-          )
-        );
-        const range = build(badRange);
-        expect(range.status).not.toBe(0);
-        expect(range.output).toContain("broken-category");
       } finally {
-        for (const dir of [shipped, badProject, badRange]) {
+        rmSync(shipped, { recursive: true, force: true });
+      }
+
+      for (const fixture of fixtures) {
+        const dir = copyRepo(`build-${fixture.name}`);
+        try {
+          fixture.inject(dir);
+          const result = build(dir);
+          expect(result.status, fixture.name).not.toBe(0);
+          for (const diagnostic of fixture.diagnostics) {
+            expect(result.output, fixture.name).toContain(diagnostic);
+          }
+        } finally {
           rmSync(dir, { recursive: true, force: true });
         }
       }
