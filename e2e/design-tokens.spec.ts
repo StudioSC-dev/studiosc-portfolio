@@ -1238,12 +1238,12 @@ test.describe("Range design system", () => {
         const out = [];
         for (const el of focusable) {
           el.focus();
-          let surface = "rgb(255, 255, 255)";
+          // Every background behind the control, nearest first, to the root.
+          const surfaces: string[] = [];
           for (let p = el.parentElement; p; p = p.parentElement) {
             const bg = getComputedStyle(p).backgroundColor;
             if (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
-              surface = bg;
-              break;
+              surfaces.push(bg);
             }
           }
           const root = el.closest<HTMLElement>("[data-fixture]");
@@ -1259,7 +1259,7 @@ test.describe("Range design system", () => {
             outlineStyle: style.outlineStyle,
             outlineWidth: style.outlineWidth,
             ring: style.outlineColor,
-            surface,
+            surfaces,
           });
         }
         return out;
@@ -1289,6 +1289,20 @@ test.describe("Range design system", () => {
       expect(problems.some((p) => p.includes("no outline"))).toBe(true);
       expect(problems.filter((p) => p.includes("not painted"))).toHaveLength(2);
     }
+
+    // Control: a translucent surface is composited, not refused. A black ring
+    // on 90% white over white is 21:1; a white ring there is 1:1.
+    const onFrosted = (ring: string) => ({
+      name: `${ring} on frosted white`,
+      focused: true,
+      painted: true,
+      outlineStyle: "solid",
+      outlineWidth: "2px",
+      ring,
+      surfaces: ["rgba(255, 255, 255, 0.9)", "rgb(255, 255, 255)"],
+    });
+    expect(ringProblems([onFrosted("rgb(0, 0, 0)")])).toEqual([]);
+    expect(ringProblems([onFrosted("rgb(255, 255, 255)")])).toHaveLength(1);
   });
 
   test("LCP within budget at the measured sha", async () => {

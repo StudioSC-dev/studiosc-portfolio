@@ -186,7 +186,21 @@ export interface RingSample {
   outlineStyle: string;
   outlineWidth: string;
   ring: string;
-  surface: string;
+  /**
+   * The backgrounds behind the control, nearest first, any of them
+   * translucent; flattened over a white canvas before the ring is measured.
+   */
+  surfaces: readonly string[];
+}
+
+/** Paints `layers` (nearest first) over a white canvas, farthest first. */
+export function flattenSurface(layers: readonly string[]): string {
+  let under = "rgb(255, 255, 255)";
+  for (const layer of [...layers].reverse()) {
+    const [r, g, b] = composite(layer, under);
+    under = `rgb(${r}, ${g}, ${b})`;
+  }
+  return under;
 }
 
 /**
@@ -205,8 +219,10 @@ export function ringProblems(
       problems.push(`${s.name}: no outline`);
     else if (parseFloat(s.outlineWidth) < 2)
       problems.push(`${s.name}: outline ${s.outlineWidth}`);
-    else if (contrast(s.ring, s.surface) < min)
-      problems.push(`${s.name}: ${contrast(s.ring, s.surface).toFixed(2)}:1`);
+    else {
+      const ratio = contrast(s.ring, flattenSurface(s.surfaces));
+      if (ratio < min) problems.push(`${s.name}: ${ratio.toFixed(2)}:1`);
+    }
   }
   return problems;
 }
