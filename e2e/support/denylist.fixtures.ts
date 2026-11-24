@@ -73,8 +73,22 @@ export const DENYLIST_FIXTURES: Record<string, RuleFixtures> = {
   },
   "env file": {
     file: "app/example.tsx",
-    matches: [".env", "cp .env.local first", ".env.production"],
-    passes: ["process.env.RESEND_API_KEY", "environment", "the dotenv package"],
+    matches: [
+      ".env",
+      "cp .env.local first",
+      ".env.production",
+      'readFileSync(".env")',
+      "load('./.env.local')",
+      "path.join(root, `.env.test`)",
+      "config/.env",
+    ],
+    passes: [
+      "process.env.RESEND_API_KEY",
+      "import.meta.env.MODE",
+      "environment",
+      "the dotenv package",
+      "a .envrc file",
+    ],
   },
   "secret prefix": {
     file: "content/blog/example.mdx",
@@ -106,6 +120,8 @@ export const DENYLIST_FIXTURES: Record<string, RuleFixtures> = {
       "+63 917 123 4567",
       "+1 415 555 0134",
       "+44 20 7946 0958",
+      "+14155550134",
+      "call +442079460958 today",
     ],
     passes: [
       "2026-11-19",
@@ -115,6 +131,9 @@ export const DENYLIST_FIXTURES: Record<string, RuleFixtures> = {
       "v20.11.1",
       "port 3000",
       "build 0917",
+      "1e+10",
+      "+08:00",
+      "+1234",
     ],
   },
 };

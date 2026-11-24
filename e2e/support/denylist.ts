@@ -56,7 +56,9 @@ export const DENYLIST: readonly DenyRule[] = [
     // Developer docs (README.md, CLAUDE.md, .gitignore) may name env files;
     // the site's own source and content may not.
     name: "env file",
-    pattern: /(^|\s)\.env(\.\w+)?\b/,
+    // `.env` at the start of a word, a quote, a bracket or a path segment:
+    // ".env", './.env.local', `config/.env`. Never `process.env`.
+    pattern: /(?:^|[\s"'`(\[{=:,/])\.env(\.\w+)?\b/,
     appliesTo: (file) => APP_DIRS.some((dir) => file.startsWith(dir)),
   },
   {
@@ -66,10 +68,10 @@ export const DENYLIST: readonly DenyRule[] = [
   },
   {
     // Philippine mobile numbers, local and +63, and other +-prefixed
-    // international numbers.
+    // international numbers, spaced or in unspaced E.164 form.
     name: "phone",
     pattern:
-      /(?<![\w.+-])(?:(?:\+63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}|\+\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]\d{3,4}[\s-]?\d{3,4})(?![\w-])/,
+      /(?<![\w.+-])(?:(?:\+63[\s-]?|0)9\d{2}[\s-]?\d{3}[\s-]?\d{4}|\+\d{1,3}[\s-]?\(?\d{2,4}\)?[\s-]\d{3,4}[\s-]?\d{3,4}|\+[1-9]\d{7,14})(?![\w-])/,
   },
 ];
 
