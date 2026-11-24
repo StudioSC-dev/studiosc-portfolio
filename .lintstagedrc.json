@@ -1,5 +1,5 @@
 {
   "*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
   "*.{json,md,mdx,css,html,yml,yaml,scss}": ["prettier --write"],
-  "*.{jpg,jpeg,png,webp,gif,avif,heic,tif,tiff,ico,svg,JPG,JPEG,PNG,WEBP,GIF,AVIF,HEIC,TIF,TIFF,ICO,SVG}": "tsx scripts/image-metadata.ts --hook"
+  "*": "tsx scripts/image-metadata.ts --hook"
 }

@@ -42,7 +42,7 @@ import {
   withFrameOffset,
   xmpSegment,
 } from "./support/dirty-images";
-import { checkIco } from "../scripts/image-metadata";
+import { checkIco, isImageCandidate } from "../scripts/image-metadata";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
@@ -88,8 +88,6 @@ function denylistHits(select: (file: string) => boolean): DenyHit[] {
     .filter((f) => select(f.path) && !isBinary(f.content))
     .flatMap((f) => scanText(f.path, f.content.toString("utf8")));
 }
-
-const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|avif|heic|tiff?|ico|svg)$/i;
 
 /** Runs the image checker CLI on some files. */
 function checkImages(files: string[]) {
@@ -310,9 +308,10 @@ test.describe("guards", () => {
 
   test("images carry no metadata", () => {
     nodeOnly();
+    // Images are picked by content as well as by name, in any case.
     const images = committedTree()
-      .map((f) => f.path)
-      .filter((f) => IMAGE_EXTENSIONS.test(f));
+      .filter((f) => isImageCandidate(f.path, f.content))
+      .map((f) => f.path);
     expect(images).toEqual(
       expect.arrayContaining([
         "app/favicon.ico",
@@ -323,6 +322,33 @@ test.describe("guards", () => {
     const tracked = checkImages(images);
     expect(tracked.stderr).toBe("");
     expect(tracked.status).toBe(0);
+
+    // Selection: a renamed or oddly cased image is a candidate; text, an
+    // MP4 and a font are not.
+    const dirtyJpeg = jpegWithSegment(
+      readFileSync(path.join(ROOT, "e2e/fixtures/images/clean.jpg")),
+      exifGpsSegment()
+    );
+    const utf16Svg = Buffer.from(
+      '\uFEFF<svg xmlns="http://www.w3.org/2000/svg"/>',
+      "utf16le"
+    );
+    for (const [file, bytes] of [
+      ["public/photo.data", dirtyJpeg],
+      ["public/a/b/Photo.JpEg", Buffer.from("anything")],
+      ["public/icon.txt", utf16Svg],
+      ["public/drawing", Buffer.from('<?xml version="1.0"?>\n<svg/>')],
+    ] as const) {
+      expect(isImageCandidate(file, bytes), file).toBe(true);
+    }
+    const mp4 = Buffer.from("\0\0\0\x18ftypisom\0\0\x02\0", "latin1");
+    for (const [file, bytes] of [
+      ["content/blog/post.mdx", Buffer.from("# A post\n")],
+      ["public/clip.mp4", mp4],
+      ["public/font.woff2", Buffer.from("wOF2\0\x01\0\0", "latin1")],
+    ] as const) {
+      expect(isImageCandidate(file, bytes), file).toBe(false);
+    }
 
     // The cleaned favicon keeps all four frames.
     const favicon = readFileSync(path.join(ROOT, "app/favicon.ico"));
@@ -613,6 +639,19 @@ test.describe("guards", () => {
       expect(blocked.output).toContain("APP1 segment (Exif)");
       expect(blocked.output).toContain("npm run photos");
       expect(commits()).toBe("1");
+
+      // Nested, oddly cased and renamed dirty images are blocked too.
+      const dirty = jpegWithSegment(jpeg, exifGpsSegment());
+      const sneaky = ["photos/deep/er/Photo.JpEg", "photos/renamed.data"];
+      for (const file of sneaky) repo.write(file, dirty);
+      repo.git(["add", "--", ...sneaky]);
+      const sneakyBlocked = repo.run("git", ["commit", "-m", "sneak photos"]);
+      expect(sneakyBlocked.status).not.toBe(0);
+      for (const file of sneaky) {
+        expect(sneakyBlocked.output).toContain(`${file}: APP1 segment (Exif)`);
+      }
+      expect(commits()).toBe("1");
+      repo.git(["reset", "-q", "--", ...sneaky]);
 
       // Left unstaged, the dirty JPEG does not block a clean one.
       repo.git(["reset", "-q", "--", "photos/dirty.jpg"]);

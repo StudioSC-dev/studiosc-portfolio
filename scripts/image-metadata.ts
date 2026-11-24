@@ -5,7 +5,9 @@
  *
  *   npx tsx scripts/image-metadata.ts [--hook] <file>...
  *
- * Exits 1 when any file fails. With --hook it also names the fix.
+ * Exits 1 when any file fails. With --hook (lint-staged passes every staged
+ * file) it checks only the files that are images by content or by name, and
+ * names the fix.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -398,6 +400,56 @@ export function checkSvg(buf: Buffer): string[] {
     : [];
 }
 
+const IMAGE_EXTENSION =
+  /\.(jpe?g|jfif|png|apng|webp|gif|avif|hei[cf]|tiff?|ico|cur|bmp|svgz?)$/i;
+
+const SVG_PROLOG =
+  /^\uFEFF?(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
+
+/**
+ * Whether a file is an image, judged by its bytes first and its name
+ * (any case) second, so a renamed or oddly cased image is still checked.
+ */
+export function isImageCandidate(file: string, buf: Buffer): boolean {
+  if (IMAGE_EXTENSION.test(file)) return true;
+  const ascii = buf.toString("latin1", 0, 16);
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  if (buf.subarray(0, 8).equals(PNG_SIGNATURE)) return true;
+  if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return true;
+  if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return true;
+  if (ascii.startsWith("II*\0") || ascii.startsWith("MM\0*")) return true;
+  if (
+    ascii.startsWith("BM") &&
+    buf.length >= 26 &&
+    buf.readUInt32LE(2) === buf.length
+  ) {
+    return true;
+  }
+  if (buf.length >= 6) {
+    const magic = buf.readUInt32BE(0);
+    if (
+      (magic === 0x00000100 || magic === 0x00000200) &&
+      buf.readUInt16LE(4) > 0
+    ) {
+      return true;
+    }
+  }
+  if (
+    ascii.slice(4, 8) === "ftyp" &&
+    /^(avi[fs]|hei[cmsx]|hev[cmsx]|mif1|msf1)$/.test(ascii.slice(8, 12))
+  ) {
+    return true;
+  }
+  // SVG text in UTF-8 or UTF-16 (either byte order).
+  const head = buf.subarray(0, 2048);
+  const swapped = Buffer.from(head.subarray(0, head.length & ~1)).swap16();
+  return [
+    head.toString("utf8"),
+    head.toString("utf16le"),
+    swapped.toString("utf16le"),
+  ].some((text) => SVG_PROLOG.test(text));
+}
+
 /** Why an image fails the allowlist. Empty when it passes. */
 export function checkImage(file: string, buf: Buffer): string[] {
   const ascii = buf.toString("latin1", 0, 16);
@@ -440,9 +492,13 @@ function main(args: string[]): number {
     const shown = relative.startsWith("..") ? file : relative;
     let problems: string[];
     try {
-      problems = checkImage(file, readFileSync(file));
-    } catch (error) {
-      problems = [`cannot be read (${(error as Error).message})`];
+      const buf = readFileSync(file);
+      // The hook gets every staged file and checks the ones that are images
+      // by content or by name.
+      if (hook && !isImageCandidate(file, buf)) continue;
+      problems = checkImage(file, buf);
+    } catch {
+      problems = ["cannot be read"];
     }
     for (const problem of problems) console.error(`${shown}: ${problem}`);
     if (problems.length) failed++;
