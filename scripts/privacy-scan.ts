@@ -20,7 +20,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { isBinary, scanText } from "../e2e/support/denylist";
+import {
+  DENYLIST,
+  isBinary,
+  scanLine,
+  scanText,
+} from "../e2e/support/denylist";
 
 export class Refusal extends Error {}
 
@@ -51,10 +56,10 @@ function git(args: string[], input?: string): string {
       maxBuffer: 1024 * 1024 * 1024,
       stdio: ["pipe", "pipe", "pipe"],
     });
-  } catch (error) {
-    const stderr = String((error as { stderr?: unknown }).stderr ?? "");
-    const reason = stderr.trim().split("\n")[0] || (error as Error).message;
-    throw new Refusal(`git ${args[0]} failed (${reason})`);
+  } catch {
+    // Git's own message can carry the destination URL or a path, so it is
+    // never shown.
+    throw new Refusal(`git ${args[0]} failed`);
   }
 }
 
@@ -211,6 +216,36 @@ export function scanContent(
   return [...scanText(file, text), ...findPrivate(file, text, privateList)];
 }
 
+/** Hits in a file's path itself: a name can publish a value too. */
+export function scanName(file: string, privateList: PrivateEntry[]): ScanHit[] {
+  return [
+    ...scanLine(file, file, 0),
+    ...findPrivate(file, file, privateList),
+  ].map((hit) => ({ file, line: 0, rule: `${hit.rule} in the file name` }));
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** A path safe to print: private values and denylist matches masked. */
+export function redactPath(file: string, privateList: PrivateEntry[]): string {
+  let safe = file;
+  for (const entry of privateList) {
+    const words = entry.value.split(/\s+/).filter(Boolean).map(escapeRegExp);
+    if (words.length) {
+      safe = safe.replace(new RegExp(words.join("\\s+"), "gi"), "[private]");
+    }
+  }
+  for (const rule of DENYLIST) {
+    const flags = rule.pattern.flags.includes("g")
+      ? rule.pattern.flags
+      : `${rule.pattern.flags}g`;
+    safe = safe.replace(new RegExp(rule.pattern.source, flags), "[redacted]");
+  }
+  return safe;
+}
+
 export interface ChangedFile {
   path: string;
   blob: string;
@@ -309,10 +344,8 @@ function destinationTips(destination: string): string[] {
   let listing: string;
   try {
     listing = git(["ls-remote", destination]);
-  } catch (error) {
-    throw new Refusal(
-      `cannot list the destination's refs: ${(error as Error).message}`
-    );
+  } catch {
+    throw new Refusal("cannot list the destination's refs");
   }
   const tips: string[] = [];
   const fetched = new Set<string>();
@@ -332,14 +365,12 @@ function destinationTips(destination: string): string[] {
             destination,
             name,
           ]);
-        } catch (error) {
-          throw new Refusal(
-            `cannot fetch ${name}: ${(error as Error).message}`
-          );
+        } catch {
+          throw new Refusal("cannot fetch a ref from the destination");
         }
       }
       if (!gitSucceeds(["cat-file", "-e", sha])) {
-        throw new Refusal(`${ref} on the destination cannot be resolved`);
+        throw new Refusal("a destination ref cannot be resolved");
       }
     }
     // A tag of a tree or blob reaches no commits, so it excludes none.
@@ -372,10 +403,8 @@ export function scanPush(
     )
       .split("\n")
       .filter(Boolean);
-  } catch (error) {
-    throw new Refusal(
-      `cannot work out which commits the push adds: ${(error as Error).message}`
-    );
+  } catch {
+    throw new Refusal("cannot work out which commits the push adds");
   }
 
   const emptyTree = git(["hash-object", "-t", "tree", "--stdin"], "").trim();
@@ -384,6 +413,9 @@ export function scanPush(
     const files = changedFiles(commit, emptyTree);
     const blobs = readBlobs(files.map((f) => f.blob));
     for (const file of files) {
+      for (const hit of scanName(file.path, privateList)) {
+        hits.push({ commit, ...hit });
+      }
       for (const hit of scanContent(
         file.path,
         blobs.get(file.blob)!,
@@ -411,8 +443,11 @@ function main(args: string[]): number {
         "privacy-scan: push refused. These commits add private values:"
       );
       for (const h of hits) {
+        const file = redactPath(h.file, privateList);
         console.error(
-          `  ${h.commit.slice(0, 12)} ${h.file}:${h.line} ${h.rule}`
+          h.line
+            ? `  ${h.commit.slice(0, 12)} ${file}:${h.line} ${h.rule}`
+            : `  ${h.commit.slice(0, 12)} ${file} ${h.rule}`
         );
       }
       console.error(
@@ -429,9 +464,7 @@ function main(args: string[]): number {
       console.error(`privacy-scan: push refused: ${error.message}`);
       return 1;
     }
-    console.error(
-      `privacy-scan: push refused: the scan failed (${(error as Error).message})`
-    );
+    console.error("privacy-scan: push refused: the scan failed");
     return 1;
   }
 }

@@ -904,12 +904,31 @@ test.describe("guards", () => {
           "binary",
           "public/data.bin",
           `\0\0${literals[0]}\0`,
-          "public/data.bin:0 private list entry on line 2 (binary file)",
+          "public/data.bin private list entry on line 2 (binary file)",
         ],
       ]) {
         repo.git(["checkout", "-q", "-b", branch, "main"]);
         if (branch === "attr") commit(".gitattributes", "*.mdx binary\n");
         commit(file, content);
+        refusedFor(push("origin", branch), needle);
+        expect(hasRef(remote, `refs/heads/${branch}`)).toBe(false);
+      }
+
+      // A file name can publish a value too; the refusal masks it.
+      for (const [branch, file, needle] of [
+        [
+          "named-literal",
+          `content/${literals[0]}.mdx`,
+          "content/[private].mdx private list entry on line 2 in the file name",
+        ],
+        [
+          "named-deny",
+          `content/at-${deny}.mdx`,
+          "content/at-[redacted].mdx private IP in the file name",
+        ],
+      ]) {
+        repo.git(["checkout", "-q", "-b", branch, "main"]);
+        commit(file, "Nothing private inside.\n");
         refusedFor(push("origin", branch), needle);
         expect(hasRef(remote, `refs/heads/${branch}`)).toBe(false);
       }
@@ -1057,6 +1076,14 @@ test.describe("guards", () => {
       refusedFor(
         hook(
           path.join(root, "nowhere.git"),
+          `refs/heads/main ${head} refs/heads/main ${zero}`
+        ),
+        "cannot list the destination's refs"
+      );
+      // Git's own error would name this destination, which holds a value.
+      refusedFor(
+        hook(
+          path.join(root, `${literals[0]}.git`),
           `refs/heads/main ${head} refs/heads/main ${zero}`
         ),
         "cannot list the destination's refs"
