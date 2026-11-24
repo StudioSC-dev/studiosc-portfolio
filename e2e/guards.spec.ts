@@ -766,6 +766,8 @@ test.describe("guards", () => {
   });
 
   test("marathon post embeds as links", async ({ page }, testInfo) => {
+    // Two widths, each settling and then waiting 5 s past load.
+    test.setTimeout(2 * 60_000);
     const social = /(^|\.)(instagram\.com|facebook\.net)$/;
     const socialRequests: string[] = [];
     page.on("request", (request) => {
