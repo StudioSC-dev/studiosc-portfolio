@@ -85,3 +85,40 @@ export function trackedFiles(): string[] {
     .filter(Boolean)
     .map((f) => f.split(path.sep).join("/"));
 }
+
+export interface TreeFile {
+  path: string;
+  content: Buffer;
+}
+
+/** Every file in the tree of `sha`, with its committed content. */
+export function treeFiles(sha = "HEAD"): TreeFile[] {
+  const entries = git(["ls-tree", "-r", "-z", "--full-tree", sha])
+    .split("\0")
+    .filter(Boolean)
+    .map((line) => {
+      const [meta, file] = line.split("\t");
+      const [, type, object] = meta.split(" ");
+      return { type, object, path: file };
+    })
+    .filter((e) => e.type === "blob");
+  const out = execFileSync("git", ["cat-file", "--batch"], {
+    cwd: ROOT,
+    env: cleanEnv(),
+    input: entries.map((e) => e.object).join("\n") + "\n",
+    maxBuffer: 1024 * 1024 * 1024,
+  });
+  const files: TreeFile[] = [];
+  let pos = 0;
+  for (const entry of entries) {
+    const headerEnd = out.indexOf(0x0a, pos);
+    const size = Number(out.subarray(pos, headerEnd).toString().split(" ")[2]);
+    const start = headerEnd + 1;
+    files.push({
+      path: entry.path,
+      content: out.subarray(start, start + size),
+    });
+    pos = start + size + 1;
+  }
+  return files;
+}

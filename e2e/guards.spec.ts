@@ -1,8 +1,46 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT } from "./support/git";
+import { ROOT, treeFiles, type TreeFile } from "./support/git";
 import { loadConfig } from "./support/config";
+import {
+  DENYLIST,
+  SELF_EXCLUDED,
+  isBinary,
+  rulesFor,
+  scanLine,
+  scanText,
+  type DenyHit,
+} from "./support/denylist";
+import {
+  DENYLIST_FIXTURES,
+  ENV_RULE_EXEMPT,
+} from "./support/denylist.fixtures";
+
+// Checks that only read files or run git need one browser project, not five.
+function nodeOnly() {
+  test.skip(
+    test.info().project.name !== "chromium",
+    "file-level check; runs once, in the chromium project"
+  );
+}
+
+let headTree: TreeFile[] | undefined;
+/** The committed tree under test, read once per worker. */
+function committedTree(): TreeFile[] {
+  headTree ??= treeFiles("HEAD");
+  return headTree;
+}
+
+/** Denylist hits across committed text files that `select` keeps. */
+function denylistHits(select: (file: string) => boolean): DenyHit[] {
+  return committedTree()
+    .filter((f) => select(f.path) && !isBinary(f.content))
+    .flatMap((f) => scanText(f.path, f.content.toString("utf8")));
+}
+
+/** A hit as text that names the file, line and rule, never the match. */
+const describeHit = (h: DenyHit) => `${h.file}:${h.line} ${h.rule}`;
 
 /** The steps of one job in a GitHub Actions workflow, as raw text blocks. */
 function workflowSteps(workflow: string, job: string): string[] {
@@ -62,5 +100,62 @@ test.describe("guards", () => {
     expect(run).toMatch(
       /\n\s+env:\n(?:\s+\S.*\n)*?\s+PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/
     );
+  });
+
+  test("denylist fixtures", () => {
+    nodeOnly();
+    expect(Object.keys(DENYLIST_FIXTURES).sort()).toEqual(
+      DENYLIST.map((r) => r.name).sort()
+    );
+    for (const rule of DENYLIST) {
+      const fixtures = DENYLIST_FIXTURES[rule.name];
+      expect(rulesFor(fixtures.file)).toContain(rule);
+      for (const sample of fixtures.matches) {
+        expect(
+          rule.pattern.test(sample),
+          `${rule.name} misses a true fixture`
+        ).toBe(true);
+        expect(scanLine(fixtures.file, sample, 1).map((h) => h.rule)).toContain(
+          rule.name
+        );
+      }
+      for (const sample of fixtures.passes) {
+        expect(rule.pattern.test(sample), `${rule.name} hits "${sample}"`).toBe(
+          false
+        );
+      }
+    }
+    // The env-file rule is scoped to the site's own source and content.
+    const envRule = DENYLIST.find((r) => r.name === "env file");
+    for (const file of ENV_RULE_EXEMPT) {
+      expect(rulesFor(file)).not.toContain(envRule);
+    }
+    // The files that define the patterns are the only ones excluded.
+    for (const file of SELF_EXCLUDED) expect(rulesFor(file)).toEqual([]);
+  });
+
+  test("committed docs carry nothing private", () => {
+    nodeOnly();
+    const tracked = new Map(committedTree().map((f) => [f.path, f]));
+    const epic = tracked.get("docs/tickets/PRV.md");
+    expect(epic, "docs/tickets/PRV.md is not tracked").toBeDefined();
+    const tickets = [
+      ...new Set(epic!.content.toString("utf8").match(/\bPRV-\d+\b/g) ?? []),
+    ];
+    expect(tickets.length).toBeGreaterThan(0);
+    for (const ticket of tickets) {
+      expect(
+        tracked.has(`docs/tickets/${ticket}.md`),
+        `docs/tickets/${ticket}.md is not tracked`
+      ).toBe(true);
+    }
+
+    const inScope = (file: string) =>
+      file.startsWith("docs/") || file.startsWith(".claude/");
+    for (const file of [...tracked.keys()].filter(inScope)) {
+      const names = rulesFor(file).map((r) => r.name);
+      expect(names).toEqual(expect.arrayContaining(["path", "lab domain"]));
+    }
+    expect(denylistHits(inScope).map(describeHit)).toEqual([]);
   });
 });
