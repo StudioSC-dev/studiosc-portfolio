@@ -104,8 +104,56 @@ function checkImages(files: string[]) {
 }
 
 const URLS: string[] = urlsFixture.urls;
-/** The content pages: every project and every blog post. */
-const CONTENT_URLS = URLS.filter((u) => /^\/(work|blog)\/[^/]+$/.test(u));
+/** A content page: a project or a blog post. */
+const CONTENT_URL = /^\/(work|blog)\/[^/]+$/;
+
+/**
+ * Why urls.json is wrong. On the PR that introduces it, it must hold exactly
+ * the original URLs; later PRs may add routes but never drop an original one.
+ * No URL may repeat.
+ */
+function urlListProblems(
+  urls: string[],
+  original: string[],
+  introducing: boolean
+): string[] {
+  const problems: string[] = [];
+  if (new Set(urls).size !== urls.length) problems.push("a URL repeats");
+  for (const url of original) {
+    if (!urls.includes(url)) problems.push(`${url} was dropped`);
+  }
+  if (introducing) {
+    for (const url of urls) {
+      if (!original.includes(url)) problems.push(`${url} is not original`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The page URLs of the tree urls.json was locked from: the six static pages,
+ * the four projects and the 22 posts.
+ */
+function originalUrls(): string[] {
+  const files = git(["ls-tree", "-r", "--name-only", urlsFixture.sha]).split(
+    "\n"
+  );
+  const staticPages = files
+    .filter((f) => /^app\/(.*\/)?page\.tsx$/.test(f) && !f.includes("["))
+    .map((f) => "/" + f.replace(/^app\/?/, "").replace(/\/?page\.tsx$/, ""));
+  const slugs = (dir: string) =>
+    files
+      .filter((f) => f.startsWith(`content/${dir}/`) && f.endsWith(".mdx"))
+      .map((f) => path.basename(f, ".mdx"));
+  expect(staticPages).toHaveLength(6);
+  expect(slugs("projects")).toHaveLength(4);
+  expect(slugs("blog")).toHaveLength(22);
+  return [
+    ...staticPages,
+    ...slugs("projects").map((s) => `/work/${s}`),
+    ...slugs("blog").map((s) => `/blog/${s}`),
+  ];
+}
 
 /** Only one browser project needs to check server responses and markup. */
 function chromiumOnly() {
@@ -785,26 +833,21 @@ test.describe("guards", () => {
 
   test("every URL resolves", async ({ request }) => {
     chromiumOnly();
-    // urls.json is exactly the page URLs of the pre-change tree.
-    const at = urlsFixture.sha;
-    const files = git(["ls-tree", "-r", "--name-only", at]).split("\n");
-    const staticPages = files
-      .filter((f) => /^app\/(.*\/)?page\.tsx$/.test(f) && !f.includes("["))
-      .map((f) => "/" + f.replace(/^app\/?/, "").replace(/\/?page\.tsx$/, ""));
-    const slugs = (dir: string) =>
-      files
-        .filter((f) => f.startsWith(`content/${dir}/`) && f.endsWith(".mdx"))
-        .map((f) => path.basename(f, ".mdx"));
-    const expected = [
-      ...staticPages,
-      ...slugs("projects").map((s) => `/work/${s}`),
-      ...slugs("blog").map((s) => `/blog/${s}`),
-    ];
-    expect(staticPages).toHaveLength(6);
-    expect(slugs("projects")).toHaveLength(4);
-    expect(slugs("blog")).toHaveLength(22);
-    expect(new Set(URLS).size).toBe(URLS.length);
-    expect([...URLS].sort()).toEqual(expected.sort());
+    // urls.json starts as exactly the page URLs of the pre-change tree. Later
+    // PRs may add routes to it but never drop one of these.
+    const expected = originalUrls();
+    const range = prRange();
+    const introducing =
+      range !== null && !existsAt(range.base, "e2e/fixtures/urls.json");
+    expect(urlListProblems(URLS, expected, introducing)).toEqual([]);
+    // The rule itself: exact on the introducing PR, additive afterwards.
+    const added = [...expected, "/preview/home"];
+    expect(urlListProblems(added, expected, true)).not.toEqual([]);
+    expect(urlListProblems(added, expected, false)).toEqual([]);
+    expect(urlListProblems(expected.slice(1), expected, false)).not.toEqual([]);
+    expect(urlListProblems([...expected, "/"], expected, false)).not.toEqual(
+      []
+    );
 
     // Each answers 200, or a 308 that leads to a 200. The first status is
     // read before any redirect is followed.
@@ -828,10 +871,14 @@ test.describe("guards", () => {
 
   test("every content page has one h1", async ({ page }) => {
     chromiumOnly();
-    expect(CONTENT_URLS).toHaveLength(26);
+    // Every project and post, and every route added after urls.json was
+    // locked; the original static pages are covered elsewhere.
+    const original = new Set(originalUrls());
+    const pages = URLS.filter((u) => CONTENT_URL.test(u) || !original.has(u));
+    expect(pages.filter((u) => original.has(u))).toHaveLength(26);
     await stubVercelInsights(page);
     const counts: string[] = [];
-    for (const url of CONTENT_URLS) {
+    for (const url of pages) {
       await page.goto(url);
       const h1 = await page.locator("h1").count();
       if (h1 !== 1) counts.push(`${url}: ${h1} h1`);
