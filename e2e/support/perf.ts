@@ -18,11 +18,19 @@ const STUBBED = /\/_vercel\/(?:insights|speed-insights)\//;
  * script requests that finish between navigation and the first network idle,
  * in a fresh Chromium context. The stubbed Vercel scripts are not counted.
  */
+export interface FirstLoad {
+  /** The navigation's HTTP status. */
+  status: number;
+  /** How many script responses were counted. */
+  scripts: number;
+  bytes: number;
+}
+
 export async function firstLoadJs(
   browser: Browser,
   baseURL: string,
   route: string
-): Promise<number> {
+): Promise<FirstLoad> {
   const context = await browser.newContext({ baseURL });
   try {
     const page = await context.newPage();
@@ -33,13 +41,13 @@ export async function firstLoadJs(
         scripts.push(request);
       }
     });
-    await page.goto(route, { waitUntil: "networkidle" });
+    const response = await page.goto(route, { waitUntil: "networkidle" });
     const finished = [...scripts];
-    let total = 0;
+    let bytes = 0;
     for (const request of finished) {
-      total += (await request.sizes()).responseBodySize;
+      bytes += (await request.sizes()).responseBodySize;
     }
-    return total;
+    return { status: response?.status() ?? 0, scripts: finished.length, bytes };
   } finally {
     await context.close();
   }
@@ -79,4 +87,38 @@ export async function layoutShift(
   } finally {
     await context.close();
   }
+}
+
+/**
+ * Why a perf baseline is invalid: `measured_sha` must be a commit id, and
+ * `original` and `current` must each hold exactly the budget routes, every
+ * value a positive whole number of bytes. Empty when it is valid.
+ */
+export function baselineProblems(baseline: unknown): string[] {
+  const problems: string[] = [];
+  const b = (baseline ?? {}) as Record<string, unknown>;
+  if (
+    typeof b.measured_sha !== "string" ||
+    !/^[0-9a-f]{40}$/.test(b.measured_sha)
+  ) {
+    problems.push("measured_sha is not a full commit id");
+  }
+  const routes = [...BUDGET_ROUTES].sort();
+  for (const key of ["original", "current"]) {
+    const map = b[key];
+    if (!map || typeof map !== "object" || Array.isArray(map)) {
+      problems.push(`${key} is not an object`);
+      continue;
+    }
+    const keys = Object.keys(map).sort();
+    if (JSON.stringify(keys) !== JSON.stringify(routes)) {
+      problems.push(`${key} does not hold exactly the budget routes`);
+    }
+    for (const [route, value] of Object.entries(map)) {
+      if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+        problems.push(`${key} ${route} is not a positive whole number`);
+      }
+    }
+  }
+  return problems;
 }

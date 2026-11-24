@@ -48,7 +48,12 @@ import marathonCard from "./fixtures/marathon-card.json";
 import urlsFixture from "./fixtures/urls.json";
 import { SHOT_WIDTHS, shot } from "./support/shot";
 import { detectCards } from "./support/cards";
-import { BUDGET_ROUTES, firstLoadJs, layoutShift } from "./support/perf";
+import {
+  BUDGET_ROUTES,
+  baselineProblems,
+  firstLoadJs,
+  layoutShift,
+} from "./support/perf";
 import perfBaseline from "./fixtures/perf-baseline.json";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
@@ -1324,8 +1329,26 @@ test.describe("guards", () => {
     const original = perfBaseline.original as Routes;
     const current = perfBaseline.current as Routes;
     const routes = [...BUDGET_ROUTES].sort();
-    expect(Object.keys(original).sort()).toEqual(routes);
-    expect(Object.keys(current).sort()).toEqual(routes);
+    // The baseline is well formed: exactly the six routes, each value a
+    // positive whole number of bytes (a string or NaN would void the check).
+    expect(baselineProblems(perfBaseline)).toEqual([]);
+    const valid = {
+      measured_sha: "a".repeat(40),
+      original: Object.fromEntries(routes.map((r) => [r, 1000])),
+      current: Object.fromEntries(routes.map((r) => [r, 1000])),
+    };
+    expect(baselineProblems(valid)).toEqual([]);
+    for (const bad of ["1000", Number.NaN, 0, -5, 10.5, null]) {
+      const broken = {
+        ...valid,
+        current: { ...valid.current, "/": bad },
+        original: { ...valid.original, "/": bad },
+      };
+      expect(baselineProblems(broken), String(bad)).not.toEqual([]);
+    }
+    expect(
+      baselineProblems({ ...valid, current: { ...valid.current, "/x": 1 } })
+    ).not.toEqual([]);
 
     // A PR that changes the baseline must have measured it at an ancestor of
     // its head, with no app change since, and may only lower `current`.
@@ -1380,11 +1403,19 @@ test.describe("guards", () => {
     // On every run: each route's first-load JS is within 3% of `current`.
     const over: string[] = [];
     for (const route of BUDGET_ROUTES) {
-      const bytes = await firstLoadJs(browser, baseURL!, route);
+      const { status, scripts, bytes } = await firstLoadJs(
+        browser,
+        baseURL!,
+        route
+      );
       testInfo.annotations.push({
         type: "first-load JS",
-        description: `${route}: ${bytes} bytes`,
+        description: `${route}: ${bytes} bytes in ${scripts} scripts`,
       });
+      // A failed navigation or no scripts would measure nothing.
+      expect(status, `${route}: status`).toBe(200);
+      expect(scripts, `${route}: script responses`).toBeGreaterThan(0);
+      expect(bytes, `${route}: bytes`).toBeGreaterThan(0);
       if (bytes > 1.03 * current[route]) {
         over.push(`${route}: ${bytes} bytes > 1.03 x ${current[route]}`);
       }
