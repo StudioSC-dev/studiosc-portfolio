@@ -780,13 +780,23 @@ test.describe("guards", () => {
       .filter({ hasText: /View on (Instagram|Facebook)/ });
     const facebook = page.locator(".fb-post, #fb-root");
 
+    // The fixture box was measured on the pre-change page, so it pins PRV-1
+    // only; later layout work (PRV-14) moves the card. Its identity, the lack
+    // of a Facebook container, the requests and the console stay checked.
+    const range = prRange();
+    const pinBox =
+      testInfo.project.name === "chromium" &&
+      range !== null &&
+      !existsAt(range.base, "e2e/guards.spec.ts");
+
     for (const [width, expected] of Object.entries(marathonCard.widths)) {
       await page.setViewportSize(expected.viewport);
       await page.goto(marathonCard.url);
       const loadedAt = Date.now();
+      // At load, before waiting for anything: no Facebook container, even a
+      // passing one.
+      expect(await facebook.count(), `${width}px at load: Facebook`).toBe(0);
       await expect(cards.first()).toBeVisible();
-      await page.waitForLoadState("networkidle");
-      await page.evaluate(() => document.fonts.ready);
 
       const measure = () =>
         cards.evaluateAll((links) =>
@@ -804,13 +814,13 @@ test.describe("guards", () => {
             };
           })
         );
-      const check = async (when: string) => {
+      const check = async (when: string, box: boolean) => {
         const found = await measure();
         expect(found, `${width}px ${when}: link cards`).toHaveLength(1);
         expect(found[0].text).toBe(expected.text);
         expect(found[0].href).toBe(expected.href);
         // The box was measured in Chromium, so only Chromium compares it.
-        if (testInfo.project.name === "chromium") {
+        if (box && pinBox) {
           for (const key of ["x", "y", "width", "height"] as const) {
             expect(
               Math.abs(found[0].box[key] - expected.box[key]),
@@ -818,14 +828,18 @@ test.describe("guards", () => {
             ).toBeLessThanOrEqual(2);
           }
         }
-        await expect(facebook, `${width}px ${when}: Facebook`).toHaveCount(0);
+        expect(await facebook.count(), `${width}px ${when}: Facebook`).toBe(0);
       };
 
-      await check("at load");
+      // The card as it first appears, then once the page has settled.
+      await check("at load", false);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+      await check("settled", true);
       expect(errors, `${width}px: console errors`).toEqual([]);
       // Past the old 3 s fallback timeout, the card is still the only one.
       await page.waitForTimeout(Math.max(0, loadedAt + 5000 - Date.now()));
-      await check("5 s after load");
+      await check("5 s after load", true);
     }
     expect(socialRequests).toEqual([]);
     expect(errors).toEqual([]);
