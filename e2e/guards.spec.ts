@@ -10,6 +10,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import {
+  changedByPr,
   ROOT,
   existsAt,
   git,
@@ -1595,14 +1596,50 @@ test.describe("guards", () => {
       baselineProblems({ ...valid, current: { ...valid.current, "/x": 1 } })
     ).not.toEqual([]);
 
+    const forked = mkdtempSync(path.join(os.tmpdir(), "baseline-change-"));
+    try {
+      const g = (args: string[]) => git(args, { cwd: forked });
+      const commitFile = (file: string, text: string) => {
+        writeFileSync(path.join(forked, file), text);
+        g(["add", "--", file]);
+        g(["-c", "commit.gpgsign=false", "commit", "-q", "-m", file]);
+      };
+      g(["init", "-q", "-b", "main"]);
+      g(["config", "user.name", "Throwaway"]);
+      g(["config", "user.email", "throwaway@example.com"]);
+      commitFile("baseline.json", "1000\n");
+      g(["checkout", "-q", "-b", "pr"]);
+      commitFile("page.txt", "a PR change\n");
+      g(["checkout", "-q", "main"]);
+      commitFile("baseline.json", "900\n");
+      const pr = {
+        base: g(["rev-parse", "main"]).trim(),
+        head: g(["rev-parse", "pr"]).trim(),
+      };
+      // The tips differ in the file, but only the base changed it.
+      expect(
+        gitOk(["diff", "--quiet", pr.base, pr.head, "--", "baseline.json"], {
+          cwd: forked,
+        })
+      ).toBe(false);
+      expect(changedByPr(pr, "baseline.json", { cwd: forked })).toBe(false);
+      g(["checkout", "-q", "pr"]);
+      commitFile("baseline.json", "950\n");
+      const edited = { ...pr, head: g(["rev-parse", "pr"]).trim() };
+      expect(changedByPr(edited, "baseline.json", { cwd: forked })).toBe(true);
+    } finally {
+      rmSync(forked, { recursive: true, force: true });
+    }
+
     // A PR that changes the baseline must have measured it at an ancestor of
     // its head, with no app change since, and may only lower `current`.
     // Push builds in CI have no PR, so only the thresholds apply there.
+    // Whether the PR changed the file is judged from where it branched off
+    // the base, so a budget lowered only on the base is not blamed on it; the
+    // budgets it may not raise are the base's own.
     const range = prRange();
     const base = range?.base ?? "";
-    const changed =
-      range !== null &&
-      !gitOk(["diff", "--quiet", range.base, range.head, "--", FILE]);
+    const changed = range !== null && changedByPr(range, FILE);
     if (changed) {
       const prHead = process.env.PR_HEAD_SHA?.trim();
       expect(

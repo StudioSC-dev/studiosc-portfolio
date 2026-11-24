@@ -89,6 +89,20 @@ export function prRange(env: Env = process.env): PrRange | null {
   return { base: baseSha(env), head: headSha(env) };
 }
 
+/**
+ * Whether the pull request itself changes `file`: its head against the point
+ * where it branched from the base, so a change made only on the base after
+ * that point is not blamed on the PR.
+ */
+export function changedByPr(
+  range: PrRange,
+  file: string,
+  opts: { cwd?: string } = {}
+): boolean {
+  const fork = git(["merge-base", range.base, range.head], opts).trim();
+  return !gitOk(["diff", "--quiet", fork, range.head, "--", file], opts);
+}
+
 /** Whether `file` exists in the tree of `sha`. */
 export function existsAt(sha: string, file: string): boolean {
   return gitOk(["cat-file", "-e", `${sha}:${file}`]);
