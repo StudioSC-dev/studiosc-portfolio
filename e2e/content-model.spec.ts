@@ -144,6 +144,18 @@ function withCheck(patch: Record<string, unknown>): unknown {
   return withPlate(realChecked, { christineCheck: { ...check, ...patch } });
 }
 
+/**
+ * True when every changed line of a next.config.ts diff (`+`/`-` lines) is an
+ * added import of a validation module or an added call to a validate function.
+ * A removal, a comment or any other setting is out of scope.
+ */
+export function isValidationOnlyConfigDiff(lines: string[]): boolean {
+  const addedImport =
+    /^\+\s*import\s[^;]*\sfrom\s+["'][^"']*validat[^"']*["'];?\s*$/i;
+  const addedCall = /^\+\s*(?:await\s+)?validate\w*\([^)]*\);?\s*$/;
+  return lines.every((l) => addedImport.test(l) || addedCall.test(l));
+}
+
 /** Files PRV-3 may touch, relative to the repo root. */
 export function isAllowedPrv3Path(path: string): boolean {
   const exact = new Set([
@@ -743,6 +755,22 @@ RANGE_CATEGORIES.push({
   });
 
   test("changes stay within PRV-3 scope", () => {
+    // The next.config.ts rule, on fixtures.
+    expect(
+      isValidationOnlyConfigDiff([
+        '+import { validateContent } from "./lib/validate-content";',
+        "+validateContent();",
+      ])
+    ).toBe(true);
+    for (const bad of [
+      "+  reactStrictMode: false, // validate later",
+      "-  allowedDevOrigins: [],",
+      "+// validateContent();",
+      "+  poweredByHeader: false,",
+    ]) {
+      expect(isValidationOnlyConfigDiff([bad]), bad).toBe(false);
+    }
+
     // The allowlist itself, on allowed and disallowed paths.
     for (const allowed of [
       "lib/statuses.ts",
@@ -793,9 +821,9 @@ RANGE_CATEGORIES.push({
         .split("\n")
         .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
       expect(
-        lines.filter((l) => !/validat/i.test(l)),
-        "next.config.ts changes beyond content validation"
-      ).toEqual([]);
+        isValidationOnlyConfigDiff(lines),
+        `next.config.ts changes beyond content validation:\n${lines.join("\n")}`
+      ).toBe(true);
     }
 
     // Routes from the base: every one still returns 200 with the same shared
