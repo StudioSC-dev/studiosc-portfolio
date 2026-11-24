@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import {
   ROOT,
@@ -12,9 +14,28 @@ import {
   treeFiles,
   type TreeFile,
 } from "./support/git";
-import { icoFrameHashes, type FrameHash } from "./support/ico";
+import {
+  icoFrameHashes,
+  readIcoDirectory,
+  type FrameHash,
+} from "./support/ico";
+import {
+  CLEAN_WEBP,
+  XMP_PACKET,
+  buildIco,
+  exifGpsSegment,
+  icoFrames,
+  isPng,
+  jpegWithSegment,
+  pngChunk,
+  pngWithChunk,
+  webpWithChunk,
+  withFrameOffset,
+  xmpSegment,
+} from "./support/dirty-images";
+import { checkIco } from "../scripts/image-metadata";
 import faviconPixels from "./fixtures/favicon-pixels.json";
-import { loadConfig } from "./support/config";
+import { TSX, loadConfig } from "./support/config";
 import {
   DENYLIST,
   SELF_EXCLUDED,
@@ -49,6 +70,18 @@ function denylistHits(select: (file: string) => boolean): DenyHit[] {
   return committedTree()
     .filter((f) => select(f.path) && !isBinary(f.content))
     .flatMap((f) => scanText(f.path, f.content.toString("utf8")));
+}
+
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif|avif|heic|tiff?|ico|svg)$/i;
+
+/** Runs the image checker CLI on some files. */
+function checkImages(files: string[]) {
+  const run = spawnSync(
+    TSX,
+    [path.join(ROOT, "scripts/image-metadata.ts"), ...files],
+    { cwd: ROOT, encoding: "utf8" }
+  );
+  return { status: run.status, stderr: run.stderr };
 }
 
 /** A hit as text that names the file, line and rule, never the match. */
@@ -244,5 +277,183 @@ test.describe("guards", () => {
     const deps = (sha: string) =>
       JSON.parse(git(["show", `${sha}:package.json`])).dependencies;
     expect(deps(head)).toEqual(deps(base));
+  });
+
+  test("images carry no metadata", () => {
+    nodeOnly();
+    const images = committedTree()
+      .map((f) => f.path)
+      .filter((f) => IMAGE_EXTENSIONS.test(f));
+    expect(images).toEqual(
+      expect.arrayContaining([
+        "app/favicon.ico",
+        "e2e/fixtures/images/clean.jpg",
+        "e2e/fixtures/images/clean.png",
+      ])
+    );
+    const tracked = checkImages(images);
+    expect(tracked.stderr).toBe("");
+    expect(tracked.status).toBe(0);
+
+    // The cleaned favicon keeps all four frames.
+    const favicon = readFileSync(path.join(ROOT, "app/favicon.ico"));
+    expect(readIcoDirectory(favicon).entries).toHaveLength(4);
+    expect(checkIco(favicon)).toEqual([]);
+
+    const jpeg = readFileSync(path.join(ROOT, "e2e/fixtures/images/clean.jpg"));
+    const png = readFileSync(path.join(ROOT, "e2e/fixtures/images/clean.png"));
+    const frames = icoFrames(favicon);
+    const pngFrame = frames.findIndex((f) => isPng(f.data));
+    const bmpFrame = frames.findIndex((f) => !isPng(f.data));
+    expect(pngFrame).toBeGreaterThan(-1);
+    expect(bmpFrame).toBeGreaterThan(-1);
+    const replaceFrame = (index: number, data: Buffer) =>
+      buildIco(frames.map((f, i) => (i === index ? { ...f, data } : f)));
+    const wrongHeader = Buffer.from(frames[bmpFrame].data);
+    wrongHeader.writeUInt32LE(124, 0);
+    const wrongSize = Buffer.from(frames[bmpFrame].data);
+    wrongSize.writeInt32LE(wrongSize.readInt32LE(4) + 1, 4);
+    const ico = buildIco(frames);
+
+    const dir = mkdtempSync(path.join(os.tmpdir(), "image-metadata-"));
+    try {
+      const dirty: [string, Buffer, RegExp[]][] = [
+        [
+          "gps.jpg",
+          jpegWithSegment(jpeg, exifGpsSegment()),
+          [/APP1 segment \(Exif\)/],
+        ],
+        [
+          "xmp.jpg",
+          jpegWithSegment(jpeg, xmpSegment()),
+          [/APP1 segment \(XMP\)/],
+        ],
+        [
+          "trailing.jpg",
+          Buffer.concat([jpeg, Buffer.from("made-up")]),
+          [/7 bytes after EOI/],
+        ],
+        [
+          "ztxt.png",
+          pngWithChunk(
+            png,
+            pngChunk(
+              "zTXt",
+              Buffer.from("Comment\0\0x\x9c\x03\0\0\0\0\x01", "latin1")
+            )
+          ),
+          [/chunk zTXt/],
+        ],
+        [
+          "trailing.png",
+          Buffer.concat([png, Buffer.from("made-up")]),
+          [/7 bytes after IEND/],
+        ],
+        [
+          "exif.ico",
+          replaceFrame(
+            pngFrame,
+            pngWithChunk(
+              frames[pngFrame].data,
+              pngChunk("eXIf", exifGpsSegment().subarray(10))
+            )
+          ),
+          [new RegExp(`frame ${pngFrame}: PNG chunk eXIf`)],
+        ],
+        [
+          "bitmap-trailing.ico",
+          replaceFrame(
+            bmpFrame,
+            Buffer.concat([frames[bmpFrame].data, Buffer.alloc(16)])
+          ),
+          [
+            new RegExp(
+              `frame ${bmpFrame}: bitmap payload is \\d+ bytes, its header implies \\d+`
+            ),
+          ],
+        ],
+        [
+          "bitmap-header.ico",
+          replaceFrame(bmpFrame, wrongHeader),
+          [
+            new RegExp(
+              `frame ${bmpFrame}: bitmap header is 124 bytes, not a 40-byte BITMAPINFOHEADER`
+            ),
+          ],
+        ],
+        [
+          "bitmap-size.ico",
+          replaceFrame(bmpFrame, wrongSize),
+          [
+            new RegExp(
+              `frame ${bmpFrame}: bitmap header says \\d+x\\d+, the directory says`
+            ),
+          ],
+        ],
+        [
+          "bounds-end.ico",
+          withFrameOffset(ico, 1, ico.length - 4),
+          [/frame 1: invalid bounds/],
+        ],
+        [
+          "bounds-directory.ico",
+          withFrameOffset(ico, 0, 6),
+          [/frame 0: invalid bounds/],
+        ],
+        [
+          "metadata.svg",
+          Buffer.from(
+            `<svg xmlns="http://www.w3.org/2000/svg"><metadata>${XMP_PACKET}</metadata></svg>`
+          ),
+          [/<metadata> element/],
+        ],
+        [
+          "exif.webp",
+          webpWithChunk(CLEAN_WEBP, "EXIF", exifGpsSegment().subarray(10)),
+          [/chunk EXIF/],
+        ],
+        [
+          "xmp.webp",
+          webpWithChunk(CLEAN_WEBP, "XMP ", Buffer.from(XMP_PACKET)),
+          [/chunk XMP/],
+        ],
+        [
+          "riff.webp",
+          Buffer.concat([CLEAN_WEBP, Buffer.from("made-up")]),
+          [/7 bytes beyond the RIFF size/],
+        ],
+        [
+          "animation.gif",
+          Buffer.from("GIF89a\x01\0\x01\0\0\0\0;", "latin1"),
+          [/GIF format is not allowed/],
+        ],
+      ];
+      for (const [name, bytes, reasons] of dirty) {
+        const file = path.join(dir, name);
+        writeFileSync(file, bytes);
+        const result = checkImages([file]);
+        expect(result.status, `${name} passed the checker`).toBe(1);
+        const lines = result.stderr.split("\n").filter(Boolean);
+        for (const reason of reasons) {
+          expect(
+            lines.some((l) => l.startsWith(`${file}: `) && reason.test(l)),
+            `${name}: expected ${reason} in\n${result.stderr}`
+          ).toBe(true);
+        }
+      }
+
+      // A clean WebP and the clean originals pass.
+      const webp = path.join(dir, "clean.webp");
+      writeFileSync(webp, CLEAN_WEBP);
+      const clean = checkImages([
+        webp,
+        path.join(ROOT, "e2e/fixtures/images/clean.jpg"),
+        path.join(ROOT, "e2e/fixtures/images/clean.png"),
+      ]);
+      expect(clean.stderr).toBe("");
+      expect(clean.status).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
