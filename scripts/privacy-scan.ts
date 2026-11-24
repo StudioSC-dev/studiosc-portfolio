@@ -95,7 +95,9 @@ function repositoryPaths(): string[] {
 
 function isWithin(child: string, parent: string): boolean {
   const rel = path.relative(parent, child);
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+  // "..private/list" is inside; only ".." itself or "../…" leaves.
+  const leaves = rel === ".." || rel.startsWith(`..${path.sep}`);
+  return !leaves && !path.isAbsolute(rel);
 }
 
 /**

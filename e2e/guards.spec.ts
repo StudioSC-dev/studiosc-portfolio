@@ -1232,12 +1232,14 @@ test.describe("guards", () => {
       // ignores it), through a symlink, or inside the git directory.
       const inRepo = path.join(repo.dir, "private-list.txt");
       writeFileSync(inRepo, `${literals[0]}\n`);
-      repo.write(".git/info/exclude", "private-list.txt\n");
+      repo.write(".git/info/exclude", "private-list.txt\n..private/\n");
       const linked = path.join(root, "linked-list.txt");
       symlinkSync(inRepo, linked);
       const inGitDir = path.join(repo.dir, ".git", "private-list.txt");
       writeFileSync(inGitDir, `${literals[0]}\n`);
-      for (const inside of [inRepo, linked, inGitDir]) {
+      const dotted = path.join(repo.dir, "..private", "list.txt");
+      repo.write("..private/list.txt", `${literals[0]}\n`);
+      for (const inside of [inRepo, linked, inGitDir, dotted]) {
         refusedFor(
           run("git", ["push", "origin", "clean"], {
             PREFLIGHT_PRIVATE_LIST: inside,
