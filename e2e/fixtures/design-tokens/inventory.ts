@@ -453,8 +453,8 @@ export const CODE_ROUTE = "/blog/tallyandtrace-sentry";
 
 /**
  * PRV-2's Scope: the files the diff may touch. Directory entries end in "/".
- * docs/boards/deviations.md may change only for a fragment-font deviation
- * (fallback step 4); the scope test checks that separately.
+ * docs/boards/deviations.md is not one: the owner ruled (2026-11-24) that the
+ * Plex overage is fixed by trimming the font, so PRV-2 leaves that file alone.
  */
 export const SCOPE_FILES = [
   "docs/design-system.md",
@@ -467,5 +467,4 @@ export const SCOPE_FILES = [
   "e2e/design-tokens.spec.ts",
   "e2e/fixtures/design-tokens/",
   "docs/perf/prv-2.json",
-  "docs/boards/deviations.md",
 ] as const;

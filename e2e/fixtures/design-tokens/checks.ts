@@ -329,6 +329,35 @@ export function unexpectedFragmentFonts(
     .map((l) => l.family);
 }
 
+/**
+ * Icon sources a diff adds to stylesheets or markup: inline SVG, SVG data
+ * URIs and SVG files in CSS `url()`s (masks, backgrounds, content).
+ */
+export function addedIconSources(diff: string): string[] {
+  return diff
+    .split("\n")
+    .filter((l) => l.startsWith("+") && !l.startsWith("+++"))
+    .filter(
+      (l) =>
+        /<svg/i.test(l) ||
+        /data:image\/svg/i.test(l) ||
+        /url\(\s*["']?[^)"']*\.svg/i.test(l)
+    );
+}
+
+/**
+ * A destination, comparable across the two test servers: a URL on either
+ * server's origin is rewritten to "<origin>"; any other origin is kept.
+ */
+export function normalizeDestination(
+  url: string,
+  origins: readonly string[]
+): string {
+  const u = new URL(url);
+  const origin = origins.includes(u.origin) ? "<origin>" : u.origin;
+  return `${origin}${u.pathname}${u.search}${u.hash}`;
+}
+
 // ---------------------------------------------------------------------------
 // Motion
 

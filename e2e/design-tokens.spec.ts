@@ -14,8 +14,10 @@ import {
 } from "@playwright/test";
 
 import {
+  addedIconSources,
   docGaps,
   expectedFontConfig,
+  normalizeDestination,
   ringProblems,
   unexpectedFragmentFonts,
   failingPairings,
@@ -245,13 +247,52 @@ const perfRecord = () => JSON.parse(read(PERF)) as PerfRecord;
 // ---------------------------------------------------------------------------
 // Git
 
+/** git, without any GIT_* variable a hook might have set. */
 function git(...args: string[]): string {
-  return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))
+  );
+  return execFileSync("git", args, {
+    cwd: ROOT,
+    encoding: "utf8",
+    env: env as NodeJS.ProcessEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+function gitOk(...args: string[]): boolean {
+  try {
+    git(...args);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The PR base: PR_BASE_SHA when CI passes it, else the merge base with origin/main. */
 function prBase(): string {
   return process.env.PR_BASE_SHA || git("merge-base", "origin/main", "HEAD");
+}
+
+/** The commit under test: PR_HEAD_SHA when CI passes it, else HEAD. */
+function prHead(): string {
+  return git("rev-parse", process.env.PR_HEAD_SHA || "HEAD");
+}
+
+const SPEC_FILE = "e2e/design-tokens.spec.ts";
+
+/**
+ * PRV-1's convention for checks bound to one PR: PRV-2's own diff checks run
+ * only on the PR that introduces this suite, the one whose base has no copy
+ * of it. On every later PR they skip, with a reason.
+ */
+function introducesSuite(base: string): boolean {
+  return !gitOk("cat-file", "-e", `${base}:${SPEC_FILE}`);
+}
+
+/** Whether `file` differs between two commits (or is new at `head`). */
+function changedBetween(base: string, head: string, file: string): boolean {
+  return !gitOk("diff", "--quiet", base, head, "--", file);
 }
 
 // ===========================================================================
@@ -756,8 +797,11 @@ test.describe("Range design system", () => {
       }
     }
     const withFragments = await fragmentWatch();
-    const deviations = fs.existsSync(path.join(ROOT, DEVIATIONS))
-      ? fragmentFontDeviations(read(DEVIATIONS))
+    // An exception counts only if the owner accepted it before this PR: it
+    // is read from the PR base, never from this branch.
+    const base = prBase();
+    const deviations = gitOk("cat-file", "-e", `${base}:${DEVIATIONS}`)
+      ? fragmentFontDeviations(git("show", `${base}:${DEVIATIONS}`))
       : [];
     const recorded = perfRecord().fragment_font_bytes;
     for (const [face, family] of Object.entries(FRAGMENT_FAMILY)) {
@@ -771,7 +815,7 @@ test.describe("Range design system", () => {
         const deviation = deviations.find((d) => d.face === face);
         expect(
           deviation,
-          `${face} is ${bytes} bytes on a fragment route, over 40 KiB, with no deviation in ${DEVIATIONS}`
+          `${face} is ${bytes} bytes on a fragment route, over 40 KiB, with no accepted deviation in ${DEVIATIONS} at the PR base`
         ).toBeDefined();
         expect(
           deviation!.gate,
@@ -1192,25 +1236,41 @@ test.describe("Range design system", () => {
     }
     expect(perf.median.lcp_ms, "median LCP on /").toBeLessThanOrEqual(3800);
 
-    const head = process.env.PR_HEAD_SHA;
-    if (head) {
-      // The PR binds the record: measured at an ancestor, with no code change since.
-      execFileSync(
-        "git",
-        ["merge-base", "--is-ancestor", perf.measured_sha, head],
-        { cwd: ROOT }
-      );
-      const changed = git("diff", "--name-only", perf.measured_sha, head)
-        .split("\n")
-        .filter((f) => /^(app|components|content|lib|public)\//.test(f));
-      expect(changed, `code changed since ${perf.measured_sha}`).toEqual([]);
-    } else {
+    // PRV-1's rule: the record binds only the PR that changes it. A later PR
+    // that leaves it alone is checked against the thresholds above, never
+    // against PRV-2's measured commit.
+    const [base, head] = [prBase(), prHead()];
+    // Control: a PR whose base already holds this record does not bind it.
+    expect(changedBetween(head, head, PERF)).toBe(false);
+    if (!changedBetween(base, head, PERF)) {
       testInfo.annotations.push({
         type: "not bound",
-        description:
-          "PR_HEAD_SHA is unset (not a pull_request run), so only the thresholds are asserted.",
+        description: `${PERF} is unchanged against ${base}, so only the thresholds are asserted.`,
       });
+      return;
     }
+
+    // This PR changes the record, so it binds: measured at an ancestor of the
+    // head, with no code change since. A rebase rewrites the measured commit;
+    // re-measure then, as below.
+    const remeasure = [
+      `Re-measure at ${head}:`,
+      "npm run build, then npx next start -p <port>;",
+      `run npx -y lighthouse@${perf.lighthouse_version} http://localhost:<port>/ --only-categories=performance,accessibility three times;`,
+      `write the three runs and their median to ${PERF} with measured_sha set to the commit measured;`,
+      "commit that file alone, on top.",
+    ].join(" ");
+    expect(
+      gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
+      `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
+    ).toBe(true);
+    const changed = git("diff", "--name-only", perf.measured_sha, head)
+      .split("\n")
+      .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+    expect(
+      changed,
+      `code changed since ${perf.measured_sha}. ${remeasure}`
+    ).toEqual([]);
   });
 
   test("board motion rules are present", async () => {
@@ -1253,18 +1313,46 @@ test.describe("Range design system", () => {
     });
     expect(overlays).toEqual([]);
 
-    // The diff adds no icon library and no icon source.
+    // Control: a CSS icon source in a diff is caught.
+    expect(
+      addedIconSources(
+        [
+          '+  mask: url("data:image/svg+xml,%3Csvg%3E%3C/svg%3E");',
+          "+  background-image: url(/icons/arrow.svg);",
+          "+  color: var(--ink);",
+        ].join("\n")
+      )
+    ).toHaveLength(2);
+
+    // The diff checks belong to PRV-2's own PR (PRV-1's rule): a later PR,
+    // whose base already holds this suite, skips them.
     const base = prBase();
-    const packageDiff = git(
-      "diff",
-      base,
-      "--",
-      "package.json",
-      "package-lock.json"
+    expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
+      false
     );
-    const iconLibraries =
-      /^\+.*"(react-icons|@heroicons\/[^"]+|@fortawesome\/[^"]+|@phosphor-icons\/[^"]+|@tabler\/icons[^"]*|feather-icons|react-feather|@radix-ui\/react-icons|@mui\/icons-material|ionicons|bootstrap-icons|remixicon|@iconify\/[^"]+|simple-icons|@mdi\/[^"]+|lucide(?!-react)[^"]*)"\s*:/m;
-    expect(packageDiff).not.toMatch(iconLibraries);
+    if (!introducesSuite(base)) {
+      testInfo.annotations.push({
+        type: "skip",
+        description: `${base} already holds ${SPEC_FILE}: PRV-2's icon diff checks ran on its own PR.`,
+      });
+      return;
+    }
+
+    // The diff adds no dependency and no icon source.
+    const deps = (json: string) => {
+      const pkg = JSON.parse(json) as Record<string, Record<string, string>>;
+      return Object.keys({
+        ...pkg.dependencies,
+        ...pkg.devDependencies,
+        ...pkg.optionalDependencies,
+        ...pkg.peerDependencies,
+      });
+    };
+    const before = new Set(deps(git("show", `${base}:package.json`)));
+    expect(
+      deps(read("package.json")).filter((d) => !before.has(d)),
+      "dependencies added"
+    ).toEqual([]);
     const added = git("diff", "--name-only", "--diff-filter=A", base)
       .split("\n")
       .filter(Boolean);
@@ -1277,7 +1365,7 @@ test.describe("Range design system", () => {
     expect(codeDiff).not.toMatch(
       /^\+.*from ["'](?!lucide-react)[^"']*icons?[^"']*["']/m
     );
-    expect(codeDiff).not.toMatch(/^\+.*<svg/m);
+    expect(addedIconSources(codeDiff), "icon sources added").toEqual([]);
   });
 
   test("design system documentation covers the scoped inventory", async () => {
@@ -1341,7 +1429,50 @@ test.describe("Range design system", () => {
     test.setTimeout(420_000);
     const base = prBase();
 
-    // Files: only Scope's.
+    // PRV-1's rule: PRV-2's scope binds PRV-2's own PR, the one whose base
+    // has no copy of this suite. Every later PR skips it.
+    expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
+      false
+    );
+    test.skip(
+      !introducesSuite(base),
+      `${base} already holds ${SPEC_FILE}: PRV-2's scope was checked on its own PR.`
+    );
+
+    // Controls: hidden text is not counted as content, and the same path on
+    // another origin is a different destination.
+    const probe = await browser.newPage({
+      baseURL: String(testInfo.project.use.baseURL),
+    });
+    await probe.goto("/");
+    await probe.evaluate(() => {
+      for (const style of [
+        "display: none",
+        "visibility: hidden",
+        "opacity: 0",
+      ]) {
+        const p = document.createElement("p");
+        p.style.cssText = style;
+        p.textContent = "PRV2 hidden probe";
+        document.body.append(p);
+      }
+    });
+    expect(await probe.evaluate(visibleText)).not.toContain(
+      "PRV2 hidden probe"
+    );
+    await probe.close();
+    expect(
+      normalizeDestination("https://elsewhere.example/work?x=1#a", [
+        "http://localhost:1",
+      ])
+    ).not.toBe(
+      normalizeDestination("http://localhost:1/work?x=1#a", [
+        "http://localhost:1",
+      ])
+    );
+
+    // Files: only Scope's, and never the deviations log (owner, 2026-11-24).
+    expect(SCOPE_FILES as readonly string[]).not.toContain(DEVIATIONS);
     const changed = git("diff", "--name-only", base)
       .split("\n")
       .filter(Boolean);
@@ -1350,29 +1481,6 @@ test.describe("Range design system", () => {
         !SCOPE_FILES.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
     );
     expect(outside, "files changed outside PRV-2's Scope").toEqual([]);
-
-    // deviations.md may change only by its fragment-font section.
-    if (changed.includes(DEVIATIONS)) {
-      const before = (() => {
-        try {
-          return git("show", `${base}:${DEVIATIONS}`);
-        } catch {
-          return "";
-        }
-      })();
-      const after = read(DEVIATIONS);
-      const heading = parseDoc(after).headings.find((h) =>
-        /fragment-font deviations/i.test(h)
-      );
-      expect(
-        heading,
-        `${DEVIATIONS} changes only by a fragment-font section`
-      ).toBeDefined();
-      const rest = withoutSection(after, heading!).trim();
-      expect(rest, `${DEVIATIONS} outside the fragment-font section`).toBe(
-        before.trim()
-      );
-    }
 
     // Routes: the base, built from the PR base, against this server.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "prv2-base-"));
@@ -1414,61 +1522,100 @@ test.describe("Range design system", () => {
       const baseURL = `http://localhost:${port}`;
       await waitFor(baseURL);
       const headURL = String(testInfo.project.use.baseURL);
+      const origins = [new URL(baseURL).origin, new URL(headURL).origin];
+      const dest = (url: string) => normalizeDestination(url, origins);
 
-      const snapshot = async (origin: string, route: string) => {
-        const context = await browser.newContext({ baseURL: origin });
+      // What a visitor sees: text whose element is rendered and not hidden,
+      // every link resolved against the page, and whether each in-page
+      // target exists.
+      const snapshot = async (origin: string, route: string, phone = false) => {
+        const context = await browser.newContext({
+          baseURL: origin,
+          ...(phone ? { viewport: { width: 390, height: 844 } } : {}),
+        });
         const page = await context.newPage();
         const response = await page.goto(route);
+        await page.waitForLoadState("networkidle");
+        if (phone) {
+          await page.getByRole("button", { name: "Toggle menu" }).click();
+          await page.waitForFunction(() => {
+            const menu = document.getElementById("mobile-menu");
+            return !!menu && getComputedStyle(menu).opacity === "1";
+          });
+        }
+        const text = await page.evaluate(visibleText);
         const result = await page.evaluate(() => {
-          const clone = document.body.cloneNode(true) as HTMLElement;
-          clone
-            .querySelectorAll(
-              "script, style, noscript, template, nextjs-portal, #__next-build-watcher"
-            )
-            .forEach((n) => n.remove());
+          const anchors = Array.from(
+            document.querySelectorAll<HTMLAnchorElement>("a[href]")
+          );
           return {
-            text: (clone.textContent ?? "").replace(/\s+/g, " ").trim(),
-            links: Array.from(
-              document.querySelectorAll<HTMLAnchorElement>("a[href]")
-            ).map((a) => a.getAttribute("href")!),
+            links: anchors.map((a) => a.href),
+            targets: anchors
+              .filter(
+                (a) =>
+                  a.hash &&
+                  a.origin === location.origin &&
+                  a.pathname === location.pathname
+              )
+              .map(
+                (a) =>
+                  `${a.hash} ${document.getElementById(decodeURIComponent(a.hash.slice(1))) ? "exists" : "missing"}`
+              ),
           };
         });
         await context.close();
-        return { status: response?.status() ?? 0, ...result };
-      };
-      const resolveLink = async (origin: string, href: string) => {
-        const context = await browser.newContext({ baseURL: origin });
-        const response = await context.request.get(href, { maxRedirects: 10 });
-        const final = new URL(response.url());
-        await context.close();
         return {
-          status: response.status(),
-          path: final.pathname + final.search,
+          status: response?.status() ?? 0,
+          text,
+          links: result.links.map(dest),
+          absolute: result.links,
+          targets: result.targets,
         };
       };
+      const resolveLink = async (url: string) => {
+        const context = await browser.newContext();
+        const response = await context.request.get(url, { maxRedirects: 10 });
+        const final = new URL(response.url());
+        final.hash = new URL(url).hash;
+        await context.close();
+        return { status: response.status(), to: dest(final.href) };
+      };
 
-      for (const route of SCOPE_ROUTES) {
+      const views = [
+        ...SCOPE_ROUTES.map((route) => ({ route, phone: false })),
+        { route: "/", phone: true },
+      ];
+      for (const { route, phone } of views) {
+        const label = phone ? `${route} (phone, menu open)` : route;
         const [before, after] = [
-          await snapshot(baseURL, route),
-          await snapshot(headURL, route),
+          await snapshot(baseURL, route, phone),
+          await snapshot(headURL, route, phone),
         ];
-        expect(after.status, `${route} still renders`).toBe(before.status);
-        expect(after.text, `${route} text`).toBe(before.text);
-        expect(after.links, `${route} link destinations`).toEqual(before.links);
-
-        const sameOrigin = [...new Set(before.links)].filter(
-          (h) => h.startsWith("/") && !h.startsWith("//")
+        expect(after.status, `${label} still renders`).toBe(before.status);
+        expect(after.text, `${label} visible text`).toBe(before.text);
+        expect(after.links, `${label} link destinations`).toEqual(before.links);
+        expect(after.targets, `${label} in-page targets`).toEqual(
+          before.targets
         );
-        for (const href of sameOrigin) {
+
+        // Each link on either test server, followed to its final URL.
+        const local = (list: string[]) =>
+          list.filter((u) => origins.includes(new URL(u).origin));
+        const [bLinks, aLinks] = [
+          local(before.absolute),
+          local(after.absolute),
+        ];
+        for (let i = 0; i < bLinks.length; i++) {
           const [b, a] = [
-            await resolveLink(baseURL, href),
-            await resolveLink(headURL, href),
+            await resolveLink(bLinks[i]),
+            await resolveLink(aLinks[i]),
           ];
+          const name = `${label} -> ${dest(bLinks[i])}`;
           if (b.status === 200) {
-            expect(a, `${route} -> ${href}`).toEqual(b);
+            expect(a, name).toEqual(b);
           } else {
             // A route a later ticket builds keeps its existing status.
-            expect(a.status, `${route} -> ${href}`).toBe(b.status);
+            expect(a.status, name).toBe(b.status);
           }
         }
       }
@@ -1480,6 +1627,24 @@ test.describe("Range design system", () => {
 });
 
 // ---------------------------------------------------------------------------
+
+/**
+ * The text a visitor sees, run in the page: text nodes whose element is
+ * rendered, visible and not transparent, whitespace collapsed.
+ */
+function visibleText(): string {
+  const skip = "script, style, noscript, template, nextjs-portal";
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const el = n.parentElement;
+    if (!el || el.closest(skip)) continue;
+    if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))
+      continue;
+    parts.push(n.textContent ?? "");
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
