@@ -158,4 +158,10 @@ test.describe("guards", () => {
     }
     expect(denylistHits(inScope).map(describeHit)).toEqual([]);
   });
+
+  test("nothing private", () => {
+    nodeOnly();
+    // Every tracked text file, except the three that define the patterns.
+    expect(denylistHits(() => true).map(describeHit)).toEqual([]);
+  });
 });
