@@ -1385,10 +1385,12 @@ test.describe("Range design system", () => {
         [
           '+  mask: url("data:image/svg+xml,%3Csvg%3E%3C/svg%3E");',
           "+  background-image: url(/icons/arrow.svg);",
+          '+  mask-image: url("data:image/png;base64,iVBORw0KGgo=");',
+          "+  -webkit-mask: url(/icons/arrow.png) no-repeat;",
           "+  color: var(--ink);",
         ].join("\n")
       )
-    ).toHaveLength(2);
+    ).toHaveLength(4);
 
     // The diff checks belong to PRV-2's own PR (PRV-1's rule): a later PR,
     // whose base already holds this suite, skips them.

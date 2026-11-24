@@ -348,8 +348,9 @@ export function unexpectedFragmentFonts(
 }
 
 /**
- * Icon sources a diff adds to stylesheets or markup: inline SVG, SVG data
- * URIs and SVG files in CSS `url()`s (masks, backgrounds, content).
+ * Icon sources a diff adds to stylesheets or markup: inline SVG, image data
+ * URIs of any format, SVG files in CSS `url()`s, and any image used as a
+ * CSS mask.
  */
 export function addedIconSources(diff: string): string[] {
   return diff
@@ -358,8 +359,11 @@ export function addedIconSources(diff: string): string[] {
     .filter(
       (l) =>
         /<svg/i.test(l) ||
-        /data:image\/svg/i.test(l) ||
-        /url\(\s*["']?[^)"']*\.svg/i.test(l)
+        // Any embedded image, vector or raster.
+        /data:image\//i.test(l) ||
+        /url\(\s*["']?[^)"']*\.svg/i.test(l) ||
+        // Any image used as a mask, the usual way to draw an icon in CSS.
+        /(?:^|[\s;{])(?:-webkit-)?mask(?:-image)?\s*:[^;]*url\(/i.test(l)
     );
 }
 
