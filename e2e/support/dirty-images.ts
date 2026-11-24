@@ -112,6 +112,25 @@ export const CLEAN_WEBP = Buffer.from(
   "base64"
 );
 
+/** A RIFF chunk: fourcc, little-endian size, data, then a pad byte if odd. */
+export function riffChunk(fourcc: string, data: Buffer, pad = 0): Buffer {
+  const head = Buffer.alloc(8);
+  head.write(fourcc, 0, "latin1");
+  head.writeUInt32LE(data.length, 4);
+  return Buffer.concat([
+    head,
+    data,
+    data.length & 1 ? Buffer.from([pad]) : Buffer.alloc(0),
+  ]);
+}
+
+/** The WebP with a raw chunk appended and its RIFF size updated. */
+export function webpWithRaw(webp: Buffer, chunk: Buffer): Buffer {
+  const out = Buffer.concat([webp, chunk]);
+  out.writeUInt32LE(out.length - 8, 4);
+  return out;
+}
+
 /** The WebP with a chunk appended and its RIFF size updated. */
 export function webpWithChunk(
   webp: Buffer,

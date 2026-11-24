@@ -36,7 +36,9 @@ import {
   jpegWithSegment,
   pngChunk,
   pngWithChunk,
+  riffChunk,
   webpWithChunk,
+  webpWithRaw,
   withFrameOffset,
   xmpSegment,
 } from "./support/dirty-images";
@@ -466,6 +468,63 @@ test.describe("guards", () => {
           "riff.webp",
           Buffer.concat([CLEAN_WEBP, Buffer.from("made-up")]),
           [/7 bytes beyond the RIFF size/],
+        ],
+        // Bytes hidden inside allowed structures, not after them.
+        [
+          "jfif-extra.jpg",
+          Buffer.concat([
+            jpeg.subarray(0, 2),
+            jpegSegment(
+              0xe0,
+              Buffer.concat([jpeg.subarray(6, 20), Buffer.from(PAYLOAD)])
+            ),
+            jpeg.subarray(20),
+          ]),
+          [/APP0 JFIF segment is \d+ bytes, not 14/],
+        ],
+        [
+          "adobe-extra.jpg",
+          jpegWithSegment(
+            jpeg,
+            jpegSegment(
+              0xee,
+              Buffer.concat([
+                Buffer.from("Adobe\0\x64\0\0\0\0\x01", "latin1"),
+                Buffer.from(PAYLOAD),
+              ])
+            )
+          ),
+          [/APP14 Adobe segment is \d+ bytes, not 12/],
+        ],
+        [
+          "iend-data.png",
+          Buffer.concat([
+            png.subarray(0, png.length - 12),
+            pngChunk("IEND", Buffer.from(PAYLOAD)),
+          ]),
+          [/chunk IEND is \d+ bytes, not 0/],
+        ],
+        [
+          "anmf.webp",
+          webpWithRaw(
+            CLEAN_WEBP,
+            riffChunk(
+              "ANMF",
+              Buffer.concat([
+                Buffer.alloc(16),
+                riffChunk("EXIF", Buffer.from(PAYLOAD)),
+              ])
+            )
+          ),
+          [/ANMF frame chunk EXIF/],
+        ],
+        [
+          "padding.webp",
+          webpWithRaw(
+            CLEAN_WEBP,
+            riffChunk("ALPH", Buffer.from("x"), "Z".charCodeAt(0))
+          ),
+          [/chunk ALPH has a nonzero padding byte/],
         ],
         [
           "animation.gif",

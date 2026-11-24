@@ -25,7 +25,20 @@ const PNG_CHUNKS = new Set([
   "sBIT",
 ]);
 
+/** Chunks whose size the PNG spec fixes; any other size hides bytes. */
+const PNG_FIXED_SIZES: Record<string, number> = {
+  IHDR: 13,
+  IEND: 0,
+  gAMA: 4,
+  cHRM: 32,
+  sRGB: 1,
+  pHYs: 9,
+};
+
 const WEBP_CHUNKS = new Set(["VP8 ", "VP8L", "VP8X", "ALPH", "ANIM", "ANMF"]);
+/** The only chunks an ANMF frame may hold, after its 16-byte header. */
+const WEBP_FRAME_CHUNKS = new Set(["VP8 ", "VP8L", "ALPH"]);
+const WEBP_FIXED_SIZES: Record<string, number> = { VP8X: 10, ANIM: 6 };
 
 /** A chunk or marker name, printable even when the bytes are not. */
 const printable = (s: string) => JSON.stringify(s.trim()).slice(1, -1);
@@ -112,6 +125,11 @@ export function checkJpeg(buf: Buffer): string[] {
     if (marker === 0xe0) {
       if (!segment.toString("latin1", 0, 5).startsWith("JFIF\0")) {
         problems.push(`APP0 segment (${appKind(segment)}), not JFIF`);
+      } else if (segment.length !== 14) {
+        // JFIF is 14 bytes; anything more is a thumbnail or hidden bytes.
+        problems.push(
+          `APP0 JFIF segment is ${segment.length} bytes, not 14 (a thumbnail or extra bytes)`
+        );
       }
     } else if (marker === 0xe2) {
       if (!segment.toString("latin1", 0, 12).startsWith("ICC_PROFILE\0")) {
@@ -120,6 +138,10 @@ export function checkJpeg(buf: Buffer): string[] {
     } else if (marker === 0xee) {
       if (!segment.toString("latin1", 0, 5).startsWith("Adobe")) {
         problems.push(`APP14 segment (${appKind(segment)}), not Adobe`);
+      } else if (segment.length !== 12) {
+        problems.push(
+          `APP14 Adobe segment is ${segment.length} bytes, not 12 (extra bytes)`
+        );
       }
     } else if (marker >= 0xe1 && marker <= 0xef) {
       problems.push(`${name} segment (${appKind(segment)})`);
@@ -171,6 +193,10 @@ export function checkPng(buf: Buffer): string[] {
     if (first && type !== "IHDR") problems.push("first chunk is not IHDR");
     first = false;
     if (!PNG_CHUNKS.has(type)) problems.push(`chunk ${printable(type)}`);
+    const fixed = PNG_FIXED_SIZES[type];
+    if (fixed !== undefined && length !== fixed) {
+      problems.push(`chunk ${type} is ${length} bytes, not ${fixed}`);
+    }
     pos += 12 + length;
     if (type === "IEND") {
       if (pos < buf.length)
@@ -190,19 +216,62 @@ export function checkWebp(buf: Buffer): string[] {
   } else if (end < buf.length) {
     problems.push(`${buf.length - end} bytes beyond the RIFF size`);
   }
-  const limit = Math.min(end, buf.length);
-  let pos = 12;
+  problems.push(
+    ...walkWebpChunks(buf, 12, Math.min(end, buf.length), WEBP_CHUNKS, "")
+  );
+  return problems;
+}
+
+/** Checks RIFF chunks in buf[start, limit) against an allowlist. */
+function walkWebpChunks(
+  buf: Buffer,
+  start: number,
+  limit: number,
+  allowed: Set<string>,
+  where: string
+): string[] {
+  const problems: string[] = [];
+  let pos = start;
   while (pos < limit) {
     if (pos + 8 > limit) {
-      problems.push(`chunk header cut short at offset ${pos}`);
+      problems.push(`${where}chunk header cut short at offset ${pos}`);
       break;
     }
     const fourcc = buf.toString("latin1", pos, pos + 4);
     const size = buf.readUInt32LE(pos + 4);
-    if (!WEBP_CHUNKS.has(fourcc)) problems.push(`chunk ${printable(fourcc)}`);
+    const name = printable(fourcc);
+    if (!allowed.has(fourcc)) problems.push(`${where}chunk ${name}`);
     if (pos + 8 + size > limit) {
-      problems.push(`chunk ${printable(fourcc)} runs past the RIFF size`);
+      problems.push(`${where}chunk ${name} runs past its container`);
       break;
+    }
+    const fixed = WEBP_FIXED_SIZES[fourcc];
+    if (fixed !== undefined && size !== fixed) {
+      problems.push(`${where}chunk ${name} is ${size} bytes, not ${fixed}`);
+    }
+    if (fourcc === "ANMF") {
+      if (size < 16) {
+        problems.push(`${where}chunk ANMF is cut short`);
+      } else {
+        problems.push(
+          ...walkWebpChunks(
+            buf,
+            pos + 8 + 16,
+            pos + 8 + size,
+            WEBP_FRAME_CHUNKS,
+            "ANMF frame "
+          )
+        );
+      }
+    }
+    if (size & 1) {
+      if (pos + 8 + size >= limit) {
+        problems.push(`${where}chunk ${name} is missing its padding byte`);
+        break;
+      }
+      if (buf[pos + 8 + size] !== 0) {
+        problems.push(`${where}chunk ${name} has a nonzero padding byte`);
+      }
     }
     pos += 8 + size + (size & 1);
   }
