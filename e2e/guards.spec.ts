@@ -40,6 +40,8 @@ import marathonCard from "./fixtures/marathon-card.json";
 import urlsFixture from "./fixtures/urls.json";
 import { SHOT_WIDTHS, shot } from "./support/shot";
 import { detectCards } from "./support/cards";
+import { BUDGET_ROUTES, firstLoadJs, layoutShift } from "./support/perf";
+import perfBaseline from "./fixtures/perf-baseline.json";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
 import {
@@ -1003,5 +1005,92 @@ test.describe("guards", () => {
     } finally {
       repo.remove();
     }
+  });
+
+  test("JS within baseline", async ({ browser, baseURL }, testInfo) => {
+    chromiumOnly();
+    test.setTimeout(3 * 60_000);
+    type Routes = Record<string, number>;
+    const FILE = "e2e/fixtures/perf-baseline.json";
+    const original = perfBaseline.original as Routes;
+    const current = perfBaseline.current as Routes;
+    const routes = [...BUDGET_ROUTES].sort();
+    expect(Object.keys(original).sort()).toEqual(routes);
+    expect(Object.keys(current).sort()).toEqual(routes);
+
+    // A PR that changes the baseline must have measured it at an ancestor of
+    // its head, with no app change since, and may only lower `current`.
+    const base = baseSha();
+    const changed = !gitOk(["diff", "--quiet", base, headSha(), "--", FILE]);
+    if (changed) {
+      const prHead = process.env.PR_HEAD_SHA?.trim();
+      expect(
+        prHead,
+        `this PR changes ${FILE}; PR_HEAD_SHA must be set`
+      ).toBeTruthy();
+      const measured = perfBaseline.measured_sha;
+      expect(
+        gitOk(["merge-base", "--is-ancestor", measured, prHead!]),
+        `measured_sha ${measured} is not an ancestor of ${prHead}`
+      ).toBe(true);
+      const appChanges = git([
+        "diff",
+        "--name-only",
+        measured,
+        prHead!,
+        "--",
+        "app",
+        "components",
+        "content",
+        "lib",
+        "public",
+      ]).trim();
+      expect(appChanges, "app files changed after measured_sha").toBe("");
+      if (!existsAt(base, FILE)) {
+        // The PR that introduces the baseline starts both from one measurement.
+        expect(current).toEqual(original);
+      } else {
+        const before = JSON.parse(git(["show", `${base}:${FILE}`])) as {
+          original: Routes;
+          current: Routes;
+        };
+        expect(original).toEqual(before.original);
+        for (const route of routes) {
+          expect(
+            current[route],
+            `current ${route} went up`
+          ).toBeLessThanOrEqual(before.current[route]);
+        }
+      }
+    }
+
+    // On every run: each route's first-load JS is within 3% of `current`.
+    const over: string[] = [];
+    for (const route of BUDGET_ROUTES) {
+      const bytes = await firstLoadJs(browser, baseURL!, route);
+      testInfo.annotations.push({
+        type: "first-load JS",
+        description: `${route}: ${bytes} bytes`,
+      });
+      if (bytes > 1.03 * current[route]) {
+        over.push(`${route}: ${bytes} bytes > 1.03 x ${current[route]}`);
+      }
+    }
+    expect(over).toEqual([]);
+  });
+
+  test("no layout shift", async ({ browser, baseURL }, testInfo) => {
+    chromiumOnly();
+    test.setTimeout(3 * 60_000);
+    const shifted: string[] = [];
+    for (const route of BUDGET_ROUTES) {
+      const score = await layoutShift(browser, baseURL!, route);
+      testInfo.annotations.push({
+        type: "layout shift",
+        description: `${route}: ${score}`,
+      });
+      if (score > 0.01) shifted.push(`${route}: ${score}`);
+    }
+    expect(shifted).toEqual([]);
   });
 });
