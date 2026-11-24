@@ -185,16 +185,41 @@ const describeHit = (h: DenyHit) => `${h.file}:${h.line} ${h.rule}`;
 
 /**
  * next.config.ts source without its allowedDevOrigins property: the property
- * line, its indented continuation lines and the comment lines right above.
+ * itself, up to its closing comma, and the comment lines right above it.
  */
 function withoutDevOrigins(source: string): string {
-  const lines = source.split("\n");
-  let start = lines.findIndex((l) => /^ {2}allowedDevOrigins:/.test(l));
-  expect(start, "allowedDevOrigins not found").toBeGreaterThan(-1);
-  let end = start + 1;
-  while (end < lines.length && !/^ {0,2}\S/.test(lines[end])) end++;
-  while (start > 0 && /^ {2}\/\//.test(lines[start - 1])) start--;
-  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+  const key = /^ {2}allowedDevOrigins:/m.exec(source);
+  expect(key, "allowedDevOrigins not found").not.toBeNull();
+  // The property ends at its first comma outside brackets and strings; the
+  // rest of its line stays, so a sibling on the same line is compared.
+  let end = key!.index + key![0].length;
+  let depth = 0;
+  let quote = "";
+  for (; end < source.length; end++) {
+    const c = source[end];
+    if (quote) {
+      if (c === "\\") end++;
+      else if (c === quote) quote = "";
+    } else if (c === '"' || c === "'" || c === "`") {
+      quote = c;
+    } else if ("([{".includes(c)) {
+      depth++;
+    } else if (")]}".includes(c)) {
+      if (depth === 0) break;
+      depth--;
+    } else if (c === "," && depth === 0) {
+      end++;
+      break;
+    }
+  }
+  // Comment lines directly above the property go with it.
+  let start = key!.index;
+  while (start > 0) {
+    const prev = source.lastIndexOf("\n", start - 2) + 1;
+    if (!/^ {2}\/\//.test(source.slice(prev, start - 1))) break;
+    start = prev;
+  }
+  return source.slice(0, start) + source.slice(end).replace(/^[ \t]*\n/, "");
 }
 
 /** The steps of one job in a GitHub Actions workflow, as raw text blocks. */
@@ -370,6 +395,12 @@ test.describe("guards", () => {
     );
     expect(withoutDevOrigins(after)).toBe(withoutDevOrigins(before));
     expect(withoutDevOrigins(sneaked)).not.toBe(withoutDevOrigins(before));
+    // A property on the same line as allowedDevOrigins shows up too.
+    const sameLine = after.replace(
+      "    .filter(Boolean),",
+      '    .filter(Boolean), output: "export",'
+    );
+    expect(withoutDevOrigins(sameLine)).not.toBe(withoutDevOrigins(before));
 
     // allowedDevOrigins comes from DEV_ORIGINS and is empty without it.
     const unset = loadConfig("next.config.ts", { DEV_ORIGINS: undefined });
