@@ -287,6 +287,16 @@ test.describe("guards", () => {
     expect(use.baseURL).toBe("http://localhost:3000");
     expect(server.url).toBe("http://localhost:3000");
     expect(server.command).toBe("npm run build && npm run start -- -p 3000");
+    // A server already on the port is never reused, locally or in CI, so a
+    // stale build cannot stand in for the tree under test.
+    for (const CI of [undefined, "true"]) {
+      const withCi = loadConfig("playwright.config.ts", { CI });
+      expect(
+        (withCi.webServer as { reuseExistingServer: boolean })
+          .reuseExistingServer,
+        `CI=${CI}`
+      ).toBe(false);
+    }
     expect((config.projects as { name: string }[]).map((p) => p.name)).toEqual([
       "chromium",
       "firefox",

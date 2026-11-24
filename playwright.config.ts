@@ -47,7 +47,9 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npm run start -- -p ${port}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse a server already on the port: it may serve an older build
+    // than the tree under test. A busy port fails the run instead.
+    reuseExistingServer: false,
     timeout: 300_000,
   },
 });
