@@ -362,26 +362,25 @@ export function scanName(file: string, privateList: PrivateEntry[]): ScanHit[] {
   ].map((hit) => ({ file, line: 0, rule: `${hit.rule} in the file name` }));
 }
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** A path safe to print: private values and denylist matches masked. */
+/**
+ * A path safe to print. Denylist matches are masked, and so is every path
+ * segment that holds a private value by the same Unicode-aware matching the
+ * scan uses, so a name the scan flags never prints its value.
+ */
 export function redactPath(file: string, privateList: PrivateEntry[]): string {
   let safe = file;
-  for (const entry of privateList) {
-    const words = entry.value.split(/\s+/).filter(Boolean).map(escapeRegExp);
-    if (words.length) {
-      safe = safe.replace(new RegExp(words.join("\\s+"), "gi"), "[private]");
-    }
-  }
   for (const rule of DENYLIST) {
     const flags = rule.pattern.flags.includes("g")
       ? rule.pattern.flags
       : `${rule.pattern.flags}g`;
     safe = safe.replace(new RegExp(rule.pattern.source, flags), "[redacted]");
   }
-  return safe;
+  return safe
+    .split("/")
+    .map((segment) =>
+      findPrivate(segment, segment, privateList).length ? "[redacted]" : segment
+    )
+    .join("/");
 }
 
 export interface ChangedFile {

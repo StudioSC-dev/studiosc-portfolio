@@ -1061,6 +1061,12 @@ test.describe("guards", () => {
     writeFileSync(list, `# fixture private list\n${literals.join("\n")}\n`);
     writeFileSync(path.join(root, "empty-list.txt"), "# nothing yet\n\n");
     const deny = DENYLIST_FIXTURES["private IP"].matches[0];
+    // The first literal in fullwidth letters: NFKC makes it the same value.
+    const FULLWIDTH = [...literals[0].toUpperCase()]
+      .map((c) =>
+        /[A-Z0-9]/.test(c) ? String.fromCharCode(c.charCodeAt(0) + 0xfee0) : c
+      )
+      .join("");
     const withList = { PREFLIGHT_PRIVATE_LIST: list };
     const outputs: string[] = [];
     const run = (cmd: string, args: string[], env = {}, input?: string) => {
@@ -1193,7 +1199,12 @@ test.describe("guards", () => {
         [
           "named-literal",
           `content/${literals[0]}.mdx`,
-          "content/[private].mdx private list entry on line 2 in the file name",
+          "content/[redacted] private list entry on line 2 in the file name",
+        ],
+        [
+          "named-fullwidth",
+          `content/${FULLWIDTH}-notes.mdx`,
+          "content/[redacted] private list entry on line 2 in the file name",
         ],
         [
           "named-deny",
@@ -1451,7 +1462,7 @@ test.describe("guards", () => {
 
       // No output ever echoes a private value or the denylist match.
       for (const output of outputs) {
-        for (const value of [...literals, deny]) {
+        for (const value of [...literals, deny, FULLWIDTH]) {
           expect(output).not.toContain(value);
         }
       }
