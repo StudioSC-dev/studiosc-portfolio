@@ -41,7 +41,11 @@ import {
   withFrameOffset,
   xmpSegment,
 } from "./support/dirty-images";
-import { checkIco, isImageCandidate } from "../scripts/image-metadata";
+import {
+  checkIco,
+  checkPng,
+  isImageCandidate,
+} from "../scripts/image-metadata";
 import { addedLineNumbers, findPrivate } from "../scripts/privacy-scan";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, nextHop, stubVercelInsights } from "./support/page";
@@ -445,6 +449,19 @@ test.describe("guards", () => {
       expect(isImageCandidate(file, bytes), file).toBe(false);
     }
 
+    // Correctly sized chunks pass.
+    const cleanPng = readFileSync(
+      path.join(ROOT, "e2e/fixtures/images/clean.png")
+    );
+    expect(
+      checkPng(
+        pngWithChunk(cleanPng, pngChunk("sBIT", Buffer.from([8, 8, 8, 8])))
+      )
+    ).toEqual([]);
+    expect(
+      checkPng(pngWithChunk(cleanPng, pngChunk("bKGD", Buffer.alloc(6))))
+    ).toEqual([]);
+
     // The cleaned favicon keeps all four frames.
     const favicon = readFileSync(path.join(ROOT, "app/favicon.ico"));
     expect(readIcoDirectory(favicon).entries).toHaveLength(4);
@@ -647,6 +664,34 @@ test.describe("guards", () => {
             pngChunk("IEND", Buffer.from(PAYLOAD)),
           ]),
           [/chunk IEND is \d+ bytes, not 0/],
+        ],
+        // Ancillary PNG chunks sized wrongly for the colour type (RGBA).
+        [
+          "sbit.png",
+          pngWithChunk(
+            png,
+            pngChunk(
+              "sBIT",
+              Buffer.concat([Buffer.from([8, 8, 8, 8]), Buffer.from(PAYLOAD)])
+            )
+          ),
+          [/chunk sBIT is \d+ bytes, not valid for colour type 6/],
+        ],
+        [
+          "bkgd.png",
+          pngWithChunk(
+            png,
+            pngChunk(
+              "bKGD",
+              Buffer.concat([Buffer.alloc(6), Buffer.from(PAYLOAD)])
+            )
+          ),
+          [/chunk bKGD is \d+ bytes, not valid for colour type 6/],
+        ],
+        [
+          "trns.png",
+          pngWithChunk(png, pngChunk("tRNS", Buffer.from(PAYLOAD))),
+          [/chunk tRNS is \d+ bytes, not valid for colour type 6/],
         ],
         [
           "anmf.webp",

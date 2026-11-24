@@ -27,6 +27,17 @@ const PNG_CHUNKS = new Set([
   "sBIT",
 ]);
 
+/**
+ * The valid sizes of chunks whose size depends on the IHDR colour type
+ * (0 grey, 2 RGB, 3 palette, 4 grey+alpha, 6 RGBA); a chunk not listed for a
+ * type is not allowed with it. tRNS for a palette is checked separately.
+ */
+const PNG_TYPED_SIZES: Record<string, Record<number, number>> = {
+  sBIT: { 0: 1, 2: 3, 3: 3, 4: 2, 6: 4 },
+  bKGD: { 0: 2, 2: 6, 3: 1, 4: 2, 6: 6 },
+  tRNS: { 0: 2, 2: 6 },
+};
+
 /** Chunks whose size the PNG spec fixes; any other size hides bytes. */
 const PNG_FIXED_SIZES: Record<string, number> = {
   IHDR: 13,
@@ -181,6 +192,8 @@ export function checkPng(buf: Buffer): string[] {
   const problems: string[] = [];
   let pos = 8;
   let first = true;
+  let colourType = -1;
+  let paletteSize = 0;
   while (pos < buf.length) {
     if (pos + 8 > buf.length) {
       problems.push(`chunk header cut short at offset ${pos}`);
@@ -198,6 +211,25 @@ export function checkPng(buf: Buffer): string[] {
     const fixed = PNG_FIXED_SIZES[type];
     if (fixed !== undefined && length !== fixed) {
       problems.push(`chunk ${type} is ${length} bytes, not ${fixed}`);
+    }
+    if (type === "IHDR" && length === 13) colourType = buf[pos + 8 + 9];
+    if (type === "PLTE") {
+      if (length % 3 || length < 3 || length > 768 || !(colourType & 2)) {
+        problems.push(`chunk PLTE is ${length} bytes, not a valid palette`);
+      }
+      paletteSize = length / 3;
+    }
+    const typed = PNG_TYPED_SIZES[type];
+    if (typed) {
+      const valid =
+        type === "tRNS" && colourType === 3
+          ? length >= 1 && length <= paletteSize
+          : typed[colourType] === length;
+      if (!valid) {
+        problems.push(
+          `chunk ${type} is ${length} bytes, not valid for colour type ${colourType}`
+        );
+      }
     }
     pos += 12 + length;
     if (type === "IEND") {
