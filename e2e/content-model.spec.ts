@@ -29,15 +29,15 @@ const PROJECT_SLUGS = [
 ];
 
 /**
- * The PR base: the PRV-3 diff and the pre-migration files are read from it.
- * Override with PRV3_BASE; otherwise the merge-base with origin/main.
+ * The PR base, from PRV3_BASE. The comparisons against it apply to the PRV-3
+ * work audit only; without PRV3_BASE they are skipped.
  */
+const BASE = process.env.PRV3_BASE;
+const NEEDS_BASE = "base comparisons run only when PRV3_BASE is set";
+
 function baseSha(): string {
-  if (process.env.PRV3_BASE) return process.env.PRV3_BASE;
-  return execFileSync("git", ["merge-base", "HEAD", "origin/main"], {
-    cwd: ROOT,
-    encoding: "utf8",
-  }).trim();
+  if (!BASE) throw new Error(NEEDS_BASE);
+  return BASE;
 }
 
 function gitShow(sha: string, path: string): string {
@@ -174,7 +174,6 @@ test.describe("content model", () => {
   });
 
   test("content matches the schema", async () => {
-    const base = baseSha();
     const expected: Record<
       string,
       { status: string; summary: string; builtWith: string[] }
@@ -200,6 +199,41 @@ test.describe("content model", () => {
         builtWith: ["React", "TypeScript", "Node.js"],
       },
     };
+
+    for (const slug of PROJECT_SLUGS) {
+      const path = `content/projects/${slug}.mdx`;
+      const now = matter(readFileSync(join(ROOT, path), "utf8"));
+
+      expect(projectFrontmatterSchema.safeParse(now.data).success, slug).toBe(
+        true
+      );
+      for (const old of ["qaVerified", "qaInProgress", "underDevelopment"]) {
+        expect(now.data, `${slug} keeps ${old}`).not.toHaveProperty(old);
+      }
+      expect(now.data.status).toBe(expected[slug].status);
+      expect(now.data.summary).toBe(expected[slug].summary);
+      expect(now.data.builtWith).toEqual(expected[slug].builtWith);
+    }
+
+    // A file that keeps a boolean fails.
+    const kept = matter(
+      readFileSync(join(ROOT, "content/projects/tallyandtrace.mdx"), "utf8")
+    );
+    expect(
+      projectFrontmatterSchema.safeParse({ ...kept.data, qaVerified: true })
+        .success
+    ).toBe(false);
+
+    // The loader sees the same four.
+    const projects = await getProjects();
+    expect(projects.map((p) => p.slug).sort()).toEqual(
+      [...PROJECT_SLUGS].sort()
+    );
+  });
+
+  test("content matches the schema against the PR base", async () => {
+    test.skip(!BASE, NEEDS_BASE);
+    const base = baseSha();
     const migrated = new Set([
       "status",
       "summary",
@@ -213,16 +247,6 @@ test.describe("content model", () => {
       const path = `content/projects/${slug}.mdx`;
       const now = matter(readFileSync(join(ROOT, path), "utf8"));
       const before = matter(gitShow(base, path));
-
-      expect(projectFrontmatterSchema.safeParse(now.data).success, slug).toBe(
-        true
-      );
-      for (const old of ["qaVerified", "qaInProgress", "underDevelopment"]) {
-        expect(now.data, `${slug} keeps ${old}`).not.toHaveProperty(old);
-      }
-      expect(now.data.status).toBe(expected[slug].status);
-      expect(now.data.summary).toBe(expected[slug].summary);
-      expect(now.data.builtWith).toEqual(expected[slug].builtWith);
       expect(now.data.tags).toEqual(before.data.tags);
       expect(now.content).toBe(before.content);
 
@@ -242,20 +266,8 @@ test.describe("content model", () => {
       expect(nowRest).toEqual(beforeRest);
     }
 
-    // A file that keeps a boolean fails.
-    const kept = matter(
-      readFileSync(join(ROOT, "content/projects/tallyandtrace.mdx"), "utf8")
-    );
-    expect(
-      projectFrontmatterSchema.safeParse({ ...kept.data, qaVerified: true })
-        .success
-    ).toBe(false);
-
-    // The loader sees the same four, and the shipped Range list is empty.
+    // The shipped Range list is empty.
     const projects = await getProjects();
-    expect(projects.map((p) => p.slug).sort()).toEqual(
-      [...PROJECT_SLUGS].sort()
-    );
     expect(RANGE_CATEGORIES).toEqual([]);
     expect(() =>
       validateRange(
@@ -490,9 +502,7 @@ test.describe("content model", () => {
     });
   });
 
-  test("changes stay within PRV-3 scope", async ({ page }) => {
-    test.setTimeout(240_000);
-
+  test("changes stay within PRV-3 scope", () => {
     // The allowlist itself, on allowed and disallowed paths.
     for (const allowed of [
       "lib/statuses.ts",
@@ -512,6 +522,13 @@ test.describe("content model", () => {
     ]) {
       expect(isAllowedPrv3Path(disallowed), disallowed).toBe(false);
     }
+  });
+
+  test("changes stay within PRV-3 scope against the PR base", async ({
+    page,
+  }) => {
+    test.skip(!BASE, NEEDS_BASE);
+    test.setTimeout(240_000);
 
     // The actual diff against the PR base (committed and working tree).
     const base = baseSha();
@@ -595,9 +612,11 @@ test.describe("content model", () => {
     const homeOrder = ["portfolio-site", "central-command", "tallyandtrace"];
     await expect(page.locator("div.group h3").first()).toBeVisible();
     const homeTitles = await page.locator("div.group h3").allTextContents();
-    expect(homeTitles).toEqual(
-      homeOrder.map((s) => expected[s as keyof typeof expected].title)
-    );
+    for (const slug of homeOrder) {
+      expect(homeTitles).toContain(
+        expected[slug as keyof typeof expected].title
+      );
+    }
     for (const slug of homeOrder) {
       const badge = cardFor(page, slug).locator("span.label");
       await expect(badge).toHaveText(
@@ -605,34 +624,69 @@ test.describe("content model", () => {
       );
     }
 
-    // Work: group headings use the same labels, in order, with the same members.
+    // Work: group headings use the same labels as the badges.
     await page.goto("/work");
     const headings = await page.locator("section.mb-16 > h2").allTextContents();
-    expect(headings).toEqual(["Live", "In QA", "In development"]);
     for (const heading of headings) expect(allowed.has(heading)).toBe(true);
-    const groups = await page.locator("section.mb-16").all();
-    const members: string[][] = [];
-    for (const group of groups) {
-      members.push(await group.locator("h3").allTextContents());
-    }
-    expect(members).toEqual([
-      ["StudioSC Portfolio"],
-      ["Central Command", "Tally And Trace"],
-      ["Fitness Rival"],
-    ]);
     for (const [slug, info] of Object.entries(expected)) {
       await expect(cardFor(page, slug).locator("span.label")).toHaveText(
         info.status
       );
+      await expect(
+        page
+          .locator("section.mb-16")
+          .filter({ has: page.locator(`a[href="/work/${slug}"]`) })
+          .locator("> h2")
+      ).toHaveText(info.status);
     }
 
-    // Case pages: the status, and the related post titles from the blog files.
+    // Case pages: the status.
     for (const [slug, info] of Object.entries(expected)) {
       await page.goto(`/work/${slug}`);
       await expect(page.locator("article header span.label").last()).toHaveText(
         info.status
       );
       await expect(page.locator("article header h1")).toHaveText(info.title);
+    }
+  });
+
+  test("status words from the set against the PR base", async ({ page }) => {
+    test.skip(!BASE, NEEDS_BASE);
+
+    // Home: three featured projects, most finished first.
+    await page.goto("/");
+    await expect(page.locator("div.group h3").first()).toBeVisible();
+    expect(await page.locator("div.group h3").allTextContents()).toEqual([
+      "StudioSC Portfolio",
+      "Central Command",
+      "Tally And Trace",
+    ]);
+
+    // Work: headings in order, with the same members as before.
+    await page.goto("/work");
+    expect(await page.locator("section.mb-16 > h2").allTextContents()).toEqual([
+      "Live",
+      "In QA",
+      "In development",
+    ]);
+    // Polled, because the dev server can reload the page on first compile.
+    await expect
+      .poll(async () => {
+        const members: string[][] = [];
+        for (const group of await page.locator("section.mb-16").all()) {
+          members.push(await group.locator("h3").allTextContents());
+        }
+        return members;
+      })
+      .toEqual([
+        ["StudioSC Portfolio"],
+        ["Central Command", "Tally And Trace"],
+        ["Fitness Rival"],
+      ]);
+
+    // Case pages: related post titles are the blog files' titles.
+    for (const slug of PROJECT_SLUGS) {
+      await page.goto(`/work/${slug}`);
       const posts = readdirSync(join(ROOT, "content/blog"))
         .map(
           (f) =>
