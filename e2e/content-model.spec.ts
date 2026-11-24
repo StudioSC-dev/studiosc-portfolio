@@ -3,6 +3,8 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import {
   cpSync,
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
@@ -10,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import matter from "gray-matter";
 import { getProject, getProjects } from "../lib/mdx";
 import { projectFrontmatterSchema } from "../lib/projects-schema";
@@ -176,6 +178,19 @@ export function isAllowedPrv3Path(path: string): boolean {
   return exact.has(path) || path.startsWith("e2e/fixtures/content-model/");
 }
 
+/**
+ * Copy `src` to `dest`, hard-linking when the filesystem allows and copying
+ * when it does not (a temp dir on another filesystem). Turbopack rejects a
+ * symlinked node_modules, so a symlink is not an option.
+ */
+export function linkOrCopyTree(src: string, dest: string): void {
+  const linked = spawnSync("cp", ["-al", src, dest], { encoding: "utf8" });
+  if (linked.status === 0) return;
+  // A failed link can leave a partial tree, and `cp -a` into it would nest.
+  rmSync(dest, { recursive: true, force: true });
+  execFileSync("cp", ["-a", src, dest]);
+}
+
 interface BaseServer {
   url: string;
   stop: () => void;
@@ -187,54 +202,55 @@ let baseServer: Promise<BaseServer> | undefined;
 function startBaseServer(sha: string): Promise<BaseServer> {
   baseServer ??= (async () => {
     const dir = tempDir("base-server");
-    execFileSync("sh", ["-c", 'git archive "$SHA" | tar -x -C "$DIR"'], {
-      cwd: ROOT,
-      env: { ...process.env, SHA: sha, DIR: dir },
-    });
-    // Turbopack rejects a symlinked node_modules, so link the files instead.
-    execFileSync("cp", [
-      "-al",
-      join(ROOT, "node_modules"),
-      join(dir, "node_modules"),
-    ]);
-    const port = await new Promise<number>((resolvePort, reject) => {
-      const probe = createServer();
-      probe.once("error", reject);
-      probe.listen(0, () => {
-        const { port: free } = probe.address() as { port: number };
-        probe.close(() => resolvePort(free));
+    try {
+      execFileSync("sh", ["-c", 'git archive "$SHA" | tar -x -C "$DIR"'], {
+        cwd: ROOT,
+        env: { ...process.env, SHA: sha, DIR: dir },
       });
-    });
-    const child = spawn("npx", ["next", "dev", "-p", String(port)], {
-      cwd: dir,
-      detached: true,
-      stdio: "ignore",
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
-    });
-    const url = `http://localhost:${port}`;
-    const stop = () => {
-      try {
-        if (child.pid) process.kill(-child.pid);
-      } catch {
-        // already gone
+      linkOrCopyTree(join(ROOT, "node_modules"), join(dir, "node_modules"));
+      const port = await new Promise<number>((resolvePort, reject) => {
+        const probe = createServer();
+        probe.once("error", reject);
+        probe.listen(0, () => {
+          const { port: free } = probe.address() as { port: number };
+          probe.close(() => resolvePort(free));
+        });
+      });
+      const child = spawn("npx", ["next", "dev", "-p", String(port)], {
+        cwd: dir,
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+      });
+      const url = `http://localhost:${port}`;
+      const stop = () => {
+        try {
+          if (child.pid) process.kill(-child.pid);
+        } catch {
+          // already gone
+        }
+        rmSync(dir, { recursive: true, force: true });
+      };
+      const deadline = Date.now() + 150_000;
+      for (;;) {
+        try {
+          const response = await fetch(url, { redirect: "manual" });
+          if (response.status === 200) break;
+        } catch {
+          // not up yet
+        }
+        if (Date.now() > deadline) {
+          stop();
+          throw new Error("base dev server did not start");
+        }
+        await new Promise((r) => setTimeout(r, 1000));
       }
+      return { url, stop };
+    } catch (error) {
+      // Do not leave the exported tree behind when setup fails.
       rmSync(dir, { recursive: true, force: true });
-    };
-    const deadline = Date.now() + 150_000;
-    for (;;) {
-      try {
-        const response = await fetch(url, { redirect: "manual" });
-        if (response.status === 200) break;
-      } catch {
-        // not up yet
-      }
-      if (Date.now() > deadline) {
-        stop();
-        throw new Error("base dev server did not start");
-      }
-      await new Promise((r) => setTimeout(r, 1000));
+      throw error;
     }
-    return { url, stop };
   })();
   return baseServer;
 }
@@ -644,19 +660,7 @@ test.describe("content model", () => {
           );
         },
       });
-      // Turbopack rejects a symlinked node_modules, so link the files instead.
-      const linked = spawnSync(
-        "cp",
-        ["-al", join(ROOT, "node_modules"), join(dest, "node_modules")],
-        { encoding: "utf8" }
-      );
-      if (linked.status !== 0) {
-        execFileSync("cp", [
-          "-a",
-          join(ROOT, "node_modules"),
-          join(dest, "node_modules"),
-        ]);
-      }
+      linkOrCopyTree(join(ROOT, "node_modules"), join(dest, "node_modules"));
       return dest;
     }
 
@@ -752,6 +756,25 @@ RANGE_CATEGORIES.push({
         }
       }
     });
+  });
+
+  test("copy fallback works across filesystems", () => {
+    // /dev/shm is a separate filesystem from the worktree, so hard links fail.
+    test.skip(!existsSync("/dev/shm"), "no /dev/shm on this machine");
+    const src = mkdtempSync(join(ROOT, ".prv3-copy-src-"));
+    const dest = mkdtempSync("/dev/shm/prv3-copy-");
+    try {
+      mkdirSync(join(src, "pkg"));
+      writeFileSync(join(src, "pkg", "index.js"), "ok");
+      const target = join(dest, "node_modules");
+      linkOrCopyTree(src, target);
+      expect(readFileSync(join(target, "pkg", "index.js"), "utf8")).toBe("ok");
+      // A copy, not a nested directory.
+      expect(existsSync(join(target, basename(src)))).toBe(false);
+    } finally {
+      rmSync(src, { recursive: true, force: true });
+      rmSync(dest, { recursive: true, force: true });
+    }
   });
 
   test("changes stay within PRV-3 scope", () => {
