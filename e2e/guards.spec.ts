@@ -850,6 +850,8 @@ test.describe("guards", () => {
     const square = `<div style="${box}border:1px solid #999;border-radius:0">x</div>`;
     const wide = `<div style="width:160px;height:80px;border:1px solid #999;border-radius:8px">x</div>`;
     const tall = `<div style="width:120px;height:96px;border:1px solid #999;border-radius:8px">x</div>`;
+    const nearWide = `<div style="width:120.25px;height:80px;border:1px solid #999;border-radius:8px">x</div>`;
+    const nearTall = `<div style="width:120px;height:80.25px;border:1px solid #999;border-radius:8px">x</div>`;
 
     const cases: [string, string, { cards: number; grids: number }][] = [
       [
@@ -887,6 +889,16 @@ test.describe("guards", () => {
       [
         "one of three a different height",
         row(repeat(2, bordered) + tall),
+        { cards: 3, grids: 0 },
+      ],
+      [
+        "one of three a quarter pixel wider",
+        row(repeat(2, bordered) + nearWide),
+        { cards: 3, grids: 0 },
+      ],
+      [
+        "one of three a quarter pixel taller",
+        row(repeat(2, bordered) + nearTall),
         { cards: 3, grids: 0 },
       ],
       [

@@ -100,9 +100,13 @@ export async function detectCards(
         [];
       for (const card of siblings) {
         const { width, height } = card.getBoundingClientRect();
+        // Equal at layout precision (1/64 px in Chromium and WebKit, 1/60 in
+        // Firefox): equally sized boxes measure identically, so any larger
+        // difference is a different size.
         const group = groups.find(
           (g) =>
-            Math.abs(g.width - width) < 0.5 && Math.abs(g.height - height) < 0.5
+            Math.abs(g.width - width) < 0.01 &&
+            Math.abs(g.height - height) < 0.01
         );
         if (group) group.members.push(card);
         else groups.push({ width, height, members: [card] });
