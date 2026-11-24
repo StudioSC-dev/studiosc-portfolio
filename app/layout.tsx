@@ -1,30 +1,28 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import {
+  ibmPlexSans,
+  jetbrainsMono,
+  manrope,
+  redHatDisplay,
+  redHatText,
+} from "@/lib/fonts";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-// Display face for headings. Instrument Serif only ships a 400 weight, which is
-// why headings use tracking rather than font-bold (see globals.css).
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
-  style: ["normal", "italic"],
-  subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-});
+// Each face sets only a CSS variable here. globals.css decides where it applies:
+// Red Hat Text on the body, Red Hat Display on headings, JetBrains Mono on pre and
+// code, and the two fragment faces only under a [data-fragment] root.
+const fontVariables = [
+  redHatDisplay.variable,
+  redHatText.variable,
+  jetbrainsMono.variable,
+  ibmPlexSans.variable,
+  manrope.variable,
+].join(" ");
 
 export const metadata: Metadata = {
   title: {
@@ -86,12 +84,7 @@ export default function RootLayout({
           />
         )}
       </head>
-      <body
-        // No bg-* here on purpose: the page colour lives on <html> so the paper
-        // texture (a z-index:-1 pseudo-element) is not painted over by body's
-        // own background, which renders after negative-z-index children.
-        className={`${inter.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable} text-body antialiased`}
-      >
+      <body className={`${fontVariables} text-body antialiased`}>
         <Header />
         <main className="min-h-screen">{children}</main>
         <Footer />
