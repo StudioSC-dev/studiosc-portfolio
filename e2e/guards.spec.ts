@@ -35,6 +35,8 @@ import {
 } from "./support/dirty-images";
 import { checkIco } from "../scripts/image-metadata";
 import { throwawayRepo } from "./support/throwaway";
+import { collectErrors, stubVercelInsights } from "./support/page";
+import marathonCard from "./fixtures/marathon-card.json";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
 import {
@@ -502,5 +504,71 @@ test.describe("guards", () => {
     } finally {
       repo.remove();
     }
+  });
+
+  test("marathon post embeds as links", async ({ page }, testInfo) => {
+    const social = /(^|\.)(instagram\.com|facebook\.net)$/;
+    const socialRequests: string[] = [];
+    page.on("request", (request) => {
+      if (social.test(new URL(request.url()).hostname)) {
+        socialRequests.push(request.url());
+      }
+    });
+    const errors = collectErrors(page);
+    await stubVercelInsights(page);
+    const cards = page
+      .locator("article a")
+      .filter({ hasText: /View on (Instagram|Facebook)/ });
+    const facebook = page.locator(".fb-post, #fb-root");
+
+    for (const [width, expected] of Object.entries(marathonCard.widths)) {
+      await page.setViewportSize(expected.viewport);
+      await page.goto(marathonCard.url);
+      const loadedAt = Date.now();
+      await expect(cards.first()).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => document.fonts.ready);
+
+      const measure = () =>
+        cards.evaluateAll((links) =>
+          links.map((a) => {
+            const r = a.getBoundingClientRect();
+            return {
+              text: (a.textContent ?? "").trim(),
+              href: a.getAttribute("href"),
+              box: {
+                x: r.x + window.scrollX,
+                y: r.y + window.scrollY,
+                width: r.width,
+                height: r.height,
+              },
+            };
+          })
+        );
+      const check = async (when: string) => {
+        const found = await measure();
+        expect(found, `${width}px ${when}: link cards`).toHaveLength(1);
+        expect(found[0].text).toBe(expected.text);
+        expect(found[0].href).toBe(expected.href);
+        // The box was measured in Chromium, so only Chromium compares it.
+        if (testInfo.project.name === "chromium") {
+          for (const key of ["x", "y", "width", "height"] as const) {
+            expect(
+              Math.abs(found[0].box[key] - expected.box[key]),
+              `${width}px ${when}: box ${key}`
+            ).toBeLessThanOrEqual(2);
+          }
+        }
+        await expect(facebook, `${width}px ${when}: Facebook`).toHaveCount(0);
+      };
+
+      await check("at load");
+      expect(errors, `${width}px: console errors`).toEqual([]);
+      // Past the old 3 s fallback timeout, the card is still the only one.
+      await page.waitForTimeout(Math.max(0, loadedAt + 5000 - Date.now()));
+      await check("5 s after load");
+    }
+    expect(socialRequests).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });

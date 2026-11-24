@@ -1,0 +1,19 @@
+{
+  "sha": "c10ae1a9a10b9665ccabbca1b470240297d5590b",
+  "url": "/blog/first-marathon",
+  "note": "The on-load Instagram link card of the marathon post at origin/main, before PRV-1, with Instagram's and Facebook's scripts blocked. Measured in Chromium once the card rendered and fonts loaded; the box is in page coordinates.",
+  "widths": {
+    "1440": {
+      "viewport": { "width": 1440, "height": 900 },
+      "text": "View on Instagram↗",
+      "href": "https://www.instagram.com/p/DUxtiRsARJw/",
+      "box": { "x": 472, "y": 910.96875, "width": 518, "height": 54 }
+    },
+    "390": {
+      "viewport": { "width": 390, "height": 844 },
+      "text": "View on Instagram↗",
+      "href": "https://www.instagram.com/p/DUxtiRsARJw/",
+      "box": { "x": 46, "y": 1303.109375, "width": 320, "height": 54 }
+    }
+  }
+}
