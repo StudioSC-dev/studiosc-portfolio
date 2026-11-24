@@ -455,6 +455,29 @@ test.describe("guards", () => {
           [/<metadata> element/],
         ],
         [
+          "utf16.svg",
+          Buffer.concat([
+            Buffer.from([0xff, 0xfe]),
+            Buffer.from(
+              `<svg xmlns="http://www.w3.org/2000/svg"><metadata>${XMP_PACKET}</metadata></svg>`,
+              "utf16le"
+            ),
+          ]),
+          [/SVG is not UTF-8/],
+        ],
+        [
+          "latin1.svg",
+          Buffer.from(
+            '<?xml version="1.0" encoding="ISO-8859-1"?><svg xmlns="http://www.w3.org/2000/svg"/>'
+          ),
+          [/SVG declares an encoding other than UTF-8/],
+        ],
+        [
+          "not-really.svg",
+          Buffer.from("Just some text that is not an SVG.\n"),
+          [/not an SVG document/],
+        ],
+        [
           "exif.webp",
           webpWithChunk(CLEAN_WEBP, "EXIF", exifGpsSegment().subarray(10)),
           [/chunk EXIF/],

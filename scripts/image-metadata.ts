@@ -365,8 +365,35 @@ export function checkIco(buf: Buffer): string[] {
   return problems;
 }
 
+/**
+ * An SVG must be a UTF-8 document whose root element is <svg>, with no
+ * <metadata> element. Other encodings fail rather than being decoded, so no
+ * element can hide in them.
+ */
 export function checkSvg(buf: Buffer): string[] {
-  return /<(?:[\w.-]+:)?metadata[\s>/]/i.test(buf.toString("utf8"))
+  if (buf.includes(0)) {
+    return ["SVG is not UTF-8 (it holds NUL bytes, as UTF-16 does)"];
+  }
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+  } catch {
+    return ["SVG is not UTF-8 (invalid byte sequence)"];
+  }
+  text = text.replace(/^\uFEFF/, "");
+  const declaration = /^<\?xml\b[^>]*\?>/.exec(text);
+  const encoding = declaration
+    ? /\bencoding\s*=\s*["']([^"']*)["']/i.exec(declaration[0])
+    : null;
+  if (encoding && !/^utf-?8$/i.test(encoding[1])) {
+    return ["SVG declares an encoding other than UTF-8"];
+  }
+  const prolog =
+    /^(?:\s|<\?[^>]*\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>[]*>)*<(?:[\w.-]+:)?svg[\s>/]/i;
+  if (!prolog.test(text)) {
+    return ["not an SVG document (its root element is not <svg>)"];
+  }
+  return /<(?:[\w.-]+:)?metadata[\s>/]/i.test(text)
     ? ["<metadata> element"]
     : [];
 }
