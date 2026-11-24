@@ -1,5 +1,6 @@
-import { test, expect } from "@playwright/test";
-import { execFileSync, spawnSync } from "node:child_process";
+import { test, expect, type Page } from "@playwright/test";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:net";
 import {
   cpSync,
   mkdtempSync,
@@ -163,12 +164,122 @@ export function isAllowedPrv3Path(path: string): boolean {
   return exact.has(path) || path.startsWith("e2e/fixtures/content-model/");
 }
 
+interface BaseServer {
+  url: string;
+  stop: () => void;
+}
+
+let baseServer: Promise<BaseServer> | undefined;
+
+/** Export the PR base to a temp dir and serve it with `next dev` on a free port. */
+function startBaseServer(sha: string): Promise<BaseServer> {
+  baseServer ??= (async () => {
+    const dir = tempDir("base-server");
+    execFileSync("sh", ["-c", 'git archive "$SHA" | tar -x -C "$DIR"'], {
+      cwd: ROOT,
+      env: { ...process.env, SHA: sha, DIR: dir },
+    });
+    // Turbopack rejects a symlinked node_modules, so link the files instead.
+    execFileSync("cp", [
+      "-al",
+      join(ROOT, "node_modules"),
+      join(dir, "node_modules"),
+    ]);
+    const port = await new Promise<number>((resolvePort, reject) => {
+      const probe = createServer();
+      probe.once("error", reject);
+      probe.listen(0, () => {
+        const { port: free } = probe.address() as { port: number };
+        probe.close(() => resolvePort(free));
+      });
+    });
+    const child = spawn("npx", ["next", "dev", "-p", String(port)], {
+      cwd: dir,
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+    });
+    const url = `http://localhost:${port}`;
+    const stop = () => {
+      try {
+        if (child.pid) process.kill(-child.pid);
+      } catch {
+        // already gone
+      }
+      rmSync(dir, { recursive: true, force: true });
+    };
+    const deadline = Date.now() + 150_000;
+    for (;;) {
+      try {
+        const response = await fetch(url, { redirect: "manual" });
+        if (response.status === 200) break;
+      } catch {
+        // not up yet
+      }
+      if (Date.now() > deadline) {
+        stop();
+        throw new Error("base dev server did not start");
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    return { url, stop };
+  })();
+  return baseServer;
+}
+
+/** Text and tag/class skeleton of <main>, retried because dev can reload the page. */
+async function snapshotMain(page: Page, url: string) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.goto(url);
+      await page.locator("main").waitFor();
+      return await page.locator("main").evaluate((root) => {
+        const skip = new Set(["SCRIPT", "STYLE", "NEXTJS-PORTAL"]);
+        const walk = (el: Element): string =>
+          `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""}[${[
+            ...el.children,
+          ]
+            .filter((child) => !skip.has(child.tagName))
+            .map(walk)
+            .join(",")}]`;
+        return {
+          text: (root as HTMLElement).innerText.replace(/[ \t]+/g, " "),
+          skeleton: walk(root),
+        };
+      });
+    } catch (error) {
+      if (attempt >= 4) throw error;
+    }
+  }
+}
+
+async function navHrefs(page: Page, url: string) {
+  await page.goto(url);
+  const hrefs = (selector: string) =>
+    page
+      .locator(selector)
+      .evaluateAll((els) => els.map((el) => el.getAttribute("href")));
+  return {
+    heading: await page.locator("h1").first().innerText(),
+    header: await hrefs("header:not(article *) a"),
+    footer: await hrefs("footer:not(article *) a"),
+  };
+}
+
+/** The old status words, and what the new set calls them. */
+const STATUS_RENAMES: [RegExp, string][] = [
+  [/^QA Verified$/i, "Live"],
+  [/^QA In Progress$/i, "In QA"],
+  [/^Under Development$/i, "In development"],
+];
+
 test.describe("content model", () => {
   // Node-only checks need one run, not one per browser project.
   test.beforeEach(async ({}, testInfo) => {
-    const nodeOnly = !/status words from the set|portfolio repo link/.test(
-      testInfo.title
-    );
+    const nodeOnly = ![
+      "status words from the set",
+      "portfolio repo link",
+    ].includes(testInfo.title);
     test.skip(
       nodeOnly && testInfo.project.name !== "chromium",
       "node-only check runs once"
@@ -660,25 +771,24 @@ RANGE_CATEGORIES.push({
       "/contact",
       "/privacy/hermes-personal-assistant",
     ];
-    const navHrefs = [
-      ...gitShow(base, "components/layout/Header.tsx").matchAll(
-        /href: "([^"]+)"/g
-      ),
-      ...gitShow(base, "components/layout/Footer.tsx").matchAll(
-        /href: "([^"]+)"/g
-      ),
-    ].map((m) => m[1]);
-    expect(navHrefs.length).toBeGreaterThan(0);
 
+    const { url: baseUrl } = await startBaseServer(base);
+    const headUrl = String(test.info().project.use.baseURL).replace(/\/$/, "");
     for (const route of routes) {
-      const response = await page.goto(route);
-      expect(response?.status(), route).toBe(200);
-      const hrefs = await page
-        .locator("header a, footer a")
-        .evaluateAll((els) => els.map((el) => el.getAttribute("href")));
-      for (const href of navHrefs) {
-        expect(hrefs, `${route} nav ${href}`).toContain(href);
+      // A direct 200 on both: a redirect that lands on a 200 does not count.
+      for (const origin of [baseUrl, headUrl]) {
+        const response = await page.request.get(`${origin}${route}`, {
+          maxRedirects: 0,
+        });
+        expect(response.status(), `${origin}${route}`).toBe(200);
       }
+      // The same page, and the same header and footer destinations, each
+      // compared on its own.
+      const before = await navHrefs(page, `${baseUrl}${route}`);
+      const after = await navHrefs(page, `${headUrl}${route}`);
+      expect(after.heading, `${route} heading`).toBe(before.heading);
+      expect(after.header, `${route} header links`).toEqual(before.header);
+      expect(after.footer, `${route} footer links`).toEqual(before.footer);
     }
   });
 
@@ -727,55 +837,58 @@ RANGE_CATEGORIES.push({
 
   test("status words from the set against the PR base", async ({ page }) => {
     test.skip(!BASE, NEEDS_BASE);
+    test.setTimeout(240_000);
+    const { url: baseUrl } = await startBaseServer(baseSha());
+    const headUrl = String(test.info().project.use.baseURL).replace(/\/$/, "");
 
-    // Home: three featured projects, most finished first.
-    await page.goto("/");
-    await expect(page.locator("div.group h3").first()).toBeVisible();
-    expect(await page.locator("div.group h3").allTextContents()).toEqual([
-      "StudioSC Portfolio",
-      "Central Command",
-      "Tally And Trace",
-    ]);
-
-    // Work: headings in order, with the same members as before.
-    await page.goto("/work");
-    expect(await page.locator("section.mb-16 > h2").allTextContents()).toEqual([
-      "Live",
-      "In QA",
-      "In development",
-    ]);
-    // Polled, because the dev server can reload the page on first compile.
-    await expect
-      .poll(async () => {
-        const members: string[][] = [];
-        for (const group of await page.locator("section.mb-16").all()) {
-          members.push(await group.locator("h3").allTextContents());
-        }
-        return members;
-      })
-      .toEqual([
-        ["StudioSC Portfolio"],
-        ["Central Command", "Tally And Trace"],
-        ["Fitness Rival"],
-      ]);
-
-    // Case pages: related post titles are the blog files' titles.
-    for (const slug of PROJECT_SLUGS) {
-      await page.goto(`/work/${slug}`);
-      const posts = readdirSync(join(ROOT, "content/blog"))
-        .map(
-          (f) =>
-            matter(readFileSync(join(ROOT, "content/blog", f), "utf8")).data
-        )
-        .filter((d) => d.projectSlug === slug)
-        .map((d) => d.title as string);
-      const shown = await page
-        .locator("section", {
-          has: page.getByRole("heading", { name: "Related Posts" }),
+    // Rendered base against rendered head: the same text (post titles, project
+    // membership and order included) except the renamed status words, and the
+    // same tag and class structure.
+    for (const route of [
+      "/",
+      "/work",
+      ...PROJECT_SLUGS.map((s) => `/work/${s}`),
+    ]) {
+      const before = await snapshotMain(page, `${baseUrl}${route}`);
+      const after = await snapshotMain(page, `${headUrl}${route}`);
+      // Only a line that is exactly an old status word is renamed, so post
+      // titles that contain the words are compared as they are. innerText
+      // follows CSS text-transform, so an upper-case line stays upper-case.
+      const renamed = before.text
+        .split("\n")
+        .map((line) => {
+          for (const [from, to] of STATUS_RENAMES) {
+            if (from.test(line.trim())) {
+              return line.trim() === line.trim().toUpperCase()
+                ? to.toUpperCase()
+                : to;
+            }
+          }
+          return line;
         })
-        .locator("h3")
-        .allTextContents();
-      expect(shown.sort()).toEqual(posts.sort());
+        .join("\n");
+      expect(after.text, `${route} text`).toBe(renamed);
+      expect(after.skeleton, `${route} structure`).toBe(before.skeleton);
+      expect(
+        after.text
+          .split("\n")
+          .filter((line) =>
+            /^(QA Verified|QA In Progress|Under Development)$/i.test(
+              line.trim()
+            )
+          ),
+        `${route} drops old words`
+      ).toEqual([]);
     }
+
+    // The migration's expected statuses, from the head's rendered pages.
+    await page.goto(`${headUrl}/work`);
+    await expect
+      .poll(() => page.locator("h2").allTextContents())
+      .toEqual(expect.arrayContaining(["Live", "In QA", "In development"]));
+  });
+
+  test.afterAll(async () => {
+    if (baseServer) (await baseServer).stop();
   });
 });
