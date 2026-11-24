@@ -32,6 +32,7 @@ import {
   exifGpsSegment,
   icoFrames,
   isPng,
+  jpegSegment,
   jpegWithSegment,
   pngChunk,
   pngWithChunk,
@@ -341,6 +342,7 @@ test.describe("guards", () => {
     wrongSize.writeInt32LE(wrongSize.readInt32LE(4) + 1, 4);
     const ico = buildIco(frames);
 
+    const PAYLOAD = "Zq9 made-up owner payload";
     const dir = mkdtempSync(path.join(os.tmpdir(), "image-metadata-"));
     try {
       const dirty: [string, Buffer, RegExp[]][] = [
@@ -353,6 +355,23 @@ test.describe("guards", () => {
           "xmp.jpg",
           jpegWithSegment(jpeg, xmpSegment()),
           [/APP1 segment \(XMP\)/],
+        ],
+        [
+          "unknown-app.jpg",
+          jpegWithSegment(
+            jpeg,
+            jpegSegment(0xe3, Buffer.from(`${PAYLOAD}\0more`, "latin1"))
+          ),
+          [/APP3 segment \(unidentified payload\)/],
+        ],
+        [
+          "unknown-app0.jpg",
+          Buffer.concat([
+            jpeg.subarray(0, 2),
+            jpegSegment(0xe0, Buffer.from(PAYLOAD, "latin1")),
+            jpeg.subarray(2),
+          ]),
+          [/APP0 segment \(unidentified payload\), not JFIF/],
         ],
         [
           "trailing.jpg",
@@ -459,6 +478,8 @@ test.describe("guards", () => {
         writeFileSync(file, bytes);
         const result = checkImages([file]);
         expect(result.status, `${name} passed the checker`).toBe(1);
+        // A diagnostic never echoes a payload.
+        expect(result.stderr).not.toContain(PAYLOAD);
         const lines = result.stderr.split("\n").filter(Boolean);
         for (const reason of reasons) {
           expect(

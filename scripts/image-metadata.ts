@@ -53,15 +53,18 @@ function jpegMarkerName(marker: number): string {
   return `marker 0x${marker.toString(16).toUpperCase().padStart(2, "0")}`;
 }
 
-/** What an application segment carries, from its identifier. */
+/** What an application segment carries, from its known identifiers only. */
 function appKind(segment: Buffer): string {
   const head = segment.toString("latin1", 0, 40);
   if (head.startsWith("Exif\0")) return "Exif";
   if (head.startsWith("http://ns.adobe.com/xap/1.0/")) return "XMP";
   if (head.startsWith("http://ns.adobe.com/xmp/extension/")) return "XMP";
   if (head.startsWith("Photoshop 3.0")) return "Photoshop IRB";
-  const id = head.split("\0")[0];
-  return id ? printable(id.slice(0, 20)) : "no identifier";
+  if (head.startsWith("JFIF\0")) return "JFIF";
+  if (head.startsWith("ICC_PROFILE\0")) return "ICC_PROFILE";
+  if (head.startsWith("Adobe")) return "Adobe";
+  // Never echo the bytes: an unknown segment's payload may be the metadata.
+  return "unidentified payload";
 }
 
 const isSof = (m: number) =>

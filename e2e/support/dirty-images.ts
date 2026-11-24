@@ -36,7 +36,7 @@ export function pngWithChunk(png: Buffer, chunk: Buffer): Buffer {
 }
 
 /** A JPEG segment: marker, length and payload. */
-function jpegSegment(marker: number, payload: Buffer): Buffer {
+export function jpegSegment(marker: number, payload: Buffer): Buffer {
   const head = Buffer.from([0xff, marker, 0, 0]);
   head.writeUInt16BE(payload.length + 2, 2);
   return Buffer.concat([head, payload]);
