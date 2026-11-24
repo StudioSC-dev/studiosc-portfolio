@@ -1,5 +1,7 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 
 import {
@@ -45,6 +47,7 @@ import {
   CONTEXT_TOKENS,
   REQUIRED_PAIRINGS,
   RETIRED_DARK_TOKENS,
+  SCOPE_FILES,
   SCOPE_ROUTES,
 } from "./fixtures/design-tokens/inventory";
 
@@ -1069,4 +1072,176 @@ test.describe("Range design system", () => {
       /\/(home|srv|tmp|Users)\/|\.dc\.html|LAB_[D]OMAIN|localhost/
     );
   });
+
+  test("changes stay within PRV-2 scope", async ({ browser }, testInfo) => {
+    chromiumOnly(testInfo);
+    test.setTimeout(420_000);
+    const base = prBase();
+
+    // Files: only Scope's.
+    const changed = git("diff", "--name-only", base)
+      .split("\n")
+      .filter(Boolean);
+    const outside = changed.filter(
+      (f) =>
+        !SCOPE_FILES.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
+    );
+    expect(outside, "files changed outside PRV-2's Scope").toEqual([]);
+
+    // deviations.md may change only by its fragment-font section.
+    if (changed.includes(DEVIATIONS)) {
+      const before = (() => {
+        try {
+          return git("show", `${base}:${DEVIATIONS}`);
+        } catch {
+          return "";
+        }
+      })();
+      const after = read(DEVIATIONS);
+      const heading = parseDoc(after).headings.find((h) =>
+        /fragment-font deviations/i.test(h)
+      );
+      expect(
+        heading,
+        `${DEVIATIONS} changes only by a fragment-font section`
+      ).toBeDefined();
+      const rest = withoutSection(after, heading!).trim();
+      expect(rest, `${DEVIATIONS} outside the fragment-font section`).toBe(
+        before.trim()
+      );
+    }
+
+    // Routes: the base, built from the PR base, against this server.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "prv2-base-"));
+    let server: ChildProcess | undefined;
+    try {
+      execFileSync("sh", ["-c", `git archive ${base} | tar -x -C "${dir}"`], {
+        cwd: ROOT,
+      });
+      fs.symlinkSync(
+        path.join(ROOT, "node_modules"),
+        path.join(dir, "node_modules")
+      );
+      const env = {
+        ...process.env,
+        NEXT_TELEMETRY_DISABLED: "1",
+        // The same placeholder CI builds with; the contact form is not exercised.
+        RESEND_API_KEY: process.env.RESEND_API_KEY ?? "dummy-key-for-build",
+      };
+      // Webpack, as Turbopack refuses a node_modules symlink outside the root.
+      execFileSync(
+        path.join(dir, "node_modules/.bin/next"),
+        ["build", "--webpack"],
+        {
+          cwd: dir,
+          env,
+          stdio: "ignore",
+        }
+      );
+      const port = await freePort();
+      server = spawn(
+        path.join(dir, "node_modules/.bin/next"),
+        ["start", "-p", String(port)],
+        {
+          cwd: dir,
+          env,
+          stdio: "ignore",
+        }
+      );
+      const baseURL = `http://localhost:${port}`;
+      await waitFor(baseURL);
+      const headURL = String(testInfo.project.use.baseURL);
+
+      const snapshot = async (origin: string, route: string) => {
+        const context = await browser.newContext({ baseURL: origin });
+        const page = await context.newPage();
+        const response = await page.goto(route);
+        const result = await page.evaluate(() => {
+          const clone = document.body.cloneNode(true) as HTMLElement;
+          clone
+            .querySelectorAll(
+              "script, style, noscript, template, nextjs-portal, #__next-build-watcher"
+            )
+            .forEach((n) => n.remove());
+          return {
+            text: (clone.textContent ?? "").replace(/\s+/g, " ").trim(),
+            links: Array.from(
+              document.querySelectorAll<HTMLAnchorElement>("a[href]")
+            ).map((a) => a.getAttribute("href")!),
+          };
+        });
+        await context.close();
+        return { status: response?.status() ?? 0, ...result };
+      };
+      const resolveLink = async (origin: string, href: string) => {
+        const context = await browser.newContext({ baseURL: origin });
+        const response = await context.request.get(href, { maxRedirects: 10 });
+        const final = new URL(response.url());
+        await context.close();
+        return {
+          status: response.status(),
+          path: final.pathname + final.search,
+        };
+      };
+
+      for (const route of SCOPE_ROUTES) {
+        const [before, after] = [
+          await snapshot(baseURL, route),
+          await snapshot(headURL, route),
+        ];
+        expect(after.status, `${route} still renders`).toBe(before.status);
+        expect(after.text, `${route} text`).toBe(before.text);
+        expect(after.links, `${route} link destinations`).toEqual(before.links);
+
+        const sameOrigin = [...new Set(before.links)].filter(
+          (h) => h.startsWith("/") && !h.startsWith("//")
+        );
+        for (const href of sameOrigin) {
+          const [b, a] = [
+            await resolveLink(baseURL, href),
+            await resolveLink(headURL, href),
+          ];
+          if (b.status === 200) {
+            expect(a, `${route} -> ${href}`).toEqual(b);
+          } else {
+            // A route a later ticket builds keeps its existing status.
+            expect(a.status, `${route} -> ${href}`).toBe(b.status);
+          }
+        }
+      }
+    } finally {
+      server?.kill();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
+
+// ---------------------------------------------------------------------------
+
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(0, () => {
+      const address = srv.address();
+      srv.close(() =>
+        typeof address === "object" && address
+          ? resolve(address.port)
+          : reject()
+      );
+    });
+  });
+}
+
+async function waitFor(url: string, timeoutMs = 60_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) return;
+    } catch {
+      // not up yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error(`${url} did not start`);
+}
