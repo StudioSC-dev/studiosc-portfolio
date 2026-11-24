@@ -338,6 +338,14 @@ test.describe("content model", () => {
       [withCheck({ repo: "someone-else/tally-and-trace" })],
       /finance[\s\S]*repo/
     );
+    rejects([withCheck({ repo: "StudioSC-dev/." })], /finance[\s\S]*repo/);
+    rejects([withCheck({ repo: "StudioSC-dev/.." })], /finance[\s\S]*repo/);
+    // A hole in the list is validated, and the error names the file and index.
+    rejects(Array(1), /content\/range\.ts[\s\S]*category #0/);
+    rejects(
+      [labCategory, , realChecked],
+      /content\/range\.ts[\s\S]*category #1/
+    );
     rejects(
       [withCheck({ test: undefined, text: undefined })],
       /finance[\s\S]*christineCheck/

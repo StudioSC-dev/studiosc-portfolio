@@ -19,7 +19,7 @@ export type FragmentId = (typeof FRAGMENT_IDS)[number];
 const fragmentId = z.string().min(1);
 
 const christineCheckSchema = z.strictObject({
-  repo: z.string().regex(/^StudioSC-dev\/[A-Za-z0-9._-]+$/, {
+  repo: z.string().regex(/^StudioSC-dev\/(?!\.{1,2}$)[A-Za-z0-9._-]+$/, {
     message: "repo must be under StudioSC-dev (StudioSC-dev/<name>)",
   }),
   path: z.string().min(1),
@@ -87,7 +87,9 @@ export function validateRange(
   const problems: string[] = [];
   const seen = new Set<string>();
 
-  categories.forEach((raw: unknown, index) => {
+  // A plain loop, so holes in a sparse array are validated too.
+  for (let index = 0; index < categories.length; index++) {
+    const raw: unknown = categories[index];
     const rawId =
       typeof raw === "object" &&
       raw !== null &&
@@ -103,7 +105,7 @@ export function validateRange(
           `${name}: ${issue.path.join(".") || "(root)"}: ${issue.message}`
         );
       }
-      return;
+      continue;
     }
 
     const category = parsed.data;
@@ -125,7 +127,7 @@ export function validateRange(
         `${name}: project slug "${category.plate.slug}" does not exist`
       );
     }
-  });
+  }
 
   if (problems.length > 0) {
     throw new Error(
