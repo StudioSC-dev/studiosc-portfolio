@@ -24,6 +24,7 @@ import {
   unexpectedFragmentFonts,
   failingPairings,
   firstFamily,
+  fontBudgetProblems,
   fontOptions,
   fragmentFontDeviations,
   missingMotionRules,
@@ -766,8 +767,40 @@ test.describe("Range design system", () => {
       );
     }
 
+    // An exception to the 40 KiB budget counts only if the owner accepted it
+    // before this PR: it is read from the PR base, never from this branch. A
+    // push build has no PR, so what it carries is already merged.
+    const base = prRange()?.base ?? prHead();
+    const deviations = gitOk("cat-file", "-e", `${base}:${DEVIATIONS}`)
+      ? fragmentFontDeviations(git("show", `${base}:${DEVIATIONS}`))
+      : [];
+    const faceBytes = (loads: FontLoad[]) =>
+      Object.fromEntries(
+        Object.entries(FRAGMENT_FAMILY)
+          .map(([face, family]) => [
+            face,
+            bytesOf(loads, new RegExp(`^${family}$`)),
+          ])
+          .filter(([, bytes]) => (bytes as number) > 0)
+      ) as Record<string, number>;
+    // Control: 45 KiB of Manrope fails without an accepted deviation, and
+    // passes with one that covers it.
+    const over = { Manrope: 45 * KIB };
+    expect(fontBudgetProblems(over, [])).toHaveLength(1);
+    const accepted = {
+      face: "Manrope",
+      gate: "40 KiB per face",
+      bytes: 46_080,
+      accepted: true,
+    };
+    expect(fontBudgetProblems(over, [accepted])).toEqual([]);
+    expect(
+      fontBudgetProblems(over, [{ ...accepted, accepted: false }])
+    ).toHaveLength(1);
+
     // A fragment face loads only where a fragment that uses it renders, so a
-    // route that later renders a fragment (the Range home) stays green.
+    // route that later renders a fragment (the Range home) stays green, and
+    // each face it loads keeps to the budget.
     const fragmentFaces: Record<string, string> = { ...FRAGMENT_FACES };
     for (const route of new Set([...BUDGET_ROUTES, ...SCOPE_ROUTES])) {
       const watch = watchFonts(page);
@@ -786,6 +819,10 @@ test.describe("Range design system", () => {
           FRAGMENT_FAMILIES
         ),
         `fragment faces on ${route}, which renders [${rendered.join(", ")}]`
+      ).toEqual([]);
+      expect(
+        fontBudgetProblems(faceBytes(loads), deviations),
+        `fragment faces over budget on ${route}, with no deviation accepted at ${base}`
       ).toEqual([]);
     }
     // Control: Manrope is expected beside a Central Command fragment, and
@@ -833,13 +870,6 @@ test.describe("Range design system", () => {
       }
     }
     const withFragments = await fragmentWatch();
-    // An exception counts only if the owner accepted it before this PR: it
-    // is read from the PR base, never from this branch. A push build has no
-    // PR, so what it carries is already merged.
-    const base = prRange()?.base ?? prHead();
-    const deviations = gitOk("cat-file", "-e", `${base}:${DEVIATIONS}`)
-      ? fragmentFontDeviations(git("show", `${base}:${DEVIATIONS}`))
-      : [];
     const recorded = perfRecord().fragment_font_bytes;
     for (const [face, family] of Object.entries(FRAGMENT_FAMILY)) {
       const bytes = bytesOf(withFragments, new RegExp(`^${family}$`));
@@ -848,26 +878,11 @@ test.describe("Range design system", () => {
         bytes,
         `${face} is requested where its fragment renders`
       ).toBeGreaterThan(0);
-      if (bytes > 40 * KIB) {
-        const deviation = deviations.find((d) => d.face === face);
-        expect(
-          deviation,
-          `${face} is ${bytes} bytes on a fragment route, over 40 KiB, with no accepted deviation in ${DEVIATIONS} at the PR base`
-        ).toBeDefined();
-        expect(
-          deviation!.gate,
-          `${face} deviation names the failed gate`
-        ).toMatch(/40 KiB/);
-        expect(
-          deviation!.bytes,
-          `${face} deviation records the measured cost`
-        ).toBeGreaterThanOrEqual(bytes);
-        expect(
-          deviation!.accepted,
-          `${face} deviation is accepted by the owner`
-        ).toBe(true);
-      }
     }
+    expect(
+      fontBudgetProblems(faceBytes(withFragments), deviations),
+      `fragment faces over budget, with no deviation accepted in ${DEVIATIONS} at ${base}`
+    ).toEqual([]);
 
     // The peso sign renders in the Plex cut itself, not in a fallback face.
     const cdp = await page.context().newCDPSession(page);

@@ -713,3 +713,23 @@ export function fragmentFontDeviations(markdown: string): FontDeviation[] {
     accepted: /^accepted\b/i.test(r["Owner acceptance"] ?? ""),
   }));
 }
+
+/**
+ * Fragment faces over the per-face budget (40 KiB) with no owner-accepted
+ * deviation that names the 40 KiB gate and covers the measured bytes.
+ */
+export function fontBudgetProblems(
+  bytesByFace: Record<string, number>,
+  deviations: readonly FontDeviation[],
+  cap = 40 * 1024
+): string[] {
+  const problems: string[] = [];
+  for (const [face, bytes] of Object.entries(bytesByFace)) {
+    if (bytes <= cap) continue;
+    const d = deviations.find((x) => x.face === face);
+    if (!d || !/40 KiB/.test(d.gate) || !(d.bytes >= bytes) || !d.accepted) {
+      problems.push(`${face}: ${bytes} bytes, over 40 KiB`);
+    }
+  }
+  return problems;
+}
