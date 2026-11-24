@@ -43,7 +43,7 @@ import {
 } from "./support/dirty-images";
 import { checkIco, isImageCandidate } from "../scripts/image-metadata";
 import { throwawayRepo } from "./support/throwaway";
-import { collectErrors, stubVercelInsights } from "./support/page";
+import { collectErrors, nextHop, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
 import urlsFixture from "./fixtures/urls.json";
 import { SHOT_WIDTHS, shot } from "./support/shot";
@@ -831,7 +831,7 @@ test.describe("guards", () => {
     expect(errors).toEqual([]);
   });
 
-  test("every URL resolves", async ({ request }) => {
+  test("every URL resolves", async ({ request, baseURL }) => {
     chromiumOnly();
     // urls.json starts as exactly the page URLs of the pre-change tree. Later
     // PRs may add routes to it but never drop one of these.
@@ -849,18 +849,37 @@ test.describe("guards", () => {
       []
     );
 
+    // Redirects follow the full Location from the URL that answered, and
+    // never leave the site.
+    const origin = new URL(baseURL!).origin;
+    expect(nextHop(`${origin}/a/b`, "c?x=1", origin).href).toBe(
+      `${origin}/a/c?x=1`
+    );
+    for (const away of [
+      "https://elsewhere.example/blog",
+      "//elsewhere.example/",
+    ]) {
+      expect(() => nextHop(`${origin}/blog`, away, origin)).toThrow(
+        "a redirect off the site"
+      );
+    }
+
     // Each answers 200, or a 308 that leads to a 200. The first status is
     // read before any redirect is followed.
     const failures: string[] = [];
     for (const url of URLS) {
-      let target = url;
+      let target = new URL(url, origin).href;
       const statuses: number[] = [];
-      for (let hop = 0; hop < 5; hop++) {
-        const res = await request.get(target, { maxRedirects: 0 });
-        statuses.push(res.status());
-        if (res.status() !== 308) break;
-        target = new URL(res.headers()["location"], new URL(target, "http://x"))
-          .pathname;
+      try {
+        for (let hop = 0; hop < 5; hop++) {
+          const res = await request.get(target, { maxRedirects: 0 });
+          statuses.push(res.status());
+          if (res.status() !== 308) break;
+          target = nextHop(target, res.headers()["location"], origin).href;
+        }
+      } catch (error) {
+        failures.push(`${url}: ${(error as Error).message}`);
+        continue;
       }
       const last = statuses[statuses.length - 1];
       const ok = last === 200 && statuses.slice(0, -1).every((s) => s === 308);
