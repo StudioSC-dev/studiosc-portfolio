@@ -99,25 +99,58 @@ export function table(doc: ParsedDoc, heading: string): Row[] {
 // Colour
 
 export type Rgb = readonly [number, number, number];
+export type Rgba = readonly [number, number, number, number];
 
-/** Parses `#RRGGBB` or a computed `rgb(r, g, b)` / `rgba(r, g, b, 1)`. */
-export function toRgb(value: string): Rgb {
+/**
+ * Parses `#RRGGBB`, `#RRGGBBAA` or a computed `rgb()` / `rgba()`, keeping the
+ * alpha (1 when absent).
+ */
+export function toRgba(value: string): Rgba {
   const v = value.trim();
-  const hex = /^#([0-9a-f]{6})$/i.exec(v);
+  const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(v);
   if (hex) {
     const n = parseInt(hex[1], 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const a = hex[2] ? parseInt(hex[2], 16) / 255 : 1;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, a];
   }
-  const rgb = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(v);
+  const rgb =
+    /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i.exec(
+      v
+    );
   if (rgb) {
-    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    const alpha =
+      rgb[4] === undefined
+        ? 1
+        : rgb[4].endsWith("%")
+          ? parseFloat(rgb[4]) / 100
+          : Number(rgb[4]);
+    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), alpha];
   }
   throw new Error(`Not a colour: ${value}`);
 }
 
+/** Paints `top` over an opaque `under`. */
+export function composite(top: string, under: string): Rgb {
+  const [r, g, b, a] = toRgba(top);
+  const [ur, ug, ub, ua] = toRgba(under);
+  if (ua < 1) throw new Error(`Surface is not opaque: ${under}`);
+  return [r * a + ur * (1 - a), g * a + ug * (1 - a), b * a + ub * (1 - a)];
+}
+
+export function toRgb(value: string): Rgb {
+  const [r, g, b] = toRgba(value);
+  return [r, g, b];
+}
+
+/** Same colour and same opacity. */
 export function sameColour(a: string, b: string): boolean {
-  const [x, y] = [toRgb(a), toRgb(b)];
-  return x[0] === y[0] && x[1] === y[1] && x[2] === y[2];
+  const [x, y] = [toRgba(a), toRgba(b)];
+  return (
+    x[0] === y[0] &&
+    x[1] === y[1] &&
+    x[2] === y[2] &&
+    Math.abs(x[3] - y[3]) < 0.01
+  );
 }
 
 function luminance([r, g, b]: Rgb): number {
@@ -128,10 +161,45 @@ function luminance([r, g, b]: Rgb): number {
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
-/** WCAG 2 contrast ratio. */
-export function contrast(a: string, b: string): number {
-  const [la, lb] = [luminance(toRgb(a)), luminance(toRgb(b))];
+/**
+ * WCAG 2 contrast ratio of `fg` as painted on `bg`. A translucent `fg` is
+ * composited over `bg` first, so fully transparent text scores 1:1; `bg`
+ * must be opaque.
+ */
+export function contrast(fg: string, bg: string): number {
+  const [la, lb] = [luminance(composite(fg, bg)), luminance(toRgb(bg))];
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+export interface RingSample {
+  name: string;
+  /** Whether the element holds focus and matches :focus-visible. */
+  focused: boolean;
+  outlineStyle: string;
+  outlineWidth: string;
+  ring: string;
+  surface: string;
+}
+
+/**
+ * Focus rings that are not painted (no focus, no outline, under 2px) or are
+ * below `min` against the surface behind them.
+ */
+export function ringProblems(
+  samples: readonly RingSample[],
+  min = 3
+): string[] {
+  const problems: string[] = [];
+  for (const s of samples) {
+    if (!s.focused) problems.push(`${s.name}: not focused`);
+    else if (s.outlineStyle === "none" || s.outlineStyle === "hidden")
+      problems.push(`${s.name}: no outline`);
+    else if (parseFloat(s.outlineWidth) < 2)
+      problems.push(`${s.name}: outline ${s.outlineWidth}`);
+    else if (contrast(s.ring, s.surface) < min)
+      problems.push(`${s.name}: ${contrast(s.ring, s.surface).toFixed(2)}:1`);
+  }
+  return problems;
 }
 
 export interface Pairing {

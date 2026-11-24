@@ -14,8 +14,8 @@ import {
 } from "@playwright/test";
 
 import {
-  contrast,
   docGaps,
+  ringProblems,
   failingPairings,
   firstFamily,
   fontOptions,
@@ -46,6 +46,7 @@ import {
   BUDGET_ROUTES,
   CODE_ROUTE,
   CONTEXT_TOKENS,
+  DOTS_OPACITY,
   REQUIRED_PAIRINGS,
   RETIRED_DARK_TOKENS,
   SCOPE_FILES,
@@ -112,8 +113,10 @@ async function inject(page: Page, html: string) {
 }
 
 /**
- * Resolves colour tokens to computed rgb, through a probe inside `scope`
- * (the page when omitted), so `var()` chains and context overrides apply.
+ * Resolves colour tokens to computed rgb, through a probe inside `scope`, so
+ * `var()` chains and context overrides apply. Without a scope the probe sits
+ * directly on <html>, so it reads the values `:root` declares and nothing a
+ * descendant overrides.
  */
 async function resolveTokens(
   page: Page,
@@ -124,7 +127,7 @@ async function resolveTokens(
     ({ names, selector }) => {
       const parent = selector
         ? document.querySelector(selector)
-        : document.body;
+        : document.documentElement;
       if (!parent) throw new Error(`No element for ${selector}`);
       const probe = document.createElement("span");
       parent.append(probe);
@@ -286,26 +289,57 @@ test.describe("Range design system", () => {
         expectColour(got[p.Token], p.Value, `${theme} ${p.Token}`);
       }
 
-      // Context tokens, each read on its fixture.
+      // The dot fields' opacity and the colour scheme, on <html>.
+      const rootState = await page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement);
+        return {
+          dots: style.getPropertyValue("--dots-opacity").trim(),
+          scheme: style.colorScheme,
+        };
+      });
+      // Compared as numbers: the CSS pipeline may write 0.55 as .55.
+      expect(Number(rootState.dots), `${theme} --dots-opacity`).toBe(
+        Number(DOTS_OPACITY[i - 1])
+      );
+      expect(rootState.scheme, `${theme} color-scheme`).toBe(theme);
+
+      // Context tokens, each read on every fixture of its context.
       await inject(page, FRAGMENT_FIXTURES);
-      const scopes: Record<string, string | undefined> = {
-        ":root": undefined,
-        "[data-fragment]": '[data-fixture="tallyandtrace"]',
-        '[data-stage="turntable"]': '[data-stage="turntable"]',
+      const scopes: Record<string, Array<string | undefined>> = {
+        ":root": [undefined],
+        "[data-fragment]": [
+          '[data-fixture="tallyandtrace"]',
+          '[data-fixture="central-command"]',
+          '[data-fixture="habit-tracker"]',
+          '[data-fixture="form-helper"]',
+          '[data-fixture="turntable"]',
+        ],
+        '[data-stage="turntable"]': ['[data-stage="turntable"]'],
       };
       const contexts = table(doc(), "Context tokens");
       expect(contexts.length).toBeGreaterThanOrEqual(CONTEXT_TOKENS.length);
       for (const c of contexts) {
         expect(c.Context in scopes, `fixture for ${c.Context}`).toBe(true);
-        const value = (await resolveTokens(page, [c.Token], scopes[c.Context]))[
-          c.Token
-        ];
-        expectColour(
-          value,
-          i === 1 ? c.Light : c.Dark,
-          `${theme} ${c.Token} in ${c.Context}`
-        );
+        for (const scope of scopes[c.Context]) {
+          const value = (await resolveTokens(page, [c.Token], scope))[c.Token];
+          expectColour(
+            value,
+            i === 1 ? c.Light : c.Dark,
+            `${theme} ${c.Token} in ${c.Context} (${scope ?? "<html>"})`
+          );
+        }
       }
+
+      // Control: a value set on body, not :root, is not read as the root's.
+      await inject(
+        page,
+        `<style>:root { --prv2-probe: #000000 } body { --prv2-probe: #ffffff }</style>`
+      );
+      expectColour(
+        (await resolveTokens(page, ["--prv2-probe"]))["--prv2-probe"],
+        "#000000",
+        "root read on <html>"
+      );
 
       // The retired --dark-* constants are declared nowhere.
       const declared = await page.evaluate(
@@ -431,6 +465,20 @@ test.describe("Range design system", () => {
         bg: got[r.Surface],
       }));
       expect(failingPairings(pairings, 4.5)).toEqual([]);
+
+      // Fully transparent text fails, though its colour alone would pass.
+      expect(
+        failingPairings(
+          [
+            {
+              name: "transparent ink on gallery",
+              fg: "rgba(29, 31, 35, 0)",
+              bg: got["--gallery"],
+            },
+          ],
+          4.5
+        )
+      ).toHaveLength(1);
 
       // A pairing below 4.5:1 must fail the same check.
       const low = await resolveTokens(page, [
@@ -806,13 +854,26 @@ test.describe("Range design system", () => {
           '[data-fixture="fade"]'
         )!;
         const m = getComputedStyle(motion);
-        const f = getComputedStyle(fade);
         return {
           animationName: m.animationName,
           animations: motion.getAnimations().length,
-          transitionDuration: f.transitionDuration,
-          transitionProperty: f.transitionProperty,
+          fade: fade.dataset.fixture ?? "",
         };
+      });
+      // The fade: after its first paint, the same element changes opacity.
+      const fade = await page.evaluate(async () => {
+        const el = document.querySelector<HTMLElement>(
+          '[data-fixture="fade"]'
+        )!;
+        await new Promise((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(r))
+        );
+        el.style.opacity = "0";
+        const transitions = el
+          .getAnimations()
+          .filter((a) => "transitionProperty" in a)
+          .map((a) => (a as CSSTransition).transitionProperty);
+        return { transitions, opacity: getComputedStyle(el).opacity };
       });
       const transition = await page.evaluate(async () => {
         const start = (
@@ -844,19 +905,22 @@ test.describe("Range design system", () => {
         await vt.finished;
         return names;
       });
-      return { state, transition };
+      return { state, fade, transition };
     };
 
     const reduced = await run(true);
     expect(reduced.state.animationName).toBe("none");
     expect(reduced.state.animations).toBe(0);
-    expect(reduced.state.transitionProperty).toBe("none");
-    expect(reduced.state.transitionDuration).toBe("0s");
+    expect(reduced.fade.transitions, "no fade under reduced motion").toEqual(
+      []
+    );
+    expect(reduced.fade.opacity, "the final opacity at once").toBe("0");
 
     const full = await run(false);
     expect(full.state.animationName).toBe("rise");
     expect(full.state.animations).toBeGreaterThan(0);
-    expect(full.state.transitionDuration).toBe("0.22s");
+    expect(full.fade.transitions, "the fade runs").toEqual(["opacity"]);
+    expect(full.fade.opacity, "mid-fade").not.toBe("0");
 
     if (browserName === "chromium") {
       expect(reduced.transition, "View Transitions in Chromium").not.toBeNull();
@@ -938,6 +1002,7 @@ test.describe("Range design system", () => {
       ...themedRows("Root colour tokens").map((r) => r[0]),
       ...themedRows("Status colours").map((r) => r[0]),
       ...table(doc(), "Legacy aliases").map((r) => r.Alias),
+      "--focus",
     ];
     expect(names).toContain("--error");
     const resolveIn = async (
@@ -953,6 +1018,7 @@ test.describe("Range design system", () => {
       });
       const page = await context.newPage();
       await page.goto("/");
+      if (js) await page.waitForLoadState("networkidle");
       const hasTheme = await page.evaluate(() =>
         document.documentElement.hasAttribute("data-theme")
       );
@@ -962,8 +1028,15 @@ test.describe("Range design system", () => {
         }, pin);
       }
       const values = await resolveTokens(page, names);
+      const root = await page.evaluate(() => {
+        const style = getComputedStyle(document.documentElement);
+        return {
+          dots: style.getPropertyValue("--dots-opacity").trim(),
+          scheme: style.colorScheme,
+        };
+      });
       await context.close();
-      return { hasTheme, values };
+      return { hasTheme, values, root };
     };
 
     for (const theme of THEMES) {
@@ -983,6 +1056,9 @@ test.describe("Range design system", () => {
           `no-JS ${theme} ${name}`
         );
       }
+      expect(noJs.root, `no-JS ${theme} opacity and color-scheme`).toEqual(
+        explicit.root
+      );
     }
   });
 
@@ -994,12 +1070,7 @@ test.describe("Range design system", () => {
             `${sel} :is(a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]))`
           )
         );
-        const out: Array<{
-          name: string;
-          ring: string;
-          surface: string;
-          visible: boolean;
-        }> = [];
+        const out = [];
         for (const el of focusable) {
           el.focus();
           let surface = "rgb(255, 255, 255)";
@@ -1011,11 +1082,15 @@ test.describe("Range design system", () => {
             }
           }
           const root = el.closest<HTMLElement>("[data-fixture]");
+          const style = getComputedStyle(el);
           out.push({
             name: `${root?.dataset.fixture}: ${el.textContent?.trim()}`,
-            ring: getComputedStyle(el).outlineColor,
+            focused:
+              document.activeElement === el && el.matches(":focus-visible"),
+            outlineStyle: style.outlineStyle,
+            outlineWidth: style.outlineWidth,
+            ring: style.outlineColor,
             surface,
-            visible: el.matches(":focus-visible"),
           });
         }
         return out;
@@ -1028,22 +1103,20 @@ test.describe("Range design system", () => {
       await page.keyboard.press("Shift");
 
       const rings = await sampleRings(
-        "[data-fragment]:not([data-fixture='low-ring'])"
+        "[data-fragment]:not([data-fragment='low-ring-fixture'])"
       );
       expect(rings.length).toBeGreaterThanOrEqual(5);
       expect(rings.some((r) => r.name.startsWith("turntable"))).toBe(true);
-      for (const r of rings)
-        expect(r.visible, `${theme} ${r.name} focus-visible`).toBe(true);
-      const failing = (list: typeof rings) =>
-        list
-          .filter((r) => contrast(r.ring, r.surface) < 3)
-          .map((r) => `${r.name}: ${contrast(r.ring, r.surface).toFixed(2)}:1`);
-      expect(failing(rings), `${theme}: rings under 3:1`).toEqual([]);
+      expect(ringProblems(rings), `${theme}: unpainted or under 3:1`).toEqual(
+        []
+      );
 
-      // A fixture ring below 3:1 fails the same check.
-      const low = await sampleRings('[data-fixture="low-ring"]');
-      expect(low).toHaveLength(1);
-      expect(failing(low)).toHaveLength(1);
+      // A ring below 3:1 and a removed outline both fail the same check.
+      const broken = await sampleRings("[data-fragment='low-ring-fixture']");
+      expect(broken).toHaveLength(2);
+      const problems = ringProblems(broken);
+      expect(problems).toHaveLength(2);
+      expect(problems.some((p) => p.includes("no outline"))).toBe(true);
     }
   });
 

@@ -118,15 +118,19 @@ export const FRAGMENT_FACES: Record<string, string> = {
 };
 
 /**
- * A deliberately broken fragment: its ring (the T&T rule colour) on white is
- * about 1.3:1, so the ring check must reject it.
+ * Deliberately broken fragments the ring check must reject: a ring in the T&T
+ * rule colour on white (about 1.3:1), and a control whose outline is removed
+ * although its outline colour would contrast.
  */
 export const LOW_RING_FIXTURE = `
 <div data-fragment="low-ring-fixture" data-fixture="low-ring" style="--focus: var(--frag-tt-rule); background: var(--frag-tt-sheet); padding: 1rem;">
   <button type="button" style="font: inherit;">Low-contrast ring</button>
+</div>
+<div data-fragment="low-ring-fixture" data-fixture="no-ring" style="background: var(--frag-tt-sheet); padding: 1rem;">
+  <button type="button" style="font: inherit; outline-style: none;">No ring</button>
 </div>`;
 
 /** Elements for the reduced-motion check, using board keyframes. */
 export const MOTION_FIXTURES = `
 <div data-motion="" data-fixture="motion" style="animation: rise 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;">Rises</div>
-<div data-fade="" data-fixture="fade" style="transition: transform 220ms ease;">Fades</div>`;
+<div data-fade="" data-fixture="fade" style="opacity: 1; transition: opacity 200ms ease;">Fades</div>`;
