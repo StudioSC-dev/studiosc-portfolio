@@ -6,9 +6,9 @@
  * added lines against the generic denylist (e2e/support/denylist.ts), and
  * runs of added lines, line wrapping folded, against the owner's private
  * list, read from the file PREFLIGHT_PRIVATE_LIST names. A value added and
- * removed within one push is still caught. Editing a file that already holds
- * a private value is never refused for that value; only a new occurrence is.
- * A value split across two commits is not caught (a known gap).
+ * removed within one push is still caught, and so is one a commit completes
+ * on a line an earlier commit wrote. Editing a file that already holds a
+ * private value is never refused for that value; only a new occurrence is.
  *
  *   .husky/pre-push runs: tsx scripts/privacy-scan.ts --pre-push <remote> <url>
  *   with git's "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
@@ -207,20 +207,18 @@ export function findPrivate(
   return hits;
 }
 
-/** Non-overlapping occurrences of a private entry in a text, after folding. */
-function countPrivate(text: string, entry: PrivateEntry): number {
-  const haystack = fold(text).folded;
-  const needle = fold(entry.value).folded;
-  if (!needle) return 0;
-  let count = 0;
+/** Where a folded needle starts in a folded text, without overlaps. */
+function occurrences(haystack: string, needle: string): number[] {
+  const found: number[] = [];
+  if (!needle) return found;
   for (
     let at = haystack.indexOf(needle);
     at !== -1;
     at = haystack.indexOf(needle, at + needle.length)
   ) {
-    count++;
+    found.push(at);
   }
-  return count;
+  return found;
 }
 
 const DIFF_CELL_LIMIT = 4_000_000;
@@ -297,13 +295,13 @@ const splitLines = (text: string) => text.split(/\r?\n/);
 
 /**
  * Hits in the text one commit adds to one file, given the file before (null
- * when the commit creates it) and after. Only added lines are judged: each
- * against the denylist, and each run of consecutive added lines against the
- * private list with line wrapping folded, so a value wrapped across added
- * lines is caught. A private value only counts when the file holds more of it
- * than before, so editing near, or on, a value the destination already has is
- * never refused. Binary content, new or changed, is checked whole against the
- * private list on the same terms.
+ * when the commit creates it) and after. Added lines are judged against the
+ * denylist. A private value counts only when the file holds more of it than
+ * before, so editing near, or on, a value the destination already has is
+ * never refused. Such a value is reported where it touches an added line,
+ * line wrapping folded, so one completed by a changed line is caught; if none
+ * does (lines between its halves were deleted), every occurrence is. Binary
+ * content, new or changed, is checked whole on the same terms.
  */
 export function scanAdded(
   file: string,
@@ -311,44 +309,63 @@ export function scanAdded(
   after: Buffer,
   privateList: PrivateEntry[]
 ): ScanHit[] {
-  const oldText = before ? before.toString("utf8") : "";
-  const oldLatin = before ? before.toString("latin1") : "";
-  const grew = (entry: PrivateEntry, text: string, latin: string) =>
-    Math.max(countPrivate(text, entry), countPrivate(latin, entry)) >
-    Math.max(countPrivate(oldText, entry), countPrivate(oldLatin, entry));
+  const oldFolds = before
+    ? [
+        fold(before.toString("utf8")).folded,
+        fold(before.toString("latin1")).folded,
+      ]
+    : [];
+  const text = after.toString("utf8");
+  const newFold = fold(text);
+  const newLatin = isBinary(after) ? fold(after.toString("latin1")).folded : "";
+  const needles = new Map(
+    privateList.map((entry) => [entry, fold(entry.value).folded])
+  );
+  const grown = privateList.filter((entry) => {
+    const needle = needles.get(entry)!;
+    const count = (folded: string) => occurrences(folded, needle).length;
+    return (
+      Math.max(count(newFold.folded), count(newLatin)) >
+      Math.max(0, ...oldFolds.map(count))
+    );
+  });
 
   if (isBinary(after)) {
-    const text = after.toString("utf8");
-    const latin = after.toString("latin1");
-    return privateList
-      .filter((entry) => grew(entry, text, latin))
-      .map((entry) => ({
-        file,
-        line: 0,
-        rule: `private list entry on line ${entry.line} (binary file)`,
-      }));
+    return grown.map((entry) => ({
+      file,
+      line: 0,
+      rule: `private list entry on line ${entry.line} (binary file)`,
+    }));
   }
 
-  const text = after.toString("utf8");
   const lines = splitLines(text);
   const added = addedLineNumbers(
-    before && !isBinary(before) ? splitLines(oldText) : [],
+    before && !isBinary(before) ? splitLines(before.toString("utf8")) : [],
     lines
   );
   const hits: ScanHit[] = [];
   for (const n of added) hits.push(...scanLine(file, lines[n - 1], n));
 
-  const runs: number[][] = [];
-  for (const n of added) {
-    const run = runs[runs.length - 1];
-    if (run && run[run.length - 1] === n - 1) run.push(n);
-    else runs.push([n]);
-  }
-  const newPrivate = privateList.filter((entry) => grew(entry, text, ""));
-  for (const run of runs) {
-    const runText = run.map((n) => lines[n - 1]).join("\n");
-    for (const hit of findPrivate(file, runText, newPrivate)) {
-      hits.push({ ...hit, line: hit.line + run[0] - 1 });
+  const isAdded = new Set(added);
+  for (const entry of grown) {
+    const needle = needles.get(entry)!;
+    const spans = occurrences(newFold.folded, needle).map((at) => [
+      newFold.lines[at],
+      newFold.lines[at + needle.length - 1],
+    ]);
+    const touching = spans.filter(([first, last]) => {
+      for (let n = first; n <= last; n++) if (isAdded.has(n)) return true;
+      return false;
+    });
+    const starts = new Set(
+      (touching.length ? touching : spans).map(([first]) => first)
+    );
+    for (const line of starts) {
+      hits.push({
+        file,
+        line,
+        rule: `private list entry on line ${entry.line}`,
+      });
     }
   }
   return hits;
