@@ -15,7 +15,8 @@
  * value.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import path from "node:path";
 import { scanLine } from "../e2e/support/denylist";
 
 export class Refusal extends Error {}
@@ -63,15 +64,56 @@ function gitSucceeds(args: string[]): boolean {
   }
 }
 
-/** The private list's entries: one per line; blank lines and # comments skipped. */
+/**
+ * The real paths of this repository: its worktree, its git directories and
+ * every other worktree of the same repository.
+ */
+function repositoryPaths(): string[] {
+  const own = git([
+    "rev-parse",
+    "--path-format=absolute",
+    "--show-toplevel",
+    "--git-dir",
+    "--git-common-dir",
+  ]);
+  const worktrees = git(["worktree", "list", "--porcelain"])
+    .split("\n")
+    .filter((l) => l.startsWith("worktree "))
+    .map((l) => l.slice("worktree ".length));
+  return [...own.split("\n"), ...worktrees].filter(Boolean).map((p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
+  });
+}
+
+function isWithin(child: string, parent: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/**
+ * The private list's entries: one per line; blank lines and # comments
+ * skipped. The list must live outside the repository (symlinks resolved), so
+ * it can never be committed with it.
+ */
 export function readPrivateList(): PrivateEntry[] {
   const file = process.env.PREFLIGHT_PRIVATE_LIST;
   if (!file) throw new Refusal("PREFLIGHT_PRIVATE_LIST is not set");
+  let real: string;
   let text: string;
   try {
-    text = readFileSync(file, "utf8");
+    real = realpathSync(file);
+    text = readFileSync(real, "utf8");
   } catch {
     throw new Refusal("the file PREFLIGHT_PRIVATE_LIST names cannot be read");
+  }
+  if (repositoryPaths().some((repo) => isWithin(real, repo))) {
+    throw new Refusal(
+      "the private list must be kept outside the repository and its git directory"
+    );
   }
   const entries = text
     .split(/\r?\n/)

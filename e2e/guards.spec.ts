@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -770,6 +776,7 @@ test.describe("guards", () => {
     const literals = ["quokka-harbour-17", "Zephyrine Analytics"];
     const list = path.join(root, "private-list.txt");
     writeFileSync(list, `# fixture private list\n${literals.join("\n")}\n`);
+    writeFileSync(path.join(root, "empty-list.txt"), "# nothing yet\n\n");
     const deny = DENYLIST_FIXTURES["private IP"].matches[0];
     const withList = { PREFLIGHT_PRIVATE_LIST: list };
     const outputs: string[] = [];
@@ -866,6 +873,30 @@ test.describe("guards", () => {
         }),
         "cannot be read"
       );
+      refusedFor(
+        run("git", ["push", "origin", "clean"], {
+          PREFLIGHT_PRIVATE_LIST: path.join(root, "empty-list.txt"),
+        }),
+        "the private list has no entries"
+      );
+      // A list inside the repository is refused: directly (even when git
+      // ignores it), through a symlink, or inside the git directory.
+      const inRepo = path.join(repo.dir, "private-list.txt");
+      writeFileSync(inRepo, `${literals[0]}\n`);
+      repo.write(".git/info/exclude", "private-list.txt\n");
+      const linked = path.join(root, "linked-list.txt");
+      symlinkSync(inRepo, linked);
+      const inGitDir = path.join(repo.dir, ".git", "private-list.txt");
+      writeFileSync(inGitDir, `${literals[0]}\n`);
+      for (const inside of [inRepo, linked, inGitDir]) {
+        refusedFor(
+          run("git", ["push", "origin", "clean"], {
+            PREFLIGHT_PRIVATE_LIST: inside,
+          }),
+          "the private list must be kept outside the repository"
+        );
+      }
+      rmSync(inRepo);
       expect(hasRef(remote, "refs/heads/clean")).toBe(false);
       expect(push("origin", "clean").status).toBe(0);
 
