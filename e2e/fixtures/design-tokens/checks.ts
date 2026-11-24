@@ -1,0 +1,496 @@
+/**
+ * Pure checks behind design-tokens.spec.ts. Each takes its input as data, so the
+ * spec runs it once on the real site or doc and once on a broken fixture, to
+ * prove the check can fail.
+ */
+
+import {
+  BOARD_IDS,
+  COMPONENTS,
+  CONTEXT_TOKENS,
+  FACES,
+  FOCUS,
+  FONT_FALLBACK_STEPS,
+  FRAGMENT_TOKENS,
+  KEYFRAMES,
+  LAYOUT,
+  LEGACY_ALIASES,
+  MOTION_MOMENTS,
+  REQUIRED_PAIRINGS,
+  ROOT_TOKENS,
+  SECTIONS,
+  SHAPE,
+  STATUS_TOKENS,
+  TYPE_SCALE,
+} from "./inventory";
+
+// ---------------------------------------------------------------------------
+// Markdown
+
+export type Row = Record<string, string>;
+
+export interface ParsedDoc {
+  /** Every heading's text, without the leading #s. */
+  headings: string[];
+  /** Tables, keyed by the nearest heading above them. */
+  tables: Map<string, Row[]>;
+  /** The body text under each heading, up to the next heading of any level. */
+  sections: Map<string, string>;
+}
+
+/** Strips backticks, bold and surrounding whitespace from a table cell. */
+export function cell(text: string): string {
+  return text.replace(/`/g, "").replace(/\*\*/g, "").trim();
+}
+
+export function parseDoc(markdown: string): ParsedDoc {
+  const headings: string[] = [];
+  const tables = new Map<string, Row[]>();
+  const sections = new Map<string, string>();
+  let current = "";
+  let header: string[] | null = null;
+  let inFence = false;
+
+  for (const line of markdown.split("\n")) {
+    if (line.startsWith("```")) {
+      inFence = !inFence;
+    }
+    const heading = inFence ? null : /^(#{1,6})\s+(.*)$/.exec(line);
+    if (heading) {
+      current = heading[2].trim();
+      headings.push(current);
+      sections.set(current, "");
+      header = null;
+      continue;
+    }
+    sections.set(current, `${sections.get(current) ?? ""}${line}\n`);
+
+    if (!inFence && line.trim().startsWith("|")) {
+      const cells = line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|");
+      if (header === null) {
+        header = cells.map(cell);
+      } else if (cells.every((c) => /^\s*:?-+:?\s*$/.test(c))) {
+        // separator row
+      } else {
+        const row: Row = {};
+        header.forEach((name, i) => {
+          row[name] = cell(cells[i] ?? "");
+        });
+        const list = tables.get(current) ?? [];
+        list.push(row);
+        tables.set(current, list);
+      }
+    } else {
+      header = null;
+    }
+  }
+  return { headings, tables, sections };
+}
+
+export function table(doc: ParsedDoc, heading: string): Row[] {
+  return doc.tables.get(heading) ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Colour
+
+export type Rgb = readonly [number, number, number];
+
+/** Parses `#RRGGBB` or a computed `rgb(r, g, b)` / `rgba(r, g, b, 1)`. */
+export function toRgb(value: string): Rgb {
+  const v = value.trim();
+  const hex = /^#([0-9a-f]{6})$/i.exec(v);
+  if (hex) {
+    const n = parseInt(hex[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  const rgb = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(v);
+  if (rgb) {
+    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  }
+  throw new Error(`Not a colour: ${value}`);
+}
+
+export function sameColour(a: string, b: string): boolean {
+  const [x, y] = [toRgb(a), toRgb(b)];
+  return x[0] === y[0] && x[1] === y[1] && x[2] === y[2];
+}
+
+function luminance([r, g, b]: Rgb): number {
+  const channel = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+/** WCAG 2 contrast ratio. */
+export function contrast(a: string, b: string): number {
+  const [la, lb] = [luminance(toRgb(a)), luminance(toRgb(b))];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+export interface Pairing {
+  name: string;
+  fg: string;
+  bg: string;
+}
+
+/** The pairings below `min`, each with its ratio. */
+export function failingPairings(
+  pairings: readonly Pairing[],
+  min: number
+): string[] {
+  return pairings
+    .map((p) => ({ p, ratio: contrast(p.fg, p.bg) }))
+    .filter(({ ratio }) => ratio < min)
+    .map(({ p, ratio }) => `${p.name}: ${ratio.toFixed(2)}:1`);
+}
+
+// ---------------------------------------------------------------------------
+// Type
+
+/** Letter-spacing in em, from computed px values ("normal" is 0). */
+export function trackingEm(letterSpacing: string, fontSize: string): number {
+  const spacing = letterSpacing === "normal" ? 0 : parseFloat(letterSpacing);
+  return spacing / parseFloat(fontSize);
+}
+
+export interface LabelSample {
+  where: string;
+  className: string;
+  textTransform: string;
+  letterSpacing: string;
+  fontSize: string;
+}
+
+/** Labels, subheads and display text that are not sentence case. */
+export function nonSentenceCase(samples: readonly LabelSample[]): string[] {
+  const problems: string[] = [];
+  for (const s of samples) {
+    if (s.textTransform !== "none") {
+      problems.push(
+        `${s.where} .${s.className}: text-transform ${s.textTransform}`
+      );
+    }
+    if (
+      s.className === "label" &&
+      trackingEm(s.letterSpacing, s.fontSize) > 0.01 + 1e-6
+    ) {
+      problems.push(
+        `${s.where} .label: letter-spacing ${trackingEm(s.letterSpacing, s.fontSize).toFixed(3)}em`
+      );
+    }
+  }
+  return problems;
+}
+
+/** The first family in a computed font-family list, unquoted. */
+export function firstFamily(fontFamily: string): string {
+  return fontFamily
+    .split(",")[0]
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
+// ---------------------------------------------------------------------------
+// Motion
+
+/** Board keyframes and view-transition rules missing from a stylesheet's source. */
+export function missingMotionRules(css: string): string[] {
+  const flat = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
+  const missing: string[] = KEYFRAMES.filter(
+    (name) => !new RegExp(`@keyframes ${name} ?\\{`).test(flat)
+  ).map((name) => `@keyframes ${name}`);
+
+  const required: Array<[string, RegExp]> = [
+    [
+      "::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal }",
+      /::view-transition-old\(root\), ?::view-transition-new\(root\) ?\{ ?animation: ?none; ?mix-blend-mode: ?normal;? ?\}/,
+    ],
+    [
+      "::view-transition-new(root) { animation: theme-reveal 560ms ease-in-out }",
+      /::view-transition-new\(root\) ?\{ ?animation: ?theme-reveal 560ms ease-in-out;? ?\}/,
+    ],
+    [
+      "reduced motion: [data-motion] { animation: none !important }",
+      /@media \(prefers-reduced-motion: ?reduce\) ?\{[^@]*\[data-motion\] ?\{ ?animation: ?none !important;? ?\}/,
+    ],
+    [
+      "reduced motion: [data-fade] { transition: none !important }",
+      /@media \(prefers-reduced-motion: ?reduce\) ?\{[^@]*\[data-fade\] ?\{ ?transition: ?none !important;? ?\}/,
+    ],
+    [
+      "reduced motion: ::view-transition-new(root) without animation",
+      /@media \(prefers-reduced-motion: ?reduce\) ?\{[^@]*::view-transition-new\((?:\*|root)\)[^{]*\{ ?animation: ?none/,
+    ],
+  ];
+  for (const [label, pattern] of required) {
+    if (!pattern.test(flat)) {
+      missing.push(label);
+    }
+  }
+  return missing;
+}
+
+/** Removes one keyframes block, for the "a missing keyframe fails" control. */
+export function withoutKeyframes(css: string, name: string): string {
+  const start = css.indexOf(`@keyframes ${name} {`);
+  if (start < 0) {
+    throw new Error(`@keyframes ${name} not found`);
+  }
+  let depth = 0;
+  for (let i = css.indexOf("{", start); i < css.length; i++) {
+    if (css[i] === "{") depth++;
+    if (css[i] === "}") depth--;
+    if (depth === 0) {
+      return css.slice(0, start) + css.slice(i + 1);
+    }
+  }
+  throw new Error(`@keyframes ${name} is not closed`);
+}
+
+// ---------------------------------------------------------------------------
+// The doc's coverage
+
+function sameHex(a: string, b: string): boolean {
+  return a.toUpperCase() === b.toUpperCase();
+}
+
+/**
+ * Everything the doc must cover, against the inventory written from §2, the
+ * boards and Scope. Returns what is missing or wrong; empty means covered.
+ */
+export function docGaps(markdown: string): string[] {
+  const doc = parseDoc(markdown);
+  const gaps: string[] = [];
+  const has = (heading: string) => doc.headings.includes(heading);
+
+  for (const section of SECTIONS) {
+    if (!has(section)) gaps.push(`section "${section}"`);
+  }
+
+  const themed = (
+    heading: string,
+    expected: Record<string, readonly [string, string]>
+  ) => {
+    const rows = table(doc, heading);
+    for (const [token, [light, dark]] of Object.entries(expected)) {
+      const row = rows.find((r) => r.Token === token);
+      if (!row) {
+        gaps.push(`${heading}: ${token}`);
+      } else if (!sameHex(row.Light, light) || !sameHex(row.Dark, dark)) {
+        gaps.push(`${heading}: ${token} should be ${light} / ${dark}`);
+      }
+    }
+  };
+  themed("Root colour tokens", ROOT_TOKENS);
+  themed("Status colours", STATUS_TOKENS);
+
+  const aliases = table(doc, "Legacy aliases");
+  for (const [alias, target] of Object.entries(LEGACY_ALIASES)) {
+    const row = aliases.find((r) => r.Alias === alias);
+    if (!row || row["Resolves to"] !== target) {
+      gaps.push(`Legacy aliases: ${alias} -> ${target}`);
+    }
+  }
+
+  const palettes = table(doc, "Product palettes");
+  for (const [token, value] of Object.entries(FRAGMENT_TOKENS)) {
+    const row = palettes.find((r) => r.Token === token);
+    if (!row) {
+      gaps.push(`Product palettes: ${token}`);
+    } else if (!sameHex(row.Value, value)) {
+      gaps.push(`Product palettes: ${token} should be ${value}`);
+    }
+  }
+
+  const contexts = table(doc, "Context tokens");
+  for (const { token, context, values } of CONTEXT_TOKENS) {
+    const row = contexts.find(
+      (r) => r.Token === token && r.Context === context
+    );
+    if (!row) {
+      gaps.push(`Context tokens: ${token} in ${context}`);
+    } else if (
+      !sameHex(row.Light, values[0]) ||
+      !sameHex(row.Dark, values[1])
+    ) {
+      gaps.push(
+        `Context tokens: ${token} in ${context} should be ${values.join(" / ")}`
+      );
+    }
+  }
+
+  const pairings = table(doc, "Text pairings");
+  for (const [fg, bg] of REQUIRED_PAIRINGS) {
+    const row = pairings.find((r) => r.Text === fg && r.Surface === bg);
+    if (!row || !row.Light || !row.Dark) {
+      gaps.push(`Text pairings: ${fg} on ${bg}, both themes`);
+    }
+  }
+
+  const scale = table(doc, "Type scale");
+  for (const [role, size, tracking] of TYPE_SCALE) {
+    const row = scale.find((r) => r.Role === role);
+    if (!row || row["Size/line"] !== size || row.Tracking !== tracking) {
+      gaps.push(`Type scale: ${role} ${size} ${tracking}`);
+    }
+  }
+
+  const faces = table(doc, "Type");
+  for (const face of FACES) {
+    if (!faces.some((r) => r.Face === face)) gaps.push(`Type: face ${face}`);
+  }
+
+  const fallback = doc.sections.get("Font fallback") ?? "";
+  for (const [step, phrase] of FONT_FALLBACK_STEPS) {
+    const line = fallback
+      .split("\n")
+      .find((l) => l.trim().startsWith(`${step}.`));
+    if (!line || !fallback.includes(phrase)) {
+      gaps.push(`Font fallback: step ${step} (${phrase})`);
+    }
+  }
+
+  const shape = table(doc, "Shape");
+  for (const [element, radius] of SHAPE) {
+    const row = shape.find((r) => r.Element === element);
+    if (!row || row.Radius !== radius) {
+      gaps.push(`Shape: ${element} ${radius}`);
+    }
+  }
+
+  const layout = doc.sections.get("Layout") ?? "";
+  for (const fact of LAYOUT) {
+    if (!layout.includes(fact)) gaps.push(`Layout: ${fact}`);
+  }
+
+  const focus = doc.sections.get("Focus") ?? "";
+  for (const fact of FOCUS) {
+    if (!focus.includes(fact)) gaps.push(`Focus: ${fact}`);
+  }
+
+  const motion = table(doc, "Motion");
+  for (const moment of MOTION_MOMENTS) {
+    const row = motion.find((r) => r.Moment === moment);
+    if (
+      !row ||
+      !row["Spec (from the boards)"] ||
+      !row["Under reduced motion"]
+    ) {
+      gaps.push(`Motion: ${moment} with its fallback`);
+    }
+  }
+
+  const keyframes = doc.sections.get("Keyframes") ?? "";
+  for (const name of KEYFRAMES) {
+    if (!keyframes.includes(`\`${name}\``)) gaps.push(`Keyframes: ${name}`);
+  }
+  if (!keyframes.includes("::view-transition-new(root)")) {
+    gaps.push("Keyframes: the view-transition rules");
+  }
+
+  for (const component of COMPONENTS) {
+    const body = doc.sections.get(component);
+    if (body === undefined) {
+      gaps.push(`Components: ${component}`);
+      continue;
+    }
+    const board = /Board: (.*)/.exec(body);
+    if (!board || !BOARD_IDS.some((id) => board[1].includes(`\`${id}\``))) {
+      gaps.push(`Components: ${component} board reference`);
+    }
+  }
+
+  return gaps;
+}
+
+/** Removes the section under one heading, for the "an entry removed fails" control. */
+export function withoutSection(markdown: string, heading: string): string {
+  const lines = markdown.split("\n");
+  const start = lines.findIndex(
+    (l) => /^#{1,6}\s/.test(l) && l.replace(/^#+\s+/, "") === heading
+  );
+  if (start < 0) {
+    throw new Error(`No section "${heading}"`);
+  }
+  const level = /^#+/.exec(lines[start])![0].length;
+  let end = start + 1;
+  while (end < lines.length) {
+    const m = /^(#{1,6})\s/.exec(lines[end]);
+    if (m && m[1].length <= level) break;
+    end++;
+  }
+  return [...lines.slice(0, start), ...lines.slice(end)].join("\n");
+}
+
+/** Removes the table row for one token, for the same control. */
+export function withoutRow(markdown: string, firstCell: string): string {
+  const lines = markdown.split("\n");
+  const index = lines.findIndex((l) =>
+    new RegExp(
+      `^\\|\\s*\`${firstCell.replace(/[-[\]/{}()*+?.\\^$|]/g, "\\$&")}\`\\s*\\|`
+    ).test(l)
+  );
+  if (index < 0) {
+    throw new Error(`No row for ${firstCell}`);
+  }
+  return [...lines.slice(0, index), ...lines.slice(index + 1)].join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Fonts
+
+/** The options object passed to one next/font call in lib/fonts.ts. */
+export function fontOptions(source: string, exportName: string): string {
+  const match = new RegExp(
+    `export const ${exportName} = [A-Za-z_]+\\(\\{([\\s\\S]*?)\\}\\);`
+  ).exec(source);
+  if (!match) {
+    throw new Error(`lib/fonts.ts has no export ${exportName}`);
+  }
+  return match[1];
+}
+
+/** A string or string-array option, read from the options source. */
+export function optionValue(
+  options: string,
+  key: string
+): string | string[] | boolean | undefined {
+  const m = new RegExp(`\\b${key}:\\s*(\\[[^\\]]*\\]|[^,\\n]+)`).exec(options);
+  if (!m) return undefined;
+  const raw = m[1].trim().replace(/,$/, "");
+  if (raw === "true" || raw === "false") return raw === "true";
+  if (raw.startsWith("[")) {
+    return Array.from(raw.matchAll(/["']([^"']+)["']/g), (x) => x[1]);
+  }
+  return raw.replace(/^["']|["']$/g, "");
+}
+
+export interface FontDeviation {
+  face: string;
+  gate: string;
+  bytes: number;
+  accepted: boolean;
+}
+
+/** Fragment-font deviations recorded under fallback step 4. */
+export function fragmentFontDeviations(markdown: string): FontDeviation[] {
+  const doc = parseDoc(markdown);
+  const heading = doc.headings.find((h) => /fragment-font deviations/i.test(h));
+  if (!heading) return [];
+  return table(doc, heading).map((r) => ({
+    face: r.Face,
+    gate: r["Failed gate"] ?? "",
+    bytes: Number(
+      /([\d,]+) bytes/.exec(r["Measured cost"] ?? "")?.[1].replace(/,/g, "") ??
+        NaN
+    ),
+    accepted: /^accepted\b/i.test(r["Owner acceptance"] ?? ""),
+  }));
+}
