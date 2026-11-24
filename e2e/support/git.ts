@@ -55,22 +55,27 @@ export function gitOk(args: string[], opts: { cwd?: string } = {}): boolean {
   }
 }
 
+type GitOpts = { cwd?: string };
+
 /** The commit under test: PR_HEAD_SHA when set (CI), otherwise HEAD. */
-export function headSha(env: Env = process.env): string {
+export function headSha(env: Env = process.env, opts: GitOpts = {}): string {
   const fromEnv = env.PR_HEAD_SHA?.trim();
-  return git(["rev-parse", "--verify", `${fromEnv || "HEAD"}^{commit}`]).trim();
+  return git(
+    ["rev-parse", "--verify", `${fromEnv || "HEAD"}^{commit}`],
+    opts
+  ).trim();
 }
 
 /**
  * The pull request base: PR_BASE_SHA when set, otherwise the merge base of
  * HEAD and origin/main. On main itself this is HEAD.
  */
-export function baseSha(env: Env = process.env): string {
+export function baseSha(env: Env = process.env, opts: GitOpts = {}): string {
   const fromEnv = env.PR_BASE_SHA?.trim();
   if (fromEnv) {
-    return git(["rev-parse", "--verify", `${fromEnv}^{commit}`]).trim();
+    return git(["rev-parse", "--verify", `${fromEnv}^{commit}`], opts).trim();
   }
-  return git(["merge-base", "HEAD", "origin/main"]).trim();
+  return git(["merge-base", "HEAD", "origin/main"], opts).trim();
 }
 
 export interface PrRange {
@@ -84,9 +89,35 @@ export interface PrRange {
  * that judge a PR's own changes do not run there. Locally it is
  * PR_BASE_SHA (or the merge base with origin/main) to PR_HEAD_SHA (or HEAD).
  */
-export function prRange(env: Env = process.env): PrRange | null {
+export function prRange(
+  env: Env = process.env,
+  opts: GitOpts = {}
+): PrRange | null {
   if (env.CI && !env.PR_HEAD_SHA?.trim()) return null;
-  return { base: baseSha(env), head: headSha(env) };
+  return { base: baseSha(env, opts), head: headSha(env, opts) };
+}
+
+/**
+ * Whether the build under test is the change that adds `file`: its base
+ * lacks the file. The base is the PR base in a pull request; on a push build
+ * (no PR) it is the head's first parent, the branch as it was before the
+ * pushed merge. A root commit has no base, so it adds nothing.
+ */
+export function addsFile(
+  file: string,
+  env: Env = process.env,
+  opts: GitOpts = {}
+): boolean {
+  const range = prRange(env, opts);
+  let base = range?.base;
+  if (!base) {
+    try {
+      base = git(["rev-parse", "--verify", "-q", "HEAD^1"], opts).trim();
+    } catch {
+      return false;
+    }
+  }
+  return !existsAt(base, file, opts);
 }
 
 /**
@@ -104,8 +135,12 @@ export function changedByPr(
 }
 
 /** Whether `file` exists in the tree of `sha`. */
-export function existsAt(sha: string, file: string): boolean {
-  return gitOk(["cat-file", "-e", `${sha}:${file}`]);
+export function existsAt(
+  sha: string,
+  file: string,
+  opts: GitOpts = {}
+): boolean {
+  return gitOk(["cat-file", "-e", `${sha}:${file}`], opts);
 }
 
 /** Tracked files at HEAD, repo-relative, with forward slashes. */

@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { spawnSync } from "node:child_process";
 import {
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -10,6 +11,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import {
+  addsFile,
   changedByPr,
   ROOT,
   existsAt,
@@ -293,6 +295,47 @@ test.describe("guards", () => {
     expect(
       prRange({ CI: "true", PR_HEAD_SHA: head, PR_BASE_SHA: head })
     ).toEqual({ base: head, head });
+
+    // Checks pinned to PRV-1 apply on its PR and on the push build of its
+    // merge (the merge's first parent lacks the guards), not on later merges.
+    const merges = mkdtempSync(path.join(os.tmpdir(), "adds-file-"));
+    try {
+      const g = (args: string[]) => git(args, { cwd: merges }).trim();
+      const commitFile = (file: string) => {
+        mkdirSync(path.dirname(path.join(merges, file)), { recursive: true });
+        writeFileSync(path.join(merges, file), `${file}\n`);
+        g(["add", "--", file]);
+        g(["commit", "-q", "-m", file]);
+      };
+      const merge = (branch: string) =>
+        g(["merge", "-q", "--no-ff", "--no-edit", branch]);
+      g(["init", "-q", "-b", "main"]);
+      g(["config", "user.name", "Throwaway"]);
+      g(["config", "user.email", "throwaway@example.com"]);
+      g(["config", "commit.gpgsign", "false"]);
+      commitFile("page.txt");
+      const GUARDS = "e2e/guards.spec.ts";
+      const push = { CI: "true", PR_HEAD_SHA: "" };
+      const at = { cwd: merges };
+      expect(addsFile(GUARDS, push, at), "a root commit").toBe(false);
+      const before = g(["rev-parse", "HEAD"]);
+      g(["checkout", "-q", "-b", "prv-1"]);
+      commitFile(GUARDS);
+      commitFile("more.txt");
+      const prv1 = g(["rev-parse", "HEAD"]);
+      const pr = { CI: "true", PR_HEAD_SHA: prv1, PR_BASE_SHA: before };
+      expect(addsFile(GUARDS, pr, at), "PRV-1's PR").toBe(true);
+      g(["checkout", "-q", "main"]);
+      merge("prv-1");
+      expect(addsFile(GUARDS, push, at), "PRV-1's merge").toBe(true);
+      g(["checkout", "-q", "-b", "later"]);
+      commitFile("later.txt");
+      g(["checkout", "-q", "main"]);
+      merge("later");
+      expect(addsFile(GUARDS, push, at), "a later merge").toBe(false);
+    } finally {
+      rmSync(merges, { recursive: true, force: true });
+    }
   });
 
   test("denylist fixtures", () => {
@@ -904,11 +947,9 @@ test.describe("guards", () => {
     // The fixture box was measured on the pre-change page, so it pins PRV-1
     // only; later layout work (PRV-14) moves the card. Its identity, the lack
     // of a Facebook container, the requests and the console stay checked.
-    const range = prRange();
+    // That holds on its PR and on the push build of its merge.
     const pinBox =
-      testInfo.project.name === "chromium" &&
-      range !== null &&
-      !existsAt(range.base, "e2e/guards.spec.ts");
+      testInfo.project.name === "chromium" && addsFile("e2e/guards.spec.ts");
 
     for (const [width, expected] of Object.entries(marathonCard.widths)) {
       await page.setViewportSize(expected.viewport);
