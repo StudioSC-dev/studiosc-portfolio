@@ -21,7 +21,12 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { DENYLIST, isBinary, scanLine } from "../e2e/support/denylist";
+import {
+  DENYLIST,
+  isBinary,
+  rulesFor,
+  scanLine,
+} from "../e2e/support/denylist";
 
 export class Refusal extends Error {}
 
@@ -312,8 +317,9 @@ const splitLines = (text: string) => text.split(/\r?\n/);
 
 /**
  * Hits in the text one commit adds to one file, given the file before (null
- * when the commit creates it) and after. Added lines are judged against the
- * denylist. A private value counts only when the file holds more of it than
+ * when the commit creates it) and after. A denylist match is reported on an
+ * added line only when the file holds more of that match than before. A
+ * private value counts only when the file holds more of it than
  * before, so editing near, or on, a value the destination already has is
  * never refused. Such a value is reported where it touches an added line,
  * line wrapping folded, so one completed by a changed line is caught; if none
@@ -360,8 +366,42 @@ export function scanAdded(
     before && !isBinary(before) ? splitLines(before.toString("utf8")) : [],
     lines
   );
+  // A denylist match counts the same way: only an added line holding a match
+  // the file has more of than before, so an edit that keeps an already
+  // published one passes.
+  const oldLines =
+    before && !isBinary(before) ? splitLines(before.toString("utf8")) : [];
+  const grownMatches = new Map<string, Set<string>>();
+  for (const rule of rulesFor(file)) {
+    const all = new RegExp(rule.pattern.source, `${rule.pattern.flags}g`);
+    const tally = (source: string[]) => {
+      const counts = new Map<string, number>();
+      for (const line of source) {
+        for (const m of line.matchAll(all)) {
+          counts.set(m[0], (counts.get(m[0]) ?? 0) + 1);
+        }
+      }
+      return counts;
+    };
+    const was = tally(oldLines);
+    const grown = new Set(
+      [...tally(lines)]
+        .filter(([m, n]) => n > (was.get(m) ?? 0))
+        .map(([m]) => m)
+    );
+    grownMatches.set(rule.name, grown);
+  }
   const hits: ScanHit[] = [];
-  for (const n of added) hits.push(...scanLine(file, lines[n - 1], n));
+  for (const n of added) {
+    for (const hit of scanLine(file, lines[n - 1], n)) {
+      const rule = rulesFor(file).find((r) => r.name === hit.rule)!;
+      const all = new RegExp(rule.pattern.source, `${rule.pattern.flags}g`);
+      const grown = grownMatches.get(rule.name)!;
+      if ([...lines[n - 1].matchAll(all)].some((m) => grown.has(m[0]))) {
+        hits.push(hit);
+      }
+    }
+  }
 
   const isAdded = new Set(added);
   for (const entry of grown) {

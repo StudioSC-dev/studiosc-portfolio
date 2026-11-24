@@ -1565,6 +1565,27 @@ test.describe("guards", () => {
         refusedFor(push("origin", branch), needle);
       }
 
+      // Denylist matches follow the same rule: editing the prose around a
+      // published one passes; a newly added one is refused.
+      repo.git(["checkout", "-q", "-b", "deny-published", "main"]);
+      const denyPublished = commit(
+        "content/box.mdx",
+        `The box sits at ${deny}.\n`
+      );
+      expect(
+        run("git", ["push", "--no-verify", "origin", "deny-published"]).status
+      ).toBe(0);
+      repo.git(["checkout", "-q", "-b", "deny-edit", denyPublished]);
+      commit("content/box.mdx", `The box still sits at ${deny}, unchanged.\n`);
+      const denyEdit = push("origin", "deny-edit");
+      expect(denyEdit.status, denyEdit.output).toBe(0);
+      repo.git(["checkout", "-q", "-b", "deny-new", denyPublished]);
+      commit(
+        "content/box.mdx",
+        `The box sits at ${deny}.\nIts twin sits at ${deny} too.\n`
+      );
+      refusedFor(push("origin", "deny-new"), "content/box.mdx:2 private IP");
+
       // Case-insensitive matching survives Unicode case changes: whole-string
       // folding, so ß matches SS, İ and ı match i, Greek sigmas match
       // whatever their position, and fullwidth letters match.
