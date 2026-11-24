@@ -218,6 +218,95 @@ export const COMPONENTS = [
   "Buttons",
 ] as const;
 
+/**
+ * What each component entry must say, and the boards it must cite: the details
+ * a later ticket builds from. Checked with whitespace collapsed.
+ */
+export const COMPONENT_DETAILS: Record<
+  (typeof COMPONENTS)[number],
+  { boards: readonly (typeof BOARD_IDS)[number][]; details: readonly string[] }
+> = {
+  "Tab pill": {
+    boards: ["range-light-desktop"],
+    details: [
+      "Choose a category",
+      "aria-pressed",
+      '"3D & motion"',
+      "pill shadow",
+    ],
+  },
+  "Chip row": {
+    boards: ["range-phone"],
+    details: [
+      "Scroll the categories back",
+      "Scroll the categories forward",
+      "2.75rem pills",
+    ],
+  },
+  Plate: {
+    boards: ["range-light-desktop", "range-phone"],
+    details: [
+      "14px radius",
+      'aria-roledescription="slide"',
+      "text-section-phone",
+      "n of 7",
+    ],
+  },
+  Peek: {
+    boards: ["range-light-desktop"],
+    details: ["aria-hidden", "12px radius", "plate-fade"],
+  },
+  "Credit line": {
+    boards: ["range-light-desktop"],
+    details: ["Built by Seth · Tested by Christine", "#seth", "#christine"],
+  },
+  "Christine line": {
+    boards: ["range-light-desktop"],
+    details: [
+      "Checked by Christine.",
+      "40-character sha",
+      "Illustrative wording",
+    ],
+  },
+  "Lab tag": {
+    boards: ["range-light-desktop"],
+    details: ["Lab demo", "dashed", "Nobody's hired us for one of these yet."],
+  },
+  "Person frame": {
+    boards: [
+      "range-light-desktop",
+      "range-profile-seth-desktop",
+      "range-profile-christine-desktop",
+    ],
+    details: [
+      "1px `--ink` border",
+      "text-person-phone",
+      "Or hire us both for your project or idea",
+    ],
+  },
+  "Holly's pile": {
+    boards: ["range-light-desktop"],
+    details: [
+      "Photos of Holly.",
+      "12rem on a phone",
+      "Chief Morale Officer",
+      "Give Holly a treat",
+    ],
+  },
+  "Ruled list": {
+    boards: ["range-light-desktop"],
+    details: ["list-style: none", "Never cards"],
+  },
+  Buttons: {
+    boards: ["range-light-desktop"],
+    details: [
+      "Start a project",
+      "No arrow glyph",
+      "Lucide is the only icon set",
+    ],
+  },
+};
+
 /** Sections the doc must have, by heading. */
 export const SECTIONS = [
   "Colour",

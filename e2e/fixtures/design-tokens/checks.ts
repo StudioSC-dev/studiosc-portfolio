@@ -6,8 +6,10 @@
 
 import {
   BOARD_IDS,
+  COMPONENT_DETAILS,
   COMPONENTS,
   CONTEXT_TOKENS,
+  DOTS_OPACITY,
   FACES,
   FOCUS,
   FONT_FALLBACK_STEPS,
@@ -464,15 +466,41 @@ export function docGaps(markdown: string): string[] {
     gaps.push("Keyframes: the view-transition rules");
   }
 
+  const colour = flat(doc.sections.get("Root colour tokens") ?? "");
+  const [dotsLight, dotsDark] = DOTS_OPACITY;
+  if (
+    !colour.includes(
+      `\`--dots-opacity\` is \`${dotsLight}\` in light and \`${dotsDark}\` in dark`
+    )
+  ) {
+    gaps.push(`Root colour tokens: --dots-opacity ${dotsLight} / ${dotsDark}`);
+  }
+
   for (const component of COMPONENTS) {
-    const body = doc.sections.get(component);
-    if (body === undefined) {
+    const raw = doc.sections.get(component);
+    if (raw === undefined) {
       gaps.push(`Components: ${component}`);
       continue;
     }
-    const board = /Board: (.*)/.exec(body);
-    if (!board || !BOARD_IDS.some((id) => board[1].includes(`\`${id}\``))) {
-      gaps.push(`Components: ${component} board reference`);
+    const body = flat(raw);
+    const { boards, details } = COMPONENT_DETAILS[component];
+    // The citation is the paragraph that starts "Board:".
+    const citation = /Board: ([\s\S]*?)(?:\n\s*\n|$)/.exec(raw)?.[1] ?? "";
+    const cited = BOARD_IDS.filter((id) => citation.includes(`\`${id}\``));
+    for (const id of boards) {
+      if (!cited.includes(id)) {
+        gaps.push(`Components: ${component} cites ${id}`);
+      }
+    }
+    for (const id of cited) {
+      if (!(boards as readonly string[]).includes(id)) {
+        gaps.push(`Components: ${component} cites an unrelated board ${id}`);
+      }
+    }
+    for (const detail of details) {
+      if (!body.includes(detail)) {
+        gaps.push(`Components: ${component} says "${detail}"`);
+      }
     }
   }
 

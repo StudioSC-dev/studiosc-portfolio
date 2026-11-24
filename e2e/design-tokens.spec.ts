@@ -1246,6 +1246,36 @@ test.describe("Range design system", () => {
     expect(docGaps(withoutSection(markdown, "Lab tag"))).toContain(
       "Components: Lab tag"
     );
+    // A component that keeps its heading and citation but loses a detail.
+    const inSection = (
+      heading: string,
+      edit: (body: string) => string
+    ): string => {
+      const start = markdown.indexOf(`### ${heading}\n`);
+      const end = markdown.indexOf("\n### ", start + 1);
+      expect(start, heading).toBeGreaterThanOrEqual(0);
+      const body = markdown.slice(start, end);
+      const edited = edit(body);
+      expect(edited, `${heading} edited`).not.toBe(body);
+      return markdown.slice(0, start) + edited + markdown.slice(end);
+    };
+    expect(
+      docGaps(inSection("Lab tag", (b) => b.replace("dashed", "solid")))
+    ).toContain('Components: Lab tag says "dashed"');
+    // A component that cites an unrelated board instead of its own.
+    const recited = inSection("Chip row", (b) =>
+      b.replace("`range-phone`", "`pages-404-desktop`")
+    );
+    expect(docGaps(recited)).toEqual(
+      expect.arrayContaining([
+        "Components: Chip row cites range-phone",
+        "Components: Chip row cites an unrelated board pages-404-desktop",
+      ])
+    );
+    // The dot fields' opacity, changed.
+    expect(
+      docGaps(markdown.replace("`0.55` in light", "`0.4` in light"))
+    ).toContain("Root colour tokens: --dots-opacity 0.55 / 0.7");
     expect(
       docGaps(withoutSection(markdown, "Font fallback")).length
     ).toBeGreaterThan(0);
