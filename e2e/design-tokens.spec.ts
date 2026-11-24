@@ -120,10 +120,11 @@ async function inject(page: Page, html: string) {
 }
 
 /**
- * Resolves colour tokens to computed rgb, through a probe inside `scope`, so
- * `var()` chains and context overrides apply. Without a scope the probe sits
- * directly on <html>, so it reads the values `:root` declares and nothing a
- * descendant overrides.
+ * Resolves colour tokens to computed rgb as the `scope` element itself holds
+ * them (<html> when omitted, so `:root`'s values): each token is read off that
+ * element's computed style, with `var()` chains already substituted, and only
+ * then converted to rgb on a detached probe. A rule that overrides the token
+ * on descendants cannot change the reading.
  */
 async function resolveTokens(
   page: Page,
@@ -136,12 +137,13 @@ async function resolveTokens(
         ? document.querySelector(selector)
         : document.documentElement;
       if (!parent) throw new Error(`No element for ${selector}`);
+      const held = getComputedStyle(parent);
       const probe = document.createElement("span");
-      parent.append(probe);
+      document.documentElement.append(probe);
       const out: Record<string, string> = {};
       for (const name of names) {
         probe.style.backgroundColor = "";
-        probe.style.backgroundColor = `var(${name})`;
+        probe.style.backgroundColor = held.getPropertyValue(name).trim();
         out[name] = getComputedStyle(probe).backgroundColor;
       }
       probe.remove();
@@ -414,6 +416,23 @@ test.describe("Range design system", () => {
         (await resolveTokens(page, ["--prv2-probe"]))["--prv2-probe"],
         "#000000",
         "root read on <html>"
+      );
+      // Control: a token overridden on descendants is still read as the
+      // sampled element holds it.
+      await inject(
+        page,
+        `<div data-fixture="probe-guard" style="--prv2-probe: #000000"><style>[data-fixture="probe-guard"] * { --prv2-probe: #ffffff }</style></div>`
+      );
+      expectColour(
+        (
+          await resolveTokens(
+            page,
+            ["--prv2-probe"],
+            '[data-fixture="probe-guard"]'
+          )
+        )["--prv2-probe"],
+        "#000000",
+        "token read on the sampled element"
       );
 
       // The retired --dark-* constants are declared nowhere.
