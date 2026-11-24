@@ -56,8 +56,8 @@ export function gitOk(args: string[], opts: { cwd?: string } = {}): boolean {
 }
 
 /** The commit under test: PR_HEAD_SHA when set (CI), otherwise HEAD. */
-export function headSha(): string {
-  const fromEnv = process.env.PR_HEAD_SHA?.trim();
+export function headSha(env: Env = process.env): string {
+  const fromEnv = env.PR_HEAD_SHA?.trim();
   return git(["rev-parse", "--verify", `${fromEnv || "HEAD"}^{commit}`]).trim();
 }
 
@@ -65,12 +65,28 @@ export function headSha(): string {
  * The pull request base: PR_BASE_SHA when set, otherwise the merge base of
  * HEAD and origin/main. On main itself this is HEAD.
  */
-export function baseSha(): string {
-  const fromEnv = process.env.PR_BASE_SHA?.trim();
+export function baseSha(env: Env = process.env): string {
+  const fromEnv = env.PR_BASE_SHA?.trim();
   if (fromEnv) {
     return git(["rev-parse", "--verify", `${fromEnv}^{commit}`]).trim();
   }
   return git(["merge-base", "HEAD", "origin/main"]).trim();
+}
+
+export interface PrRange {
+  base: string;
+  head: string;
+}
+
+/**
+ * The pull request under test. In CI that is PR_BASE_SHA..PR_HEAD_SHA, and a
+ * build without PR_HEAD_SHA (a push to main or develop) has none, so checks
+ * that judge a PR's own changes do not run there. Locally it is
+ * PR_BASE_SHA (or the merge base with origin/main) to PR_HEAD_SHA (or HEAD).
+ */
+export function prRange(env: Env = process.env): PrRange | null {
+  if (env.CI && !env.PR_HEAD_SHA?.trim()) return null;
+  return { base: baseSha(env), head: headSha(env) };
 }
 
 /** Whether `file` exists in the tree of `sha`. */

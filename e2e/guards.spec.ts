@@ -11,12 +11,11 @@ import os from "node:os";
 import path from "node:path";
 import {
   ROOT,
-  baseSha,
   existsAt,
   git,
   gitBuffer,
   gitOk,
-  headSha,
+  prRange,
   treeFiles,
   type TreeFile,
 } from "./support/git";
@@ -183,9 +182,22 @@ test.describe("guards", () => {
     expect(checkout).toMatch(/\n\s+with:\n(?:\s+\S.*\n)*?\s+fetch-depth: 0\b/);
     const run = steps.find((s) => /run: npm run test:e2e\b/.test(s));
     expect(run, "test job does not run test:e2e").toBeDefined();
-    expect(run).toMatch(
-      /\n\s+env:\n(?:\s+\S.*\n)*?\s+PR_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/
-    );
+    for (const [name, field] of [
+      ["PR_HEAD_SHA", "head"],
+      ["PR_BASE_SHA", "base"],
+    ]) {
+      expect(run).toMatch(
+        new RegExp(
+          `\\n\\s+env:\\n(?:\\s+\\S.*\\n)*?\\s+${name}: \\$\\{\\{ github\\.event\\.pull_request\\.${field}\\.sha \\}\\}`
+        )
+      );
+    }
+    // A push build (no PR head) judges no PR; a PR build uses its own base.
+    const head = git(["rev-parse", "HEAD"]).trim();
+    expect(prRange({ CI: "true", PR_HEAD_SHA: "" })).toBeNull();
+    expect(
+      prRange({ CI: "true", PR_HEAD_SHA: head, PR_BASE_SHA: head })
+    ).toEqual({ base: head, head });
   });
 
   test("denylist fixtures", () => {
@@ -302,9 +314,9 @@ test.describe("guards", () => {
 
     // The scope check is PRV-1's own: it applies while the base branch does
     // not carry these guards yet, and compares the PR head with that base.
-    const base = baseSha();
-    if (existsAt(base, "e2e/guards.spec.ts")) return;
-    const head = headSha();
+    const range = prRange();
+    if (!range || existsAt(range.base, "e2e/guards.spec.ts")) return;
+    const { base, head } = range;
     const isApplication = (file: string) =>
       /^(app|components|content|lib|public|types)\//.test(file) ||
       /^(next\.config\.ts|middleware\.ts|proxy\.ts|instrumentation\.ts|postcss\.config\.mjs)$/.test(
@@ -1317,8 +1329,12 @@ test.describe("guards", () => {
 
     // A PR that changes the baseline must have measured it at an ancestor of
     // its head, with no app change since, and may only lower `current`.
-    const base = baseSha();
-    const changed = !gitOk(["diff", "--quiet", base, headSha(), "--", FILE]);
+    // Push builds in CI have no PR, so only the thresholds apply there.
+    const range = prRange();
+    const base = range?.base ?? "";
+    const changed =
+      range !== null &&
+      !gitOk(["diff", "--quiet", range.base, range.head, "--", FILE]);
     if (changed) {
       const prHead = process.env.PR_HEAD_SHA?.trim();
       expect(
