@@ -755,4 +755,253 @@ test.describe("guards", () => {
       if (expected.grids) expect(report.grids[0].count, name).toBe(3);
     }
   });
+
+  test("pre-push privacy", () => {
+    nodeOnly();
+    test.setTimeout(5 * 60_000);
+    const repo = throwawayRepo(
+      [".husky/pre-push", "scripts/privacy-scan.ts", "e2e/support/denylist.ts"],
+      "pre-push-"
+    );
+    const root = path.dirname(repo.dir);
+    // A fixture private list of made-up values.
+    const literals = ["quokka-harbour-17", "Zephyrine Analytics"];
+    const list = path.join(root, "private-list.txt");
+    writeFileSync(list, `# fixture private list\n${literals.join("\n")}\n`);
+    const deny = DENYLIST_FIXTURES["private IP"].matches[0];
+    const withList = { PREFLIGHT_PRIVATE_LIST: list };
+    const outputs: string[] = [];
+    const run = (cmd: string, args: string[], env = {}, input?: string) => {
+      const result = repo.run(cmd, args, {
+        env: { ...withList, ...env },
+        input,
+      });
+      outputs.push(result.output);
+      return result;
+    };
+    const push = (...args: string[]) => run("git", ["push", ...args]);
+    const bare = (name: string) => {
+      const dir = path.join(root, `${name}.git`);
+      repo.git(["init", "-q", "--bare", dir]);
+      return dir;
+    };
+    const commit = (
+      file: string,
+      content: string,
+      message = `edit ${file}`
+    ) => {
+      repo.write(file, content);
+      repo.git(["add", "--", file]);
+      repo.git(["commit", "-q", "-m", message]);
+      return repo.git(["rev-parse", "HEAD"]).trim();
+    };
+    const refusedFor = (
+      result: { status: number | null; output: string },
+      ...needles: string[]
+    ) => {
+      expect(result.status, result.output).not.toBe(0);
+      expect(result.output).toContain("privacy-scan: push refused");
+      for (const needle of needles) expect(result.output).toContain(needle);
+    };
+    const hasRef = (remote: string, ref: string) =>
+      repo.git(["ls-remote", remote, ref]).trim() !== "";
+    const zero = "0".repeat(40);
+
+    try {
+      const remote = bare("remote");
+      repo.git(["remote", "add", "origin", remote]);
+
+      // A clean push goes through.
+      const first = push("origin", "main");
+      expect(first.status, first.output).toBe(0);
+      expect(first.output).toContain("scanned 1 commit(s)");
+      expect(hasRef(remote, "refs/heads/main")).toBe(true);
+
+      // A private literal or a denylist hit under each scanned folder.
+      for (const folder of [
+        "docs/boards",
+        "docs/provenance",
+        "docs/tickets",
+        "content",
+      ]) {
+        for (const [kind, text, rule] of [
+          [
+            "literal",
+            `Met the ${literals[1]} team.`,
+            "private list entry on line 3",
+          ],
+          ["denylist", `The box sits at ${deny}.`, "private IP"],
+        ]) {
+          const branch = `${kind}-${folder.replace(/\//g, "-")}`;
+          repo.git(["checkout", "-q", "-b", branch, "main"]);
+          commit(`${folder}/note.md`, `# Note\n\n${text}\n`);
+          refusedFor(push("origin", branch), `${folder}/note.md:3 ${rule}`);
+          expect(hasRef(remote, `refs/heads/${branch}`)).toBe(false);
+          repo.git(["checkout", "-q", "main"]);
+        }
+      }
+
+      // Added then removed within one push: refused, naming the first commit.
+      repo.git(["checkout", "-q", "-b", "add-remove", "main"]);
+      const added = commit("content/post.mdx", `Hello ${literals[0]}\n`);
+      const removed = commit("content/post.mdx", "Hello\n");
+      const addRemove = push("origin", "add-remove");
+      refusedFor(addRemove, `${added.slice(0, 12)} content/post.mdx:1`);
+      expect(addRemove.output).not.toContain(removed.slice(0, 12));
+
+      // Without a readable private list every push is refused.
+      repo.git(["checkout", "-q", "-b", "clean", "main"]);
+      commit("content/clean.mdx", "Nothing private here.\n");
+      refusedFor(
+        run("git", ["push", "origin", "clean"], {
+          PREFLIGHT_PRIVATE_LIST: undefined,
+        }),
+        "PREFLIGHT_PRIVATE_LIST is not set"
+      );
+      refusedFor(
+        run("git", ["push", "origin", "clean"], {
+          PREFLIGHT_PRIVATE_LIST: path.join(root, "missing.txt"),
+        }),
+        "cannot be read"
+      );
+      expect(hasRef(remote, "refs/heads/clean")).toBe(false);
+      expect(push("origin", "clean").status).toBe(0);
+
+      // A stale local remote-tracking ref that already holds the dirty
+      // commit does not exempt it: new branch, then an existing one.
+      repo.git(["checkout", "-q", "-b", "stale-new", "main"]);
+      const staleNew = commit("content/stale.mdx", `${literals[0]}\n`);
+      repo.git(["update-ref", "refs/remotes/origin/stale-new", staleNew]);
+      refusedFor(push("origin", "stale-new"), "content/stale.mdx:1");
+      repo.git(["checkout", "-q", "clean"]);
+      const staleOld = commit("content/stale.mdx", `${literals[0]}\n`);
+      repo.git(["update-ref", "refs/remotes/origin/clean", staleOld]);
+      refusedFor(push("origin", "clean"), "content/stale.mdx:1");
+      repo.git(["reset", "-q", "--hard", "HEAD~1"]);
+
+      // A first push scans only commits new to every destination ref. A
+      // branch other than main already holds a dirty commit, and its tip is
+      // not even present locally.
+      repo.git(["checkout", "-q", "-b", "archive", "main"]);
+      const published = commit("content/archive.mdx", `${literals[0]}\n`);
+      expect(
+        run("git", ["push", "--no-verify", "origin", "archive"]).status
+      ).toBe(0);
+      const other = path.join(root, "other");
+      repo.git(["clone", "-q", "--branch", "archive", remote, other]);
+      repo.write("../other/content/more.mdx", "More.\n");
+      repo.git(["add", "content/more.mdx"], { cwd: other });
+      repo.git(
+        [
+          "-c",
+          "user.name=O",
+          "-c",
+          "user.email=o@example.com",
+          "commit",
+          "-q",
+          "-m",
+          "more",
+        ],
+        { cwd: other }
+      );
+      repo.git(["push", "-q", "--no-verify", "origin", "archive"], {
+        cwd: other,
+      });
+      const remoteTip = repo.git(["rev-parse", "HEAD"], { cwd: other }).trim();
+      expect(repo.run("git", ["cat-file", "-e", remoteTip]).status).not.toBe(0);
+      repo.git(["checkout", "-q", "-b", "topic", published]);
+      commit("content/topic.mdx", "A clean follow-up.\n");
+      const reached = push("origin", "topic");
+      expect(reached.status, reached.output).toBe(0);
+      expect(reached.output).toContain("scanned 1 commit(s)");
+
+      // One remote, separate fetch and push URLs: a commit the fetch side
+      // already has is still new to the push side.
+      const fetchSide = bare("fetch-side");
+      const pushSide = bare("push-side");
+      repo.git(["checkout", "-q", "main"]);
+      for (const side of [fetchSide, pushSide]) {
+        expect(push(side, "main").status).toBe(0);
+      }
+      repo.git(["remote", "add", "split", fetchSide]);
+      repo.git(["remote", "set-url", "--push", "split", pushSide]);
+      repo.git(["checkout", "-q", "-b", "shared", "main"]);
+      commit("content/shared.mdx", `${literals[1]}\n`);
+      expect(
+        run("git", ["push", "--no-verify", fetchSide, "shared"]).status
+      ).toBe(0);
+      repo.git(["fetch", "-q", "split"]);
+      repo.git(["checkout", "-q", "-b", "split-topic", "shared"]);
+      commit("content/split.mdx", "Clean.\n");
+      refusedFor(push("split", "split-topic"), "content/shared.mdx:1");
+      expect(hasRef(pushSide, "refs/heads/split-topic")).toBe(false);
+
+      // A root commit is scanned against the empty tree.
+      const blob = repo
+        .run("git", ["hash-object", "-w", "--stdin"], {
+          input: `${literals[0]}\n`,
+        })
+        .output.trim();
+      const inner = repo
+        .run("git", ["mktree"], { input: `100644 blob ${blob}\troot.mdx\n` })
+        .output.trim();
+      const tree = repo
+        .run("git", ["mktree"], { input: `040000 tree ${inner}\tcontent\n` })
+        .output.trim();
+      const rootCommit = repo.git(["commit-tree", tree, "-m", "root"]).trim();
+      refusedFor(
+        push("origin", `${rootCommit}:refs/heads/rooted`),
+        `${rootCommit.slice(0, 12)} content/root.mdx:1`
+      );
+
+      // A clean ref deletion succeeds.
+      expect(hasRef(remote, "refs/heads/clean")).toBe(true);
+      const deletion = push("origin", "--delete", "clean");
+      expect(deletion.status, deletion.output).toBe(0);
+      expect(hasRef(remote, "refs/heads/clean")).toBe(false);
+
+      // Fail closed: an unreachable destination, a local commit that cannot
+      // be resolved, and a commit whose diff cannot be read.
+      const hook = (url: string, line: string) =>
+        run("sh", [".husky/pre-push", "origin", url], {}, `${line}\n`);
+      const head = repo.git(["rev-parse", "main"]).trim();
+      refusedFor(
+        hook(
+          path.join(root, "nowhere.git"),
+          `refs/heads/main ${head} refs/heads/main ${zero}`
+        ),
+        "cannot list the destination's refs"
+      );
+      const unknown = "1234567".repeat(5) + "89abc";
+      refusedFor(
+        hook(remote, `refs/heads/x ${unknown} refs/heads/x ${zero}`),
+        "cannot work out which commits the push adds"
+      );
+      const broken = repo
+        .run(
+          "git",
+          ["hash-object", "-t", "commit", "-w", "--literally", "--stdin"],
+          {
+            input:
+              `tree ${"ab".repeat(20)}\n` +
+              "author A <a@example.com> 1700000000 +0000\n" +
+              "committer A <a@example.com> 1700000000 +0000\n\nbroken\n",
+          }
+        )
+        .output.trim();
+      refusedFor(
+        hook(remote, `refs/heads/x ${broken} refs/heads/x ${zero}`),
+        `cannot diff commit ${broken.slice(0, 12)}`
+      );
+
+      // No output ever echoes a private value or the denylist match.
+      for (const output of outputs) {
+        for (const value of [...literals, deny]) {
+          expect(output).not.toContain(value);
+        }
+      }
+    } finally {
+      repo.remove();
+    }
+  });
 });

@@ -1,0 +1,1 @@
+npx --no tsx scripts/privacy-scan.ts --pre-push "$1" "$2"
