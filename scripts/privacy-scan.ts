@@ -109,12 +109,29 @@ export function readPrivateList(): PrivateEntry[] {
   const file = process.env.PREFLIGHT_PRIVATE_LIST;
   if (!file) throw new Refusal("PREFLIGHT_PRIVATE_LIST is not set");
   let real: string;
-  let text: string;
+  let bytes: Buffer;
   try {
     real = realpathSync(file);
-    text = readFileSync(real, "utf8");
+    bytes = readFileSync(real);
   } catch {
     throw new Refusal("the file PREFLIGHT_PRIVATE_LIST names cannot be read");
+  }
+  // A list in another encoding would match nothing, so it fails closed.
+  const bom = [
+    [0xef, 0xbb, 0xbf],
+    [0xff, 0xfe],
+    [0xfe, 0xff],
+  ].some((mark) => mark.every((byte, i) => bytes[i] === byte));
+  if (bom || bytes.includes(0)) {
+    throw new Refusal(
+      "the private list must be plain UTF-8 text, without a byte-order mark or NUL bytes (save it as UTF-8, not UTF-16)"
+    );
+  }
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Refusal("the private list is not valid UTF-8 text");
   }
   if (repositoryPaths().some((repo) => isWithin(real, repo))) {
     throw new Refusal(

@@ -1430,6 +1430,38 @@ test.describe("guards", () => {
         }),
         "the private list has no entries"
       );
+      // A list in another encoding would match nothing: it is refused.
+      const plain = `${literals.join("\n")}\n`;
+      for (const [name, bytes, needle] of [
+        [
+          "utf16-bom.txt",
+          Buffer.concat([
+            Buffer.from([0xff, 0xfe]),
+            Buffer.from(plain, "utf16le"),
+          ]),
+          "plain UTF-8 text",
+        ],
+        ["utf16.txt", Buffer.from(plain, "utf16le"), "plain UTF-8 text"],
+        [
+          "utf8-bom.txt",
+          Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(plain)]),
+          "plain UTF-8 text",
+        ],
+        [
+          "latin1.txt",
+          Buffer.from(`Caf\xe9 ${literals[0]}\n`, "latin1"),
+          "the private list is not valid UTF-8 text",
+        ],
+      ] as const) {
+        const listFile = path.join(root, name);
+        writeFileSync(listFile, bytes);
+        refusedFor(
+          run("git", ["push", "origin", "clean"], {
+            PREFLIGHT_PRIVATE_LIST: listFile,
+          }),
+          needle
+        );
+      }
       // A list inside the repository is refused: directly (even when git
       // ignores it), through a symlink, or inside the git directory.
       const inRepo = path.join(repo.dir, "private-list.txt");
