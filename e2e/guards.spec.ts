@@ -38,6 +38,8 @@ import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
 import urlsFixture from "./fixtures/urls.json";
+import { SHOT_WIDTHS, shot } from "./support/shot";
+import { detectCards } from "./support/cards";
 import faviconPixels from "./fixtures/favicon-pixels.json";
 import { TSX, loadConfig } from "./support/config";
 import {
@@ -662,5 +664,95 @@ test.describe("guards", () => {
       }
     }
     expect(failures).toEqual([]);
+  });
+
+  test("captures desktop and phone", async ({ page }, testInfo) => {
+    const width = SHOT_WIDTHS[testInfo.project.name];
+    test.skip(!width, "screenshots are taken in Chromium and Mobile Chrome");
+    await stubVercelInsights(page);
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const taken = await shot(page, testInfo, "home");
+    expect(taken?.width).toBe(width);
+    const png = readFileSync(taken!.path);
+    expect(png.toString("latin1", 12, 16)).toBe("IHDR");
+    const [pngWidth, pngHeight] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+    expect(pngWidth).toBe(width);
+    // Full page: taller than the viewport, as tall as the document.
+    const { inner, scroll } = await page.evaluate(() => ({
+      inner: window.innerHeight,
+      scroll: document.documentElement.scrollHeight,
+    }));
+    expect(pngHeight).toBeGreaterThan(inner);
+    expect(Math.abs(pngHeight - scroll)).toBeLessThanOrEqual(1);
+  });
+
+  test("card detector controls", async ({ page }) => {
+    const row = (children: string, attrs = "") =>
+      `<div ${attrs} style="display:flex;gap:12px;background:#fff">${children}</div>`;
+    const repeat = (n: number, html: string) => Array(n).fill(html).join("");
+    const box = "width:120px;height:80px;";
+    const bordered = `<div style="${box}border:1px solid #999;border-radius:8px">x</div>`;
+    const shaded = `<div style="${box}background:#eee;border-radius:8px">x</div>`;
+    const link = `<a href="#" style="display:block;${box}border:1px solid #999;border-radius:6px">x</a>`;
+    const ruled = `<div style="${box}border-top:1px solid #999;border-bottom:1px solid #999;border-radius:4px">x</div>`;
+    const button = `<button style="${box}border:1px solid #999;border-radius:8px">x</button>`;
+    const square = `<div style="${box}border:1px solid #999;border-radius:0">x</div>`;
+    const wide = `<div style="width:160px;height:80px;border:1px solid #999;border-radius:8px">x</div>`;
+    const tall = `<div style="width:120px;height:96px;border:1px solid #999;border-radius:8px">x</div>`;
+
+    const cases: [string, string, { cards: number; grids: number }][] = [
+      [
+        "three bordered rounded siblings",
+        row(repeat(3, bordered)),
+        { cards: 3, grids: 1 },
+      ],
+      [
+        "three rounded background-only siblings",
+        row(repeat(3, shaded)),
+        { cards: 3, grids: 1 },
+      ],
+      ["three rounded a blocks", row(repeat(3, link)), { cards: 3, grids: 1 }],
+      [
+        "ruled rows",
+        `<div style="background:#fff">${repeat(3, ruled)}</div>`,
+        { cards: 0, grids: 0 },
+      ],
+      ["three rounded buttons", row(repeat(3, button)), { cards: 0, grids: 0 }],
+      [
+        "three rounded siblings in a fragment",
+        row(repeat(3, bordered), "data-fragment"),
+        { cards: 0, grids: 0 },
+      ],
+      [
+        "two qualifying siblings",
+        row(repeat(2, bordered)),
+        { cards: 2, grids: 0 },
+      ],
+      [
+        "one of three a different width",
+        row(repeat(2, bordered) + wide),
+        { cards: 3, grids: 0 },
+      ],
+      [
+        "one of three a different height",
+        row(repeat(2, bordered) + tall),
+        { cards: 3, grids: 0 },
+      ],
+      [
+        "three square bordered siblings",
+        row(repeat(3, square)),
+        { cards: 0, grids: 0 },
+      ],
+    ];
+    for (const [name, html, expected] of cases) {
+      await page.setContent(
+        `<body style="margin:0;background:#fff">${html}</body>`
+      );
+      const report = await detectCards(page);
+      expect(report.cards.length, `${name}: cards`).toBe(expected.cards);
+      expect(report.grids.length, `${name}: grids`).toBe(expected.grids);
+      if (expected.grids) expect(report.grids[0].count, name).toBe(3);
+    }
   });
 });
