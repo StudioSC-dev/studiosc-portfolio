@@ -15,6 +15,7 @@ import {
 
 import {
   addedIconSources,
+  finalWithFragment,
   docGaps,
   expectedFontConfig,
   normalizeDestination,
@@ -1591,25 +1592,12 @@ test.describe("Range design system", () => {
             return !!menu && getComputedStyle(menu).opacity === "1";
           });
         }
-        const text = await page.evaluate(visibleText);
+        const text = await settledText(page);
         const result = await page.evaluate(() => {
           const anchors = Array.from(
             document.querySelectorAll<HTMLAnchorElement>("a[href]")
           );
-          return {
-            links: anchors.map((a) => a.href),
-            targets: anchors
-              .filter(
-                (a) =>
-                  a.hash &&
-                  a.origin === location.origin &&
-                  a.pathname === location.pathname
-              )
-              .map(
-                (a) =>
-                  `${a.hash} ${document.getElementById(decodeURIComponent(a.hash.slice(1))) ? "exists" : "missing"}`
-              ),
-          };
+          return { links: anchors.map((a) => a.href) };
         });
         await context.close();
         return {
@@ -1617,17 +1605,42 @@ test.describe("Range design system", () => {
           text,
           links: result.links.map(dest),
           absolute: result.links,
-          targets: result.targets,
         };
+      };
+      // Whether the page at `url` has the element its fragment names.
+      const targetOf = async (url: string) => {
+        const id = decodeURIComponent(new URL(url).hash.slice(1));
+        const page = await browser.newPage();
+        await page.goto(url);
+        await page.waitForLoadState("networkidle");
+        const found = await page.evaluate(
+          (i) => !!document.getElementById(i),
+          id
+        );
+        await page.close();
+        return found ? "exists" : "missing";
       };
       const resolveLink = async (url: string) => {
         const context = await browser.newContext();
         const response = await context.request.get(url, { maxRedirects: 10 });
-        const final = new URL(response.url());
-        final.hash = new URL(url).hash;
+        const final = finalWithFragment(response.url(), url);
         await context.close();
-        return { status: response.status(), to: dest(final.href) };
+        const status = response.status();
+        // A link to a fragment is followed to its page, and the target checked.
+        const target =
+          status === 200 && new URL(final).hash ? await targetOf(final) : null;
+        return { status, to: dest(final), target };
       };
+      // Controls: a redirect's own fragment survives, and a followed link to
+      // a missing target is caught.
+      expect(
+        finalWithFragment("http://h.test/a#redirected", "http://h.test/b#asked")
+      ).toBe("http://h.test/a#redirected");
+      expect(
+        finalWithFragment("http://h.test/a", "http://h.test/b#asked")
+      ).toBe("http://h.test/a#asked");
+      expect(await targetOf(`${headURL}/about#seth`)).toBe("exists");
+      expect(await targetOf(`${headURL}/about#prv2-missing`)).toBe("missing");
 
       const views = [
         ...SCOPE_ROUTES.map((route) => ({ route, phone: false })),
@@ -1642,9 +1655,6 @@ test.describe("Range design system", () => {
         expect(after.status, `${label} still renders`).toBe(before.status);
         expect(after.text, `${label} visible text`).toBe(before.text);
         expect(after.links, `${label} link destinations`).toEqual(before.links);
-        expect(after.targets, `${label} in-page targets`).toEqual(
-          before.targets
-        );
 
         // Each link on either test server, followed to its final URL.
         const local = (list: string[]) =>
@@ -1692,6 +1702,32 @@ function visibleText(): string {
     parts.push(n.textContent ?? "");
   }
   return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The visible text once entrance animations have finished: no animation
+ * running and the same text on three reads 300ms apart (10s at most), so a
+ * card still fading in on one server is not read as missing content.
+ */
+async function settledText(page: Page): Promise<string> {
+  const until = Date.now() + 10_000;
+  let last = "";
+  let same = 0;
+  while (Date.now() < until) {
+    const [text, running] = await Promise.all([
+      page.evaluate(visibleText),
+      page.evaluate(
+        () =>
+          document.getAnimations().filter((a) => a.playState === "running")
+            .length
+      ),
+    ]);
+    same = text === last && running === 0 ? same + 1 : 0;
+    last = text;
+    if (same >= 2) return text;
+    await page.waitForTimeout(300);
+  }
+  return last;
 }
 
 function freePort(): Promise<number> {

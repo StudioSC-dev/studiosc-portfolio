@@ -346,6 +346,16 @@ export function addedIconSources(diff: string): string[] {
 }
 
 /**
+ * Where a link lands: the final URL after redirects, keeping a fragment the
+ * redirect set, else the one the link asked for (as a browser does).
+ */
+export function finalWithFragment(finalUrl: string, requested: string): string {
+  const final = new URL(finalUrl);
+  if (!final.hash) final.hash = new URL(requested).hash;
+  return final.href;
+}
+
+/**
  * A destination, comparable across the two test servers: a URL on either
  * server's origin is rewritten to "<origin>"; any other origin is kept.
  */
