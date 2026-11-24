@@ -118,7 +118,8 @@ const CONTENT_URL = /^\/(work|blog)\/[^/]+$/;
 /**
  * Why urls.json is wrong. On the PR that introduces it, it must hold exactly
  * the original URLs; later PRs may add routes but never drop an original one.
- * No URL may repeat.
+ * No URL may repeat, and each must be a path on the site itself, so no
+ * request ever goes to another server.
  */
 function urlListProblems(
   urls: string[],
@@ -127,6 +128,14 @@ function urlListProblems(
 ): string[] {
   const problems: string[] = [];
   if (new Set(urls).size !== urls.length) problems.push("a URL repeats");
+  const site = "http://site.invalid";
+  for (const url of urls) {
+    const onSite =
+      typeof url === "string" &&
+      url.startsWith("/") &&
+      new URL(url, site).origin === site;
+    if (!onSite) problems.push(`${url} is not a path on the site`);
+  }
   for (const url of original) {
     if (!urls.includes(url)) problems.push(`${url} was dropped`);
   }
@@ -943,6 +952,18 @@ test.describe("guards", () => {
     expect(urlListProblems([...expected, "/"], expected, false)).not.toEqual(
       []
     );
+    // Entries are checked as site paths before any request is made.
+    for (const away of [
+      "https://elsewhere.example/blog",
+      "//elsewhere.example/blog",
+      "/\\elsewhere.example/blog",
+      "blog",
+    ]) {
+      expect(
+        urlListProblems([...expected, away], expected, false),
+        away
+      ).toContain(`${away} is not a path on the site`);
+    }
 
     // Redirects follow the full Location from the URL that answered, and
     // never leave the site.
