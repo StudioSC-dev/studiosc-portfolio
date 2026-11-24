@@ -25,15 +25,16 @@ without JavaScript. The boards hold these values in their `themes` table
 
 ### Root colour tokens
 
-| Token       | Light     | Dark      | Role                                    | Board                                       |
-| ----------- | --------- | --------- | --------------------------------------- | ------------------------------------------- |
-| `--gallery` | `#E9EAEC` | `#141619` | page                                    | `range-light-desktop`, `range-dark-desktop` |
-| `--plate`   | `#FFFFFF` | `#1D2024` | plates, panels, tab pill                | `range-light-desktop`, `range-dark-desktop` |
-| `--peek`    | `#F4F5F6` | `#191B1F` | dimmed side plates, photo frames        | `range-light-desktop`, `range-dark-desktop` |
-| `--ink`     | `#1D1F23` | `#ECEEF1` | text, primary button, person-frame rule | `range-light-desktop`, `range-dark-desktop` |
-| `--muted`   | `#5E636B` | `#A3A9B2` | secondary text                          | `range-light-desktop`, `range-dark-desktop` |
-| `--rule`    | `#D0D3D8` | `#30343A` | row rules, plate borders                | `range-light-desktop`, `range-dark-desktop` |
-| `--accent`  | `#1F4FD1` | `#7FA2FF` | headline word, dot fields, focus ring   | `range-light-desktop`, `range-dark-desktop` |
+| Token       | Light     | Dark      | Role                                                  | Board                                          |
+| ----------- | --------- | --------- | ----------------------------------------------------- | ---------------------------------------------- |
+| `--gallery` | `#E9EAEC` | `#141619` | page                                                  | `range-light-desktop`, `range-dark-desktop`    |
+| `--plate`   | `#FFFFFF` | `#1D2024` | plates, panels, tab pill                              | `range-light-desktop`, `range-dark-desktop`    |
+| `--peek`    | `#F4F5F6` | `#191B1F` | dimmed side plates, photo frames                      | `range-light-desktop`, `range-dark-desktop`    |
+| `--ink`     | `#1D1F23` | `#ECEEF1` | text, primary button, person-frame rule               | `range-light-desktop`, `range-dark-desktop`    |
+| `--muted`   | `#5E636B` | `#A3A9B2` | secondary text                                        | `range-light-desktop`, `range-dark-desktop`    |
+| `--rule`    | `#D0D3D8` | `#30343A` | row rules, plate borders                              | `range-light-desktop`, `range-dark-desktop`    |
+| `--accent`  | `#1F4FD1` | `#7FA2FF` | headline word, dot fields, focus ring                 | `range-light-desktop`, `range-dark-desktop`    |
+| `--error`   | `#B3261E` | `#FF9B8F` | form error summary, invalid fields and their messages | `pages-contact-desktop`, `pages-contact-phone` |
 
 `--dots-opacity` is `0.55` in light and `0.7` in dark: the dot fields are an
 ordered dither in `--accent` at the page edges, at that opacity. There are no
@@ -152,6 +153,8 @@ pairings hold in both themes because the palettes do not change.
 | `--accent`                     | `--gallery`              | 5.63:1  | 7.35:1  | Headline word, Holly's title line |
 | `--accent`                     | `--plate`                | 6.78:1  | 6.63:1  | Accent text on a plate            |
 | `--accent`                     | `--peek`                 | 6.21:1  | 6.99:1  | Accent text on a peek             |
+| `--error`                      | `--plate`                | 6.54:1  | 8.05:1  | Form errors on the contact plate  |
+| `--error`                      | `--gallery`              | 5.43:1  | 8.92:1  | Form errors on the page           |
 | `--ink`                        | `--gallery`              | 13.71:1 | 15.59:1 | Body and headings                 |
 | `--ink`                        | `--plate`                | 16.50:1 | 14.07:1 | Body and headings                 |
 | `--ink`                        | `--peek`                 | 15.12:1 | 14.83:1 | Body and headings                 |
@@ -229,6 +232,9 @@ Consolas, monospace`). The site sets JetBrains Mono there instead, as §2 of the
 | Display (h1), desktop | 92/92     | -0.04em  | `range-light-desktop`: "We build dashboards. / We break them first." (600) |
 | Display (h1), phone   | 42/46     | -0.035em | `range-phone`: the same headline                                           |
 | Section title         | 32/40     | -0.015em | `range-light-desktop`: "The two of us", "Writing", "Every project" (600)   |
+| Section title, phone  | 24/32     | 0        | `range-phone`: the same titles and every plate name (600)                  |
+| Person name           | 36/44     | -0.02em  | `range-light-desktop`: "Seth Palileo", "Christine Nacar-Palileo" (600)     |
+| Person name, phone    | 28/36     | -0.02em  | `range-phone`: the same names (600)                                        |
 | Title                 | 20/28     | 0        | `range-light-desktop`: "Or hire us both for your project or idea"          |
 | Lead                  | 18/28     | 0        | `range-light-desktop`: "Husband and wife, developer and tester. …"         |
 | Body                  | 16/26     | 0        | `range-light-desktop`: the page's base size                                |
@@ -236,10 +242,11 @@ Consolas, monospace`). The site sets JetBrains Mono there instead, as §2 of the
 | Meta                  | 13/20     | 0        | `range-light-desktop`: peek category, figcaptions                          |
 | Caption               | 12/18     | 0        | `range-light-desktop`: the "Lab demo" tag                                  |
 
-Utilities: `text-display`, `text-display-phone`, `text-section`, `text-title`,
+Utilities: `text-display`, `text-display-phone`, `text-section`,
+`text-section-phone`, `text-person`, `text-person-phone`, `text-title`,
 `text-lead`, `text-copy`, `text-small`, `text-meta` and `text-caption`. The
-boards also set a few one-off sizes inside a component (person names 36/44,
-Holly 44/48, the contact title 48/52); those are listed with the component.
+boards also set a few one-off sizes inside a component (Holly 44/48, the
+contact title 48/52); those are listed with the component.
 
 ### Font fallback
 
@@ -276,9 +283,11 @@ rgba(0,0,0,0.35)` (`shadow-pill`).
 
 ## Layout
 
-- One container: 75rem of content plus 2.5rem gutters, 1200px wide in all
-  (`max-w-page`, `px-gutter`). The header is 5.5rem tall and sections are 5rem
-  apart (`range-light-desktop`).
+- One container, as the boards build it: `box-sizing: content-box`, 75rem
+  (1200px) of content and 2.5rem gutters, so 1280px wide in all. The recipe is
+  `box-content max-w-page px-gutter mx-auto`; with Tailwind's default border
+  box the content would shrink to 1120px. The header is 5.5rem tall and
+  sections are 5rem apart (`range-light-desktop`).
 - A phone uses one centred axis with 16px gutters (`px-gutter-phone`). Tables
   and lists inside fragments stay left-aligned (`range-phone`).
 
@@ -371,7 +380,8 @@ Board: `range-light-desktop`, "The range"; `range-phone` for the phone layout.
   3.25rem 2.5rem 2.5rem, two columns (19rem and the fragment).
 - A slide: `aria-roledescription="slide"`, labelled like "1 of 7: Dashboards,
   Central Command".
-- The name is Red Hat Display 600, 32/40, -0.015em. Facts are a ruled `dl`
+- The name is Red Hat Display 600, 32/40, -0.015em (`text-section`); 24/32
+  on a phone (`text-section-phone`). Facts are a ruled `dl`
   (Status, Built with or Tested with, Started) at 15/24, with `--muted` terms;
   Status is 600.
 - The fragment is a `figure` in a 6px frame, with a 13/20 `--muted` caption,
@@ -428,7 +438,8 @@ split by an ink rule"; `range-profile-seth-desktop` and
 - One frame on `--plate` with a 1px `--ink` border and a 14px radius, split by a
   1px `--ink` rule; stacked on a phone.
 - Each panel pads 2.5rem: a 7rem photo (1px `--rule` border, 4px radius), the
-  name (Red Hat Display 600, 36/44, -0.02em), the role (16/24, 600), the fact
+  name (Red Hat Display 600, 36/44, -0.02em, `text-person`; 28/36 on a phone,
+  `text-person-phone`), the role (16/24, 600), the fact
   line (15/24, `--muted`), the pitch (17/26), "Open to", "What I did here" (a
   14/20 600 `--muted` heading over a ruled list), Download CV and Email, then
   LinkedIn and GitHub.
@@ -440,7 +451,7 @@ split by an ink rule"; `range-profile-seth-desktop` and
 Board: `range-light-desktop`, "Holly: the studio dog. Not staff, so a softer
 radius than the people blocks".
 
-- A 13rem square group labelled "Photos of Holly. The left and right arrow keys
+- A 13rem square group (12rem on a phone, `range-phone`) labelled "Photos of Holly. The left and right arrow keys
   flip through them.", focusable. Six prints, each with a 1px `--rule` border,
   a 2.5rem radius, on `--plate`; the next two show behind at 4° and -3°.
 - Back and next (2.75rem, 6px) around an "n / 6" counter.

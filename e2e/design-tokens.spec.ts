@@ -26,6 +26,7 @@ import {
   parseDoc,
   sameColour,
   table,
+  trackingEm,
   withoutKeyframes,
   withoutRow,
   withoutSection,
@@ -49,6 +50,7 @@ import {
   RETIRED_DARK_TOKENS,
   SCOPE_FILES,
   SCOPE_ROUTES,
+  TYPE_SCALE,
 } from "./fixtures/design-tokens/inventory";
 
 const ROOT = process.cwd();
@@ -336,6 +338,70 @@ test.describe("Range design system", () => {
         [...RETIRED_DARK_TOKENS]
       );
       expect(declared, "retired --dark-* declarations").toEqual([]);
+    }
+
+    // The container recipe: 1200px of content plus 2.5rem gutters, 1280px.
+    if (!test.info().project.use.isMobile) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/");
+      await inject(
+        page,
+        `<div data-fixture="container" class="box-content max-w-page px-gutter mx-auto">Container</div>`
+      );
+      const box = await page.evaluate(() => {
+        const el = document.querySelector<HTMLElement>(
+          '[data-fixture="container"]'
+        )!;
+        const s = getComputedStyle(el);
+        return {
+          outer: el.getBoundingClientRect().width,
+          content:
+            el.clientWidth -
+            parseFloat(s.paddingLeft) -
+            parseFloat(s.paddingRight),
+        };
+      });
+      expect(box, "container at 1440px").toEqual({
+        outer: 1280,
+        content: 1200,
+      });
+    }
+
+    // The phone and person sizes the boards draw, as utilities.
+    const utilities: Record<string, string> = {
+      "text-section-phone": "Section title, phone",
+      "text-person": "Person name",
+      "text-person-phone": "Person name, phone",
+    };
+    await page.goto("/");
+    await inject(
+      page,
+      Object.keys(utilities)
+        .map((c) => `<p data-type="${c}" class="${c}">Type</p>`)
+        .join("")
+    );
+    for (const [utility, role] of Object.entries(utilities)) {
+      const row = TYPE_SCALE.find((r) => r[0] === role)!;
+      const [size, leading] = row[1].split("/").map(Number);
+      const got = await page.evaluate((c) => {
+        const s = getComputedStyle(
+          document.querySelector(`[data-type="${c}"]`)!
+        );
+        return {
+          size: parseFloat(s.fontSize),
+          leading: parseFloat(s.lineHeight),
+          tracking: s.letterSpacing,
+          fontSize: s.fontSize,
+        };
+      }, utility);
+      expect([got.size, got.leading], `${utility} size`).toEqual([
+        size,
+        leading,
+      ]);
+      expect(
+        trackingEm(got.tracking, got.fontSize),
+        `${utility} tracking`
+      ).toBeCloseTo(parseFloat(row[2]), 3);
     }
 
     const css = read(CSS);
@@ -873,6 +939,7 @@ test.describe("Range design system", () => {
       ...themedRows("Status colours").map((r) => r[0]),
       ...table(doc(), "Legacy aliases").map((r) => r.Alias),
     ];
+    expect(names).toContain("--error");
     const resolveIn = async (
       b: Browser,
       js: boolean,

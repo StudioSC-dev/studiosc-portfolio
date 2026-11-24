@@ -365,7 +365,8 @@ export function docGaps(markdown: string): string[] {
     }
   }
 
-  const layout = doc.sections.get("Layout") ?? "";
+  const flat = (text: string) => text.replace(/\s+/g, " ");
+  const layout = flat(doc.sections.get("Layout") ?? "");
   for (const fact of LAYOUT) {
     if (!layout.includes(fact)) gaps.push(`Layout: ${fact}`);
   }

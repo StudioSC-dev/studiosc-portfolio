@@ -16,7 +16,12 @@ export const ROOT_TOKENS: Record<string, readonly [Hex, Hex]> = {
   "--muted": ["#5E636B", "#A3A9B2"],
   "--rule": ["#D0D3D8", "#30343A"],
   "--accent": ["#1F4FD1", "#7FA2FF"],
+  // The contact boards' error colour, separate from the status --danger.
+  "--error": ["#B3261E", "#FF9B8F"],
 };
+
+/** The dot fields' opacity, [light, dark], from the boards' themes table. */
+export const DOTS_OPACITY = ["0.55", "0.7"] as const;
 
 /** Scope: the four status colours keep their light and dark values. */
 export const STATUS_TOKENS: Record<string, readonly [Hex, Hex]> = {
@@ -144,6 +149,8 @@ export const REQUIRED_PAIRINGS: ReadonlyArray<readonly [string, string]> = [
   ["--accent", "--gallery"],
   ["--accent", "--plate"],
   ["--accent", "--peek"],
+  ["--error", "--plate"],
+  ["--error", "--gallery"],
   ["--ink", "--gallery"],
   ["--ink", "--plate"],
   ["--ink", "--peek"],
@@ -192,6 +199,8 @@ export const BOARD_IDS = [
   "pages-post-work-desktop",
   "pages-post-life-desktop",
   "pages-404-desktop",
+  "pages-contact-desktop",
+  "pages-contact-phone",
 ] as const;
 
 /** Scope's component list; each needs its own entry with a board reference. */
@@ -234,6 +243,9 @@ export const TYPE_SCALE: ReadonlyArray<readonly [string, string, string]> = [
   ["Display (h1), desktop", "92/92", "-0.04em"],
   ["Display (h1), phone", "42/46", "-0.035em"],
   ["Section title", "32/40", "-0.015em"],
+  ["Section title, phone", "24/32", "0"],
+  ["Person name", "36/44", "-0.02em"],
+  ["Person name, phone", "28/36", "-0.02em"],
   ["Title", "20/28", "0"],
   ["Lead", "18/28", "0"],
   ["Body", "16/26", "0"],
@@ -263,7 +275,14 @@ export const SHAPE: ReadonlyArray<readonly [string, string]> = [
 ];
 
 /** §2 layout facts. */
-export const LAYOUT = ["75rem", "2.5rem", "1200px", "16px"] as const;
+export const LAYOUT = [
+  "content-box",
+  "box-content max-w-page px-gutter mx-auto",
+  "75rem",
+  "2.5rem",
+  "1280px",
+  "16px",
+] as const;
 
 /** Focus facts. */
 export const FOCUS = ["2px", "3px", "--focus"] as const;

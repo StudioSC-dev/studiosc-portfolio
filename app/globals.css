@@ -2,6 +2,13 @@
 @plugin "@tailwindcss/typography";
 
 /*
+  The page container, as the boards build it: 75rem of content in a content
+  box, plus 2.5rem gutters (1280px wide in all at desktop). Generated here so
+  the recipe exists before the first page uses it.
+*/
+@source inline("box-content max-w-page px-gutter px-gutter-phone mx-auto");
+
+/*
   StudioSC design tokens: Range.
 
   docs/design-system.md is the reference for every value here and quotes the
@@ -24,6 +31,7 @@
   --muted: #5e636b; /* secondary text */
   --rule: #d0d3d8; /* row rules, plate borders */
   --accent: #1f4fd1; /* headline word, dot fields, focus ring */
+  --error: #b3261e; /* form error summary, invalid fields and their messages */
   --dots-opacity: 0.55;
 
   /* Focus ring colour. Fragments and the turntable stage set their own. */
@@ -130,6 +138,7 @@
   --muted: #a3a9b2;
   --rule: #30343a;
   --accent: #7fa2ff;
+  --error: #ff9b8f;
   --dots-opacity: 0.7;
 
   --ok: #a3b18a;
@@ -150,6 +159,7 @@
     --muted: #a3a9b2;
     --rule: #30343a;
     --accent: #7fa2ff;
+    --error: #ff9b8f;
     --dots-opacity: 0.7;
 
     --ok: #a3b18a;
@@ -170,6 +180,7 @@
   --color-muted: var(--muted);
   --color-rule: var(--rule);
   --color-accent: var(--accent);
+  --color-error: var(--error);
 
   --color-ok: var(--ok);
   --color-warn: var(--warn);
@@ -225,6 +236,14 @@
   --text-section: 2rem;
   --text-section--line-height: 2.5rem;
   --text-section--letter-spacing: -0.015em;
+  --text-section-phone: 1.5rem;
+  --text-section-phone--line-height: 2rem;
+  --text-person: 2.25rem;
+  --text-person--line-height: 2.75rem;
+  --text-person--letter-spacing: -0.02em;
+  --text-person-phone: 1.75rem;
+  --text-person-phone--line-height: 2.25rem;
+  --text-person-phone--letter-spacing: -0.02em;
   --text-title: 1.25rem;
   --text-title--line-height: 1.75rem;
   --text-lead: 1.125rem;
