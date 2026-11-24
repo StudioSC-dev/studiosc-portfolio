@@ -15,6 +15,7 @@ import {
 
 import {
   addedIconSources,
+  allowsHeadingWeight,
   finalWithFragment,
   docGaps,
   expectedFontConfig,
@@ -592,6 +593,13 @@ test.describe("Range design system", () => {
       "Red Hat Text": "optional",
     });
     expect(stepped.weights["Red Hat Text"]).toContain("700");
+    // Control: by default only the board's Display weights pass (500 is not
+    // one); under step 2 any weight from 600 to 700 does.
+    const plain = expectedFontConfig([]);
+    expect(allowsHeadingWeight(plain, 500)).toBe(false);
+    expect(allowsHeadingWeight(plain, 600)).toBe(true);
+    expect(allowsHeadingWeight(stepped, 650)).toBe(true);
+    expect(allowsHeadingWeight(stepped, 500)).toBe(false);
 
     // The font declarations, read from lib/fonts.ts.
     const source = read(FONTS);
@@ -740,12 +748,10 @@ test.describe("Range design system", () => {
     for (const h of faces.headings) {
       expect(firstFamily(h.family), `${h.tag} family`).toBe(config.headingFace);
       const weight = Number(h.weight);
-      expect(weight, `${h.tag} weight`).toBeGreaterThanOrEqual(
-        config.headingWeights[0]
-      );
-      expect(weight, `${h.tag} weight`).toBeLessThanOrEqual(
-        config.headingWeights[1]
-      );
+      expect(
+        allowsHeadingWeight(config, weight),
+        `${h.tag} weight ${weight}`
+      ).toBe(true);
       expect(
         covers(config.headingFace, weight),
         `${config.headingFace} serves ${weight}`

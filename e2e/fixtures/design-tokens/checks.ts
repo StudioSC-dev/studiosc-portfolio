@@ -273,8 +273,13 @@ export type RedHat = "Red Hat Display" | "Red Hat Text";
 export interface FontConfig {
   /** The face headings compute to. */
   headingFace: RedHat;
-  /** Heading weights allowed, [min, max]. */
-  headingWeights: readonly [number, number];
+  /**
+   * Heading weights allowed: the board's listed weights for Red Hat Display,
+   * or any weight from 600 to 700 once step 2 moves headings to Red Hat Text.
+   */
+  headingWeights:
+    | { listed: readonly number[] }
+    | { range: readonly [number, number] };
   /** The `display` each Red Hat face must declare. */
   display: Record<RedHat, "swap" | "optional">;
   /** The weights step 1 may trim each Red Hat face to. */
@@ -299,13 +304,26 @@ export function expectedFontConfig(steps: readonly number[]): FontConfig {
   if (steps.includes(2)) textWeights.push("700");
   return {
     headingFace,
-    headingWeights: steps.includes(2) ? [600, 700] : [400, 700],
+    headingWeights: steps.includes(2)
+      ? { range: [600, 700] }
+      : { listed: BOARD_WEIGHTS["Red Hat Display"].map(Number) },
     display,
     weights: {
       "Red Hat Display": BOARD_WEIGHTS["Red Hat Display"],
       "Red Hat Text": textWeights,
     },
   };
+}
+
+/** Whether a computed heading weight is one the configuration allows. */
+export function allowsHeadingWeight(
+  config: FontConfig,
+  weight: number
+): boolean {
+  const allowed = config.headingWeights;
+  return "listed" in allowed
+    ? allowed.listed.includes(weight)
+    : weight >= allowed.range[0] && weight <= allowed.range[1];
 }
 
 export interface FontLoadLike {
