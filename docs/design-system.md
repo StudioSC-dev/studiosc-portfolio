@@ -220,7 +220,10 @@ pairings hold in both themes because the palettes do not change.
 Consolas, monospace`). The site sets JetBrains Mono there instead, as §2 of the
   plan decides, so code reads the same on every platform. The `font-mono`
   utility stays a system stack, so nothing outside `pre` and `code` fetches the
-  code face.
+  code face. It is the board's stack with "Liberation Mono" named before the
+  generic `monospace`, so Linux resolves one face for good: the bare generic
+  can resolve to one face and then, on a later layout, another, which re-wraps
+  the line.
 - Labels and headings are in sentence case. `.label`, `.subhead` and the old
   display class `.font-serif` (now the display face) compute to
   `text-transform: none`, and `.label` has no letter-spacing.

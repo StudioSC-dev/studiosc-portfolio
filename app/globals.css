@@ -201,8 +201,13 @@
   /* The old display class, now the display face. PRV-18 retires the name. */
   --font-serif:
     var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
-  /* A system stack: JetBrains Mono is loaded only for pre and code. */
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /*
+    A system stack: JetBrains Mono is loaded only for pre and code. Liberation
+    Mono names the Linux face, so the bare generic never picks a face that a
+    later layout swaps for another (and re-wraps the line).
+  */
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 /* Shape, shadow, layout and the type scale, from the boards. */
@@ -285,7 +290,8 @@ body {
   pre,
   code {
     font-family:
-      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+      "Liberation Mono", monospace;
     font-weight: 400;
   }
 }
