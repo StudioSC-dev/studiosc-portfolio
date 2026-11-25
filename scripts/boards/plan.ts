@@ -9,6 +9,7 @@ import {
   stateName,
   type BoardsDir,
   type Deviation,
+  type Later,
   type Row,
   type Sections,
   type Theme,
@@ -44,21 +45,19 @@ export function boardThemes(
   return out;
 }
 
-const subsets = <T>(items: T[]): T[][] =>
-  items
-    .reduce<T[][]>((acc, x) => [...acc, ...acc.map((s) => [...s, x])], [[]])
-    .slice(1);
-
-export const laterTickets = (rows: Row[]) =>
-  [
-    ...new Set(rows.flatMap((r) => (r.later ?? []).map((l) => l.ticket))),
-  ].sort();
+export interface Hide {
+  selector: string;
+  mode: "hide" | "remove";
+}
 
 export interface PlannedCapture {
   state: string;
   rm: boolean;
+  /** The later deviations whose elements are hidden (their ids). */
   pending: string[];
   key: string;
+  /** The board elements hidden for them, each scoped to its row. */
+  hide: Hide[];
 }
 
 /** The states of a row that its board draws at a width. */
@@ -68,45 +67,67 @@ export const rowStates = (sections: Sections, row: Row, width: Width) =>
     return !w || w.includes(width);
   });
 
-/** Every capture regen makes for one board in one theme. */
-export function plannedCaptures(
-  sections: Sections,
-  bt: BoardTheme
-): PlannedCapture[] {
-  const states = [
-    ...new Set(bt.rows.flatMap((r) => rowStates(sections, r, bt.width))),
-  ].sort();
-  const out: PlannedCapture[] = [];
-  const add = (state: string, rm: boolean, pending: string[]) =>
-    out.push({
-      state,
-      rm,
-      pending,
-      key: `${bt.theme}/${stateName(state, { rm, pending })}`,
-    });
-  for (const state of states)
-    for (const rm of [false, true]) add(state, rm, []);
-  const tickets = laterTickets(bt.rows);
-  if (tickets.length > 4)
-    throw new Error("more than four later tickets on one board");
-  const laterStates = [
-    ...new Set(
-      bt.rows
-        .filter((r) => r.later?.length)
-        .flatMap((r) => rowStates(sections, r, bt.width))
-    ),
-  ].sort();
-  for (const set of subsets(tickets))
-    for (const state of laterStates)
-      for (const rm of [false, true]) add(state, rm, set);
-  return out;
+/** The deviation that stands for a later entry: property `later`, built `absent`. */
+export const laterSelector = (hide: { selector: string }[]) =>
+  hide.map((h) => h.selector).join(", ");
+
+export interface Where {
+  state: string;
+  width: string;
+  theme: string;
 }
 
-/** The board elements hidden for a set of pending tickets, scoped to their rows. */
-export function hiddenFor(rows: Row[], pending: string[]) {
+/** A later deviation that names exactly this row's later entry, here. */
+const standsFor = (d: Deviation, row: Row, l: Later, where: Where) =>
+  d.property === "later" &&
+  d.section.includes(row.id) &&
+  d.state.includes(where.state) &&
+  d.width.includes(where.width) &&
+  d.theme.includes(where.theme) &&
+  d.board === laterSelector(l.hide) &&
+  d.built === "absent" &&
+  d.expires === l.ticket;
+
+/**
+ * The later deviations that apply to these rows here: each names one row's
+ * later entry exactly, and its ticket is not merged. Their ids, sorted.
+ */
+export function laterFor(
+  deviations: Deviation[],
+  merged: string[],
+  rows: Row[],
+  where: Where
+): string[] {
+  const out = new Set<string>();
+  for (const row of rows)
+    for (const l of row.later ?? []) {
+      if (merged.includes(l.ticket)) continue;
+      for (const d of deviations)
+        if (standsFor(d, row, l, where)) out.add(d.id);
+    }
+  return [...out].sort();
+}
+
+/**
+ * The board elements hidden for a set of later deviations: only the entries
+ * those deviations name, each scoped to its own row, so accepting one row's
+ * entry never hides another row's.
+ */
+export function hiddenFor(
+  deviations: Deviation[],
+  merged: string[],
+  rows: Row[],
+  where: Where,
+  ids: string[]
+): Hide[] {
+  const named = deviations.filter((d) => ids.includes(d.id));
   return rows.flatMap((row) =>
     (row.later ?? [])
-      .filter((l) => pending.includes(l.ticket))
+      .filter(
+        (l) =>
+          !merged.includes(l.ticket) &&
+          named.some((d) => standsFor(d, row, l, where))
+      )
       .flatMap((l) =>
         l.hide.map((h) => ({
           selector: `:is(${row.board}) :is(${h.selector})`,
@@ -116,41 +137,75 @@ export function hiddenFor(rows: Row[], pending: string[]) {
   );
 }
 
-/** The deviation that stands for a later entry: property `later`, built `absent`. */
-export const laterSelector = (hide: { selector: string }[]) =>
-  hide.map((h) => h.selector).join(", ");
+export interface Register {
+  deviations: Deviation[];
+  merged: string[];
+}
 
 /**
- * The tickets whose elements are still hidden for this state: a later entry
- * on a built row, its ticket not merged, and an accepted, unexpired
- * deviation that names it exactly.
+ * Every capture regen makes for one board in one theme: each state with
+ * motion on and reduced, and for each, the partial-build variants the
+ * register calls for: one hiding every later entry the register lists, and
+ * one hiding only the accepted ones (when they differ).
+ */
+export function plannedCaptures(
+  sections: Sections,
+  bt: BoardTheme,
+  register: Register
+): PlannedCapture[] {
+  const states = [
+    ...new Set(bt.rows.flatMap((r) => rowStates(sections, r, bt.width))),
+  ].sort();
+  const active = activeDeviations(register.deviations, register.merged);
+  const out: PlannedCapture[] = [];
+  for (const state of states)
+    for (const rm of [false, true]) {
+      const where = {
+        state: stateName(state, { rm }),
+        width: bt.width,
+        theme: bt.theme,
+      };
+      const sets = [
+        [],
+        laterFor(register.deviations, register.merged, bt.rows, where),
+        laterFor(active, register.merged, bt.rows, where),
+      ];
+      const seen = new Set<string>();
+      for (const pending of sets) {
+        const key = `${bt.theme}/${stateName(state, { rm, pending })}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          state,
+          rm,
+          pending,
+          key,
+          hide: hiddenFor(
+            register.deviations,
+            register.merged,
+            bt.rows,
+            where,
+            pending
+          ),
+        });
+      }
+    }
+  return out;
+}
+
+/**
+ * The later deviations in effect for a check: those an accepted, unexpired
+ * deviation names exactly, over every row the board draws here.
  */
 export function pendingFor(
   boards: BoardsDir,
   rows: Row[],
-  where: { state: string; width: string; theme: string }
+  where: Where
 ): string[] {
-  const active: Deviation[] = activeDeviations(
-    boards.deviations,
-    boards.merged
+  return laterFor(
+    activeDeviations(boards.deviations, boards.merged),
+    boards.merged,
+    rows,
+    where
   );
-  const out = new Set<string>();
-  for (const row of rows) {
-    for (const l of row.later ?? []) {
-      if (boards.merged.includes(l.ticket)) continue;
-      const ok = active.some(
-        (d) =>
-          d.property === "later" &&
-          d.section.includes(row.id) &&
-          d.state.includes(where.state) &&
-          d.width.includes(where.width) &&
-          d.theme.includes(where.theme) &&
-          d.board === laterSelector(l.hide) &&
-          d.built === "absent" &&
-          d.expires === l.ticket
-      );
-      if (ok) out.add(l.ticket);
-    }
-  }
-  return [...out].sort();
 }

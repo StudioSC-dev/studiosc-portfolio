@@ -2,9 +2,9 @@
  * Fidelity measurement, injected into every board and site page before its
  * own scripts run (Playwright addInitScript). It defines window.__fidelity:
  *
- * - a motion recorder: every CSS animation and transition that starts is
- *   noted with its name, duration, element and the direction its keyframes
- *   move in;
+ * - a motion recorder: every CSS animation and transition that starts, and
+ *   every Web Animations effect, is noted with its name, duration, element
+ *   and the direction it moves in as played (reversed playback included);
  * - settle(): ends every finite animation at its final state and parks
  *   endless ones at their start, so a capture never depends on timing;
  * - measure(): boxes, type, colour, copy, image frames and colour tokens of
@@ -16,6 +16,8 @@
   if (window.__fidelity) return;
 
   const records = [];
+  /** Every animation already noted, so a sweep never notes one twice. */
+  const seen = new WeakSet();
   let recording = true;
 
   const round = (n, d = 2) => {
@@ -87,26 +89,78 @@
       v.y > 0 ? "y+" : v.y < 0 ? "y-" : ""
     }`;
 
-  /** Where an animation moves its element, from its keyframes. */
+  /** A length in px: px, viewport units or a percentage of the viewport. */
+  const px = (value, unit) => {
+    const v = parseFloat(value);
+    const vw = innerWidth / 100;
+    const vh = innerHeight / 100;
+    switch (unit) {
+      case "vw":
+        return v * vw;
+      case "vh":
+        return v * vh;
+      case "vmax":
+        return v * Math.max(vw, vh);
+      case "vmin":
+        return v * Math.min(vw, vh);
+      case "%":
+        return ((v / 100) * Math.hypot(innerWidth, innerHeight)) / Math.SQRT2;
+      default:
+        return v;
+    }
+  };
+
+  /** A circle() clip: its radius in px and its centre, when given in px. */
+  const circle = (value) => {
+    const m =
+      /circle\(\s*(-?[\d.]+)(px|%|vw|vh|vmax|vmin)?(?:\s+at\s+(-?[\d.]+)px\s+(-?[\d.]+)px)?/.exec(
+        value || ""
+      );
+    if (!m) return null;
+    return {
+      r: px(m[1], m[2]),
+      at: m[3] === undefined ? null : [parseFloat(m[3]), parseFloat(m[4])],
+    };
+  };
+
+  /** The keyframes in the order the animation plays them. */
+  const played = (anim) => {
+    const frames = anim.effect.getKeyframes();
+    const t = anim.effect.getTiming ? anim.effect.getTiming() : {};
+    const backwards =
+      (t.direction === "reverse" || t.direction === "alternate-reverse") !==
+      anim.playbackRate < 0;
+    return backwards ? [...frames].reverse() : frames;
+  };
+
+  /** Where an animation moves its element, from its keyframes as played. */
   const direction = (frames) => {
     const parts = [];
-    const clip = frames.find((k) => k.clipPath && k.clipPath !== "none");
-    if (clip) {
-      const at = /at\s+(-?[\d.]+)px\s+(-?[\d.]+)px/.exec(clip.clipPath);
-      if (/circle\(/.test(clip.clipPath) && at) {
-        // The control under the circle's centre: the reveal grows from it.
-        const x = parseFloat(at[1]);
-        const y = parseFloat(at[2]);
-        const control = [
-          ...document.querySelectorAll("button, a[href], [role=button]"),
-        ].find((c) => {
-          const r = c.getBoundingClientRect();
-          return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-        });
+    const clips = frames.filter((k) => k.clipPath && k.clipPath !== "none");
+    if (clips.length) {
+      const a = circle(clips[0].clipPath);
+      const b = circle(clips[clips.length - 1].clipPath);
+      if (a && b) {
+        // A reveal grows from, or shrinks into, the control under its centre.
+        const verb = b.r > a.r ? "grow" : b.r < a.r ? "shrink" : "hold";
+        const at = (b.r >= a.r ? a : b).at;
+        const control = at
+          ? [
+              ...document.querySelectorAll("button, a[href], [role=button]"),
+            ].find((c) => {
+              const r = c.getBoundingClientRect();
+              return (
+                at[0] >= r.left &&
+                at[0] <= r.right &&
+                at[1] >= r.top &&
+                at[1] <= r.bottom
+              );
+            })
+          : null;
         parts.push(
           control
-            ? `grow@${control.tagName.toLowerCase()}[${(control.getAttribute("aria-label") || control.textContent || "").trim()}]`
-            : "grow@point"
+            ? `${verb}@${control.tagName.toLowerCase()}[${(control.getAttribute("aria-label") || control.textContent || "").trim()}]`
+            : `${verb}@point`
         );
       } else {
         parts.push("wipe");
@@ -135,6 +189,49 @@
     return parts.join(" ") || "none";
   };
 
+  /** Notes one animation, once. */
+  const record = (anim, el, pseudo, name) => {
+    if (!anim || !anim.effect || seen.has(anim)) return;
+    seen.add(anim);
+    if (!recording) return;
+    const timing = anim.effect.getComputedTiming();
+    records.push({
+      el,
+      pseudo,
+      name,
+      duration: round(Number(timing.duration) || 0, 1),
+      direction: direction(played(anim)),
+    });
+  };
+
+  const nameOf = (anim) =>
+    anim.animationName ||
+    (anim.transitionProperty
+      ? `transition:${anim.transitionProperty}`
+      : `animate:${anim.id || "effect"}`);
+
+  /** Animations no event announced (Web Animations, or a missed start). */
+  const sweep = () => {
+    for (const anim of document.getAnimations()) {
+      if (seen.has(anim) || anim.playState === "finished") continue;
+      const effect = anim.effect;
+      const pseudo = (effect && effect.pseudoElement) || "";
+      const el = (effect && effect.target) || document.documentElement;
+      record(anim, el, pseudo, nameOf(anim));
+    }
+  };
+
+  // Element.animate starts no CSS event: note it as it starts.
+  const animate = Element.prototype.animate;
+  Element.prototype.animate = function (...args) {
+    const anim = animate.apply(this, args);
+    const opts = args[1];
+    const pseudo =
+      (opts && typeof opts === "object" && opts.pseudoElement) || "";
+    record(anim, this, pseudo, nameOf(anim));
+    return anim;
+  };
+
   const note = (event) => {
     if (!recording) return;
     const name = event.animationName || event.propertyName;
@@ -146,17 +243,14 @@
           .filter((a) => a.effect && a.effect.pseudoElement === pseudo)
       : event.target.getAnimations();
     const anim = pool.find(
-      (a) => (a.animationName || a.transitionProperty) === name
+      (a) => !seen.has(a) && (a.animationName || a.transitionProperty) === name
     );
-    if (!anim || !anim.effect) return;
-    const timing = anim.effect.getComputedTiming();
-    records.push({
-      el: event.target,
+    record(
+      anim,
+      event.target,
       pseudo,
-      name: event.animationName ? name : `transition:${name}`,
-      duration: round(Number(timing.duration) || 0, 1),
-      direction: direction(anim.effect.getKeyframes()),
-    });
+      event.animationName ? name : `transition:${name}`
+    );
   };
   document.addEventListener("animationstart", note, true);
   document.addEventListener("transitionrun", note, true);
@@ -373,12 +467,11 @@
     return text.replace(/\s+/g, " ").trim();
   };
 
-  const tokensAt = (el) => {
+  /** The listed colour tokens an element defines (or inherits). */
+  const tokensAt = (el, names) => {
     const cs = getComputedStyle(el);
     const out = {};
-    for (let i = 0; i < cs.length; i++) {
-      const name = cs[i];
-      if (!name.startsWith("--")) continue;
+    for (const name of names) {
       const value = cs.getPropertyValue(name).trim();
       if (isColour(value)) out[name] = colour(value);
     }
@@ -396,6 +489,64 @@
     return out;
   };
 
+  const labelOf = (el) =>
+    (el.getAttribute("aria-label") || el.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80);
+
+  /** What a control can change in a row: pictures, slides, scroll, pressed. */
+  const showsOf = (els, excluded) => {
+    const inRow = (selector, skipChildRows) => {
+      const found = [];
+      for (const root of els) {
+        const list = root.matches(selector) ? [root] : [];
+        list.push(...root.querySelectorAll(selector));
+        for (const el of list) {
+          if (found.includes(el) || !visible(el)) continue;
+          if (skipChildRows && excluded.some((x) => x === el || x.contains(el)))
+            continue;
+          found.push(el);
+        }
+      }
+      return found;
+    };
+    const scrolling = [];
+    for (const root of els)
+      for (const el of [root, ...root.querySelectorAll("*")]) {
+        if (el.scrollWidth <= el.clientWidth + 1) continue;
+        const o = getComputedStyle(el).overflowX;
+        if (o === "auto" || o === "scroll") scrolling.push(el);
+      }
+    return {
+      photos: inRow("img", true).map((i) =>
+        (i.currentSrc || i.getAttribute("src") || "")
+          .split("?")[0]
+          .split("/")
+          .pop()
+      ),
+      // A row's slides count even when they are rows of their own.
+      slides: inRow('[aria-roledescription="slide"]', false).map(labelOf),
+      scroll: scrolling.map((el) => Math.round(el.scrollLeft)),
+      pressed: inRow(
+        '[aria-pressed="true"], [aria-selected="true"], [aria-checked="true"], [aria-current]:not([aria-current="false"])',
+        true
+      ).map(labelOf),
+    };
+  };
+
+  /** Scroll positions of the window and every scrolling element. */
+  const scrollState = () => {
+    const out = [scrollX, scrollY];
+    for (const el of document.querySelectorAll("*"))
+      if (
+        el.scrollWidth > el.clientWidth + 1 ||
+        el.scrollHeight > el.clientHeight + 1
+      )
+        out.push(el.scrollLeft, el.scrollTop);
+    return out.join(",");
+  };
+
   window.__fidelity = {
     /** Starts a fresh motion record. */
     motionStart() {
@@ -408,6 +559,7 @@
      * key element it ran on. `owner` takes motions outside every row.
      */
     motionTake(spec) {
+      sweep();
       const categories = Object.entries(spec.keys);
       const rows = spec.rows.map((row) => ({
         row,
@@ -472,6 +624,14 @@
           // An animation that cannot be finished is left as it is.
         }
       }
+      // A smooth scroll (a chip strip) is not an animation: wait for it.
+      let last = scrollState();
+      for (let same = 0, i = 0; same < 3 && i < 120; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        const now = scrollState();
+        same = now === last ? same + 1 : 0;
+        last = now;
+      }
       // Every picture decoded, so a shot never catches one half painted.
       await Promise.all(
         [...document.images].map((i) => i.decode().catch(() => {}))
@@ -531,23 +691,112 @@
             keyData(k, origin)
           ),
           order: 0,
+          shows: showsOf(els, excluded),
         };
-        all.push({ id: row.id, el: els[0] });
+        all.push({ id: row.id, x, y });
       }
-      all.sort((a, b) =>
-        a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING
-          ? -1
-          : 1
-      );
+      // Rendered order: top to bottom, and left to right on one line (tops
+      // within 4px), so a CSS reorder counts and DOM order does not.
+      all.sort((a, b) => (Math.abs(a.y - b.y) > 4 ? a.y - b.y : a.x - b.x));
       all.forEach((r, i) => {
         out.rows[r.id].order = i;
       });
-      // Tokens are read where the boards define them: the root.
-      const root = document.documentElement;
-      out.tokens = spec.tokenNames
-        ? tokenValues(root, spec.tokenNames)
-        : tokensAt(root);
+      // Tokens are read where the palette is defined: the board's wrapper,
+      // or the site's scope for the same tokens.
+      const scope = spec.tokens && document.querySelector(spec.tokens.scope);
+      out.tokens = !scope
+        ? {}
+        : spec.tokens.read
+          ? tokenValues(scope, spec.tokens.read)
+          : tokensAt(scope, spec.tokens.names);
       return out;
+    },
+
+    /**
+     * The files the page shows as pictures: each image's chosen source (its
+     * `<picture>` source for this width) and each CSS background image, as
+     * URLs. What the page renders, not what the browser happened to fetch.
+     */
+    photos() {
+      const out = new Set();
+      for (const img of document.images) {
+        const src = img.currentSrc || img.src;
+        if (src) out.add(src);
+      }
+      for (const el of document.querySelectorAll("*"))
+        for (const m of getComputedStyle(el).backgroundImage.matchAll(
+          /url\("?([^")]+)"?\)/g
+        ))
+          out.add(m[1]);
+      return [...out].sort();
+    },
+
+    /**
+     * The page's font faces: each @font-face rule with its family, weight,
+     * style, range and file, and the load status of the face it made; and
+     * the first family and weight of every visible text element in `rows`.
+     */
+    fonts(spec) {
+      const faces = [];
+      const ranges = (v) =>
+        (v || "U+0-10FFFF")
+          .split(",")
+          .map((r) => r.trim().replace(/^U\+/i, "").split("-"))
+          .map(([a, b]) => `${parseInt(a, 16)}-${parseInt(b || a, 16)}`)
+          .join(",");
+      const loaded = [...document.fonts];
+      for (const sheet of document.styleSheets) {
+        let rules;
+        try {
+          rules = sheet.cssRules;
+        } catch {
+          continue;
+        }
+        for (const rule of rules) {
+          if (!(rule instanceof CSSFontFaceRule)) continue;
+          const st = rule.style;
+          const fam = st
+            .getPropertyValue("font-family")
+            .trim()
+            .replace(/^["']|["']$/g, "");
+          const weight = st.getPropertyValue("font-weight").trim() || "400";
+          const style = st.getPropertyValue("font-style").trim() || "normal";
+          const range = ranges(st.getPropertyValue("unicode-range"));
+          const urls = [
+            ...st
+              .getPropertyValue("src")
+              .matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g),
+          ].map((m) => new URL(m[1], sheet.href || location.href).href);
+          const face = loaded.find(
+            (f) =>
+              f.family.replace(/^["']|["']$/g, "") === fam &&
+              f.weight === weight &&
+              f.style === style &&
+              ranges(f.unicodeRange) === range
+          );
+          faces.push({
+            family: fam,
+            weight,
+            style,
+            urls,
+            local: /local\(/.test(st.getPropertyValue("src")),
+            status: face ? face.status : "unknown",
+          });
+        }
+      }
+      const used = new Set();
+      for (const row of spec.rows)
+        for (const root of rowElements(row))
+          for (const el of [root, ...root.querySelectorAll(spec.text)]) {
+            if (!visible(el) || !el.textContent.trim()) continue;
+            const cs = getComputedStyle(el);
+            const first = cs.fontFamily
+              .split(",")[0]
+              .trim()
+              .replace(/^["']|["']$/g, "");
+            used.add(`${first}|${cs.fontWeight}|${cs.fontStyle}`);
+          }
+      return { faces, used: [...used].sort() };
     },
   };
 })();

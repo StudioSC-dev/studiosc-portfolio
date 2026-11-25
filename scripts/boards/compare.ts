@@ -126,11 +126,11 @@ function compareKey(
     push(`${k} background`, b.background, s.background);
   if (b.border !== s.border) push(`${k} border`, b.border, s.border);
   if (b.ratio !== undefined) {
-    // A frame's ratio may move only as far as its box tolerance allows.
+    // The frame's own shape, on its own: within a pixel's rounding of the
+    // board's ratio, however the box moves inside its tolerance.
     const [, , w, h] = b.box;
-    const lo = (w - TOLERANCE.key) / (h + TOLERANCE.key);
-    const hi = (w + TOLERANCE.key) / Math.max(1, h - TOLERANCE.key);
-    if (s.ratio === undefined || s.ratio < lo - EPS || s.ratio > hi + EPS)
+    const allow = b.ratio / Math.max(1, Math.min(w, h));
+    if (s.ratio === undefined || !within(b.ratio, s.ratio, allow))
       push(`${k} aspect ratio`, b.ratio, s.ratio ?? "none");
     if (b.radius !== s.radius) push(`${k} radius`, b.radius, s.radius);
   }
@@ -328,18 +328,22 @@ export function compareMotion(
   return out;
 }
 
-/** Under reduced motion no animation may run at all. */
+/**
+ * Under reduced motion no animation may run at all, from load through every
+ * step: each one is named on its own row, or on `owner` when it ran outside
+ * every built row.
+ */
 export function compareReducedMotion(
-  section: string,
+  owner: string,
   where: Where,
   site: Motion[]
 ): Failure[] {
   return site.map((m) => ({
-    section,
+    section: m.row ?? owner,
     ...where,
     property: "reduced motion",
     expected: "no animation",
-    actual: `${m.name} on ${m.key}`,
+    actual: `${m.name} on ${m.row ? m.key : "the page"}`,
   }));
 }
 
@@ -347,11 +351,69 @@ export function compareReducedMotion(
 export const rowMotion = (motion: Motion[], row: Row) =>
   motion.filter((m) => m.row === row.id || (row.pageMotion && m.row === null));
 
-/** A row's measurement as a change signature (picture and pressed state included). */
-export const signature = (r: RowMeasure | null | undefined) =>
-  r
-    ? JSON.stringify([
-        r.copy,
-        r.keys.map((k) => [k.key, k.box, k.src, k.aria, k.color]),
-      ])
-    : "none";
+const list = (v: (string | number)[]) =>
+  v.length ? v.map(String).join(", ") : "nothing";
+const quote = (s: string) =>
+  JSON.stringify(s.length > 60 ? `${s.slice(0, 57)}...` : s);
+
+/**
+ * A control's visible result, against the state it starts from: whatever
+ * its step changes on the board (the copy, the picture in view, the slide in
+ * view, a strip's scroll and its direction, the pressed control) must change
+ * on the site too, and a strip must scroll the same way.
+ */
+export function compareControl(
+  section: string,
+  where: Where,
+  control: string,
+  board: [RowMeasure | null | undefined, RowMeasure | null | undefined],
+  site: [RowMeasure | null | undefined, RowMeasure | null | undefined]
+): Failure[] {
+  const out: Failure[] = [];
+  const [b0, b1] = board;
+  const [s0, s1] = site;
+  if (!b0 || !b1) return out;
+  const push = (property: string, expected: string, actual: string) =>
+    out.push({ section, ...where, property, expected, actual });
+  if (!s0 || !s1) {
+    push("control", `${control} changes the section`, "the section is missing");
+    return out;
+  }
+  if (b0.copy !== b1.copy && s0.copy === s1.copy)
+    push(
+      "control copy",
+      `${control} changes the text`,
+      `the text stays ${quote(s1.copy)}`
+    );
+  const aspects = [
+    ["photos", "photo", "shows another photo"],
+    ["slides", "plate", "shows another plate"],
+    ["pressed", "pressed", "presses another control"],
+  ] as const;
+  for (const [key, name, does] of aspects) {
+    const before = b0.shows[key];
+    const after = b1.shows[key];
+    if (before.join("|") === after.join("|")) continue;
+    if (s0.shows[key].join("|") === s1.shows[key].join("|"))
+      push(
+        `control ${name}`,
+        `${control} ${does} (board: ${list(before)} to ${list(after)})`,
+        `it stays ${list(s1.shows[key])}`
+      );
+  }
+  const moved = (a: number[], b: number[]) =>
+    Math.sign(b.reduce((t, v) => t + v, 0) - a.reduce((t, v) => t + v, 0));
+  const way = moved(b0.shows.scroll, b1.shows.scroll);
+  if (way) {
+    const siteWay = moved(s0.shows.scroll, s1.shows.scroll);
+    const say = (n: number) =>
+      n > 0 ? "scrolls forward" : n < 0 ? "scrolls back" : "does not scroll";
+    if (siteWay !== way)
+      push(
+        "control scroll",
+        `${control} ${say(way)} (board: ${list(b0.shows.scroll)} to ${list(b1.shows.scroll)})`,
+        `it ${say(siteWay)} (${list(s0.shows.scroll)} to ${list(s1.shows.scroll)})`
+      );
+  }
+  return out;
+}

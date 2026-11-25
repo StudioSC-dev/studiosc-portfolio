@@ -42,6 +42,12 @@ export interface StateDef {
   ticket?: string;
   /** The widths whose boards draw the control; all when absent. */
   widths?: Width[];
+  /**
+   * The state this one's last step starts from ("default" when absent): a
+   * control's result is checked against it, so a back action must undo the
+   * step before it.
+   */
+  from?: string;
 }
 
 /** Where a row's reference comes from at one width and theme. */
@@ -83,6 +89,21 @@ export interface Row {
   keys?: Record<string, { board: string; site: string }>;
   /** The row also owns motion outside every row (the theme reveal). */
   pageMotion?: boolean;
+  /**
+   * The evidence for an undrawn width: the board at that width that was
+   * rendered and does not draw the row. Regen measures the row there.
+   */
+  undrawn?: Partial<Record<Width, string>>;
+}
+
+/** Where the colour tokens are read: the board's wrapper and the site's scope. */
+export interface TokenScope {
+  /** The board element that defines the palette (the runtime's page wrapper). */
+  board: string;
+  /** The site element whose tokens stand for it (PRV-2: `:root`). */
+  site: string;
+  /** The tokens compared; a board that does not define one leaves it out. */
+  names: string[];
 }
 
 export interface Sections {
@@ -95,6 +116,7 @@ export interface Sections {
   /** Key-element categories, in priority order. */
   keys: Record<string, string>;
   states: Record<string, StateDef>;
+  tokens: TokenScope;
   rows: Row[];
 }
 
@@ -135,12 +157,28 @@ export interface KeyMeasure {
   };
 }
 
+/** What a control can change in a row, for the controls check. */
+export interface RowShows {
+  /** The pictures in view (file names). */
+  photos: string[];
+  /** The slides in view (their labels). */
+  slides: string[];
+  /** The horizontal scroll position of each scrolling strip. */
+  scroll: number[];
+  /** The pressed, selected or current controls (their labels). */
+  pressed: string[];
+}
+
 export interface RowMeasure {
   box: [number, number, number, number];
   copy: string;
   keys: KeyMeasure[];
+  /** The row's place in rendered order (top, then left) among the rows measured. */
   order: number;
+  shows: RowShows;
   shot?: string;
+  /** The sha256 of the shot file, so a replaced shot is caught. */
+  shotSha?: string;
 }
 
 export interface Motion {
@@ -162,6 +200,7 @@ export interface BoardRef {
   board: string;
   runtime: string;
   fonts: Record<string, string>;
+  /** The photos this board loaded while rendering, with their sha256s. */
   images: Record<string, string>;
   width: Width;
   captures: Record<string, Capture>;
@@ -377,8 +416,11 @@ export function parseDeviations(markdown: string): Deviation[] {
       return cells[i] ?? "";
     };
     const expires = unquote(get("expires"));
+    const id = unquote(get("id"));
+    if (out.some((d) => d.id === id))
+      throw new Error(`deviations.md: duplicate id ${id}`);
     out.push({
-      id: unquote(get("id")),
+      id,
       section: list(unquote(get("section"))),
       state: list(unquote(get("state"))),
       width: list(unquote(get("width"))),
@@ -394,9 +436,21 @@ export function parseDeviations(markdown: string): Deviation[] {
   return out;
 }
 
-/** An owner's acceptance names the owner and a date. */
-export const isAccepted = (d: Deviation) =>
-  /\bowner\b.*\b\d{4}-\d{2}-\d{2}\b/i.test(d.accepted);
+/**
+ * An owner's acceptance reads exactly `owner, YYYY-MM-DD`, a real date:
+ * anything else (a rejection, a question, a note naming the owner) is not one.
+ */
+export function isAccepted(d: Deviation): boolean {
+  const m = /^owner, (\d{4})-(\d{2})-(\d{2})$/.exec(d.accepted.trim());
+  if (!m) return false;
+  const [y, mo, day] = m.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, day));
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() === mo - 1 &&
+    date.getUTCDate() === day
+  );
+}
 
 /** The deviations that suppress mismatches today. */
 export const activeDeviations = (all: Deviation[], merged: string[]) =>
@@ -513,20 +567,41 @@ export function pinProblems(dir: string, expected?: string[]): string[] {
       problems.push(
         `spec.json: ${board} references were made from other font sha256s`
       );
-    const imagePins = Object.fromEntries(
-      Object.entries(manifest.images).map(([f, p]) => [f, p.sha256])
-    );
-    if (stableJson(ref.images) !== stableJson(imagePins))
-      problems.push(
-        `spec.json: ${board} references were made from other image sha256s`
-      );
+    // Only the photos this board loads: another photo's change leaves it be.
+    for (const [f, sha] of Object.entries(ref.images)) {
+      const want = manifest.images[f]?.sha256;
+      if (!want)
+        problems.push(
+          `spec.json: ${board} references were made from photo ${f}, which is not pinned`
+        );
+      else if (sha !== want)
+        problems.push(
+          `spec.json: ${board} references were made from other image sha256s (${f})`
+        );
+    }
+    const shots = new Map<string, string>();
     for (const capture of Object.values(ref.captures)) {
       for (const row of Object.values(capture.rows)) {
         if (!row?.shot) continue;
         referenced.add(row.shot);
-        if (!existsSync(path.join(dir, row.shot)))
-          problems.push(`${row.shot}: referenced by spec.json but missing`);
+        if (!row.shotSha) {
+          problems.push(`${row.shot}: spec.json records no sha256 for it`);
+          continue;
+        }
+        shots.set(row.shot, row.shotSha);
       }
+    }
+    for (const [shot, want] of shots) {
+      const p = path.join(dir, shot);
+      if (!existsSync(p)) {
+        problems.push(`${shot}: referenced by spec.json but missing`);
+        continue;
+      }
+      const got = sha256(readFileSync(p));
+      if (got !== want)
+        problems.push(
+          `${shot}: sha256 ${got} differs from the ${want} spec.json recorded`
+        );
     }
   }
   for (const board of Object.keys(manifest.boards))
@@ -586,7 +661,29 @@ export function checkSections(boards: BoardsDir): SectionCheck {
       }
       const src = row.sources[width];
       if (src === null) {
-        undrawn.push(`${row.id} at ${width}`);
+        // Skipped only on evidence: a board at this width, rendered, that
+        // does not draw the row.
+        const board = row.undrawn?.[width];
+        const capture = board
+          ? spec.boards[board]?.captures[captureKey("light", "default")]
+          : undefined;
+        if (!board)
+          problems.push(
+            `${at}: ${width} is marked undrawn but names no board that leaves it out`
+          );
+        else if (manifest.boards[board]?.width !== width)
+          problems.push(
+            `${at}: ${board}, the undrawn evidence at ${width}, is not a pinned ${width} board`
+          );
+        else if (!capture || !(row.id in capture.rows))
+          problems.push(
+            `${at}: ${board} light/default never measured this row; run boards:regen`
+          );
+        else if (capture.rows[row.id])
+          problems.push(
+            `${at}: ${board} draws this row at ${width}, so it cannot be skipped`
+          );
+        else undrawn.push(`${row.id} at ${width}`);
         continue;
       }
       for (const theme of THEMES) {
@@ -629,5 +726,40 @@ export function checkSections(boards: BoardsDir): SectionCheck {
       }
     }
   }
+  problems.push(...paletteProblems(boards));
   return { problems, undrawn };
+}
+
+/**
+ * Every board's default state carries the palette read at its wrapper, and
+ * a section drawn in both themes has a light palette and a dark one that
+ * differ: an empty or unchanging palette means the tokens were read in the
+ * wrong place, and the token checks would compare nothing.
+ */
+function paletteProblems(boards: BoardsDir): string[] {
+  const { sections, spec } = boards;
+  const problems = new Set<string>();
+  const tokens = (board: string, theme: Theme) =>
+    spec.boards[board]?.captures[captureKey(theme, "default")]?.tokens;
+  for (const [board, ref] of Object.entries(spec.boards))
+    for (const theme of THEMES) {
+      const t = ref.captures[captureKey(theme, "default")]?.tokens;
+      if (t && !Object.keys(t).length)
+        problems.add(
+          `spec.json: ${board} ${theme}/default has no colour tokens at ${sections.tokens.board}`
+        );
+    }
+  for (const row of sections.rows)
+    for (const width of WIDTHS) {
+      const src = row.sources?.[width];
+      if (!src?.light?.board || !src.dark?.board) continue;
+      const light = tokens(src.light.board, "light");
+      const dark = tokens(src.dark.board, "dark");
+      if (!light || !dark || !Object.keys(light).length) continue;
+      if (stableJson(light) === stableJson(dark))
+        problems.add(
+          `spec.json: ${src.light.board} light and ${src.dark.board} dark have the same palette`
+        );
+    }
+  return [...problems];
 }

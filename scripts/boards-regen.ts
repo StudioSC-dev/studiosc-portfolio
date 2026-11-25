@@ -3,16 +3,18 @@
  *
  * The only way to change docs/boards/ref/ and spec.json. It renders each
  * board with the pinned canvas runtime and fonts, measures every row in
- * every reference state and shoots it as a lossy WebP (none for reduced
- * motion or a state held in flight: the verifier compares settled states).
+ * every reference state (reduced motion and states held in flight
+ * included) and shoots it as a lossy WebP (owner, 2026-11-25), recording
+ * each shot's sha256 and the photos each board loads.
  *
  * The runtime (`support.js`) is never committed. Regen reads it from the
  * gitignored cache (BOARDS_CACHE, default .cache/boards/) and, when the
- * cache is empty, fetches it from BOARDS_RUNTIME_URL or the manifest's
- * runtime.url into the cache. Either way its sha256 must equal the
- * manifest's before anything renders; every pinned board, font and photo is
- * checked the same way. On any mismatch regen exits non-zero, names the
- * sha256 and writes nothing.
+ * cache is empty, fetches it into the cache from BOARDS_RUNTIME_URL, or
+ * else from the manifest's runtime.url resolved against
+ * BOARDS_RUNTIME_BASE (the canvas origin, which no tracked file names).
+ * Either way its sha256 must equal the manifest's before anything renders;
+ * every pinned board, font and photo is checked the same way. On any
+ * mismatch regen exits non-zero, names the sha256 and writes nothing.
  *
  * With --board, only those boards are re-rendered: every other board's
  * references and spec.json entries stay byte for byte as they were.
@@ -28,7 +30,9 @@ import path from "node:path";
 import { chromium } from "@playwright/test";
 import {
   boardContext,
+  boardPhotos,
   BOARD_ORIGIN,
+  RASTER_ARGS,
   captureState,
   load,
   rowQueries,
@@ -37,6 +41,7 @@ import {
 } from "./boards/capture";
 import {
   packSpec,
+  parseDeviations,
   readJson,
   readSpec,
   refPath,
@@ -46,7 +51,7 @@ import {
   type Sections,
   type SpecFile,
 } from "./boards/model";
-import { boardThemes, hiddenFor, plannedCaptures } from "./boards/plan";
+import { boardThemes, plannedCaptures } from "./boards/plan";
 
 export class RegenError extends Error {}
 
@@ -68,11 +73,30 @@ export function inputProblems(dir: string, manifest: Manifest): string[] {
   return problems;
 }
 
+/**
+ * Where the runtime is fetched from: BOARDS_RUNTIME_URL as given, or the
+ * manifest's runtime.url (absolute, or relative to BOARDS_RUNTIME_BASE).
+ */
+export function runtimeSource(
+  manifest: Manifest,
+  url: string | undefined,
+  base: string | undefined
+): string | null {
+  if (url) return url;
+  const rel = manifest.runtime.url;
+  if (!rel) return null;
+  if (/^[a-z]+:\/\//i.test(rel)) return rel;
+  return base
+    ? new URL(rel, base.endsWith("/") ? base : `${base}/`).href
+    : null;
+}
+
 /** The runtime from the cache, or fetched into it; never unchecked. */
 export async function runtimeBytes(
   manifest: Manifest,
   cache: string,
-  url: string | undefined
+  url: string | undefined,
+  base?: string
 ): Promise<Buffer> {
   const cached = path.join(cache, "support.js");
   const want = manifest.runtime.sha256;
@@ -85,10 +109,12 @@ export async function runtimeBytes(
       );
     return bytes;
   }
-  const from = url || manifest.runtime.url;
+  const from = runtimeSource(manifest, url, base);
   if (!from)
     throw new RegenError(
-      `no runtime: put the canvas runtime at ${cached} or set BOARDS_RUNTIME_URL (${manifest.runtime.source})`
+      manifest.runtime.url
+        ? `no runtime: set BOARDS_RUNTIME_BASE to the canvas origin that serves ${manifest.runtime.url}, or put the runtime at ${cached} (${manifest.runtime.source})`
+        : `no runtime: put the canvas runtime at ${cached} or set BOARDS_RUNTIME_URL (${manifest.runtime.source})`
     );
   const res = await fetch(from);
   if (!res.ok)
@@ -109,6 +135,7 @@ interface Options {
   boards: string[];
   cache: string;
   runtimeUrl?: string;
+  runtimeBase?: string;
   log?: (line: string) => void;
 }
 
@@ -117,6 +144,12 @@ export async function regen(opts: Options): Promise<void> {
   const dir = path.resolve(opts.dir);
   const manifest = readJson<Manifest>(path.join(dir, "manifest.json"));
   const sections = readJson<Sections>(path.join(dir, "sections.json"));
+  const register = {
+    deviations: parseDeviations(
+      readFileSync(path.join(dir, "deviations.md"), "utf8")
+    ),
+    merged: readJson<string[]>(path.join(dir, "merged.json")),
+  };
   const specFile = path.join(dir, "spec.json");
   const previous: SpecFile = existsSync(specFile)
     ? readSpec(specFile)
@@ -126,7 +159,12 @@ export async function regen(opts: Options): Promise<void> {
   if (problems.length) throw new RegenError(problems.join("\n"));
   const unknown = opts.boards.filter((b) => !(b in manifest.boards));
   if (unknown.length) throw new RegenError(`not pinned: ${unknown.join(", ")}`);
-  const runtime = await runtimeBytes(manifest, opts.cache, opts.runtimeUrl);
+  const runtime = await runtimeBytes(
+    manifest,
+    opts.cache,
+    opts.runtimeUrl,
+    opts.runtimeBase
+  );
 
   const todo = opts.boards.length
     ? opts.boards
@@ -134,28 +172,34 @@ export async function regen(opts: Options): Promise<void> {
   const fonts = Object.fromEntries(
     Object.entries(manifest.fonts).map(([f, p]) => [f, p.sha256])
   );
-  const images = Object.fromEntries(
-    Object.entries(manifest.images).map(([f, p]) => [f, p.sha256])
-  );
   const files = new Map<string, Buffer>();
   const seen = new Map<string, string>();
   const made: Record<string, BoardRef> = {};
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: RASTER_ARGS });
   try {
     for (const board of todo) {
       const pin = manifest.boards[board];
+      const photos = new Set<string>();
       const ref: BoardRef = {
         board: pin.sha256,
         runtime: manifest.runtime.sha256,
         fonts,
-        images,
+        images: {},
         width: pin.width,
         captures: {},
       };
+      // Rows this board is the undrawn evidence for: measured, never drawn.
+      const evidence = sections.rows.filter(
+        (r) => r.undrawn?.[pin.width] === board
+      );
       for (const bt of boardThemes(sections, board, pin.width)) {
-        const queries = rowQueries(bt.rows, sections.rows, "board");
-        for (const plan of plannedCaptures(sections, bt)) {
+        const queries = rowQueries(
+          [...bt.rows, ...evidence.filter((r) => !bt.rows.includes(r))],
+          sections.rows,
+          "board"
+        );
+        for (const plan of plannedCaptures(sections, bt, register)) {
           const refused: string[] = [];
           const ctx = await boardContext(
             browser,
@@ -180,8 +224,10 @@ export async function regen(opts: Options): Promise<void> {
               queries,
               { state: plan.state, theme: bt.theme, toggle: bt.toggle },
               "board",
-              { hide: hiddenFor(bt.rows, plan.pending) }
+              { hide: plan.hide, allMotion: plan.rm }
             );
+            for (const f of await boardPhotos(page))
+              if (f in manifest.images) photos.add(f);
             if (errors.length)
               throw new RegenError(`${board}: ${errors.join("; ")}`);
             if (refused.length)
@@ -189,14 +235,14 @@ export async function regen(opts: Options): Promise<void> {
                 `${board}: requested an unpinned file: ${refused.join(", ")}`
               );
             const stateLabel = plan.key.slice(bt.theme.length + 1);
-            const shots = !plan.rm && !sections.states[plan.state]?.inFlight;
             for (const [id, row] of Object.entries(capture.rows)) {
-              if (!row || !shots) continue;
+              if (!row) continue;
               const png = await shoot(page, row.box);
               const webp = await toWebp(page, png);
               // A shot identical to one already made for this board (another
               // state, or reduced motion) is kept once.
-              const hash = `${board}|${sha256(webp)}`;
+              const digest = sha256(webp);
+              const hash = `${board}|${digest}`;
               let rel = seen.get(hash);
               if (!rel) {
                 rel = refPath(board, id, stateLabel, pin.width, bt.theme);
@@ -204,6 +250,7 @@ export async function regen(opts: Options): Promise<void> {
                 seen.set(hash, rel);
               }
               row.shot = rel;
+              row.shotSha = digest;
             }
             ref.captures[plan.key] = capture;
             log(`${board} ${plan.key}`);
@@ -212,6 +259,9 @@ export async function regen(opts: Options): Promise<void> {
           }
         }
       }
+      ref.images = Object.fromEntries(
+        [...photos].sort().map((f) => [f, manifest.images[f].sha256])
+      );
       made[board] = ref;
     }
   } finally {
@@ -243,6 +293,7 @@ function parseArgs(argv: string[]): Options {
     boards: [],
     cache: process.env.BOARDS_CACHE || ".cache/boards",
     runtimeUrl: process.env.BOARDS_RUNTIME_URL || undefined,
+    runtimeBase: process.env.BOARDS_RUNTIME_BASE || undefined,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];

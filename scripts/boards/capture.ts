@@ -148,17 +148,30 @@ export async function boardContext(
   return ctx;
 }
 
-/** A site context: same-origin requests only, so images stay local. */
+const FONT_FILE = /\.(woff2?|ttf|otf)$/i;
+
+/**
+ * A site context: same-origin requests only, so images stay local. Each
+ * font file the site loads is noted with its sha256 in `fonts`, so its faces
+ * can be bound to the pinned files.
+ */
 export async function siteContext(
   browser: Browser,
   sections: Sections,
   baseURL: string,
-  opts: ContextOptions
+  opts: ContextOptions,
+  fonts: Map<string, string> = new Map()
 ): Promise<BrowserContext> {
   const ctx = await newContext(browser, sections, opts, { baseURL });
   const origin = new URL(baseURL).origin;
   await ctx.route("**/*", async (route) => {
     const url = new URL(route.request().url());
+    if (url.origin === origin && FONT_FILE.test(url.pathname)) {
+      const response = await route.fetch();
+      const body = await response.body();
+      if (response.ok()) fonts.set(url.href, sha256(body));
+      return route.fulfill({ response, body });
+    }
     if (
       url.origin === origin ||
       url.protocol === "data:" ||
@@ -169,6 +182,48 @@ export async function siteContext(
   });
   return ctx;
 }
+
+/** The pinned photos a board page shows (`img/<file>`), by file name. */
+export async function boardPhotos(page: Page): Promise<string[]> {
+  const urls = (await page.evaluate(() =>
+    (
+      window as unknown as { __fidelity: { photos(): string[] } }
+    ).__fidelity.photos()
+  )) as string[];
+  const prefix = `${BOARD_ORIGIN}/img/`;
+  return urls
+    .filter((u) => u.startsWith(prefix))
+    .map((u) => decodeURIComponent(u.slice(prefix.length)));
+}
+
+export interface FontFaceReport {
+  family: string;
+  weight: string;
+  style: string;
+  urls: string[];
+  local: boolean;
+  status: string;
+}
+
+/** The page's @font-face rules and load status, and the faces its rows use. */
+export const fontsReport = (page: Page, rows: RowQuery[], sections: Sections) =>
+  page.evaluate(
+    (spec) =>
+      (
+        window as unknown as {
+          __fidelity: { fonts(s: unknown): unknown };
+        }
+      ).__fidelity.fonts(spec),
+    {
+      rows,
+      text:
+        sections.keys.text +
+        ", " +
+        sections.keys.heading +
+        ", " +
+        sections.keys.control,
+    }
+  ) as Promise<{ faces: FontFaceReport[]; used: string[] }>;
 
 const locate = (page: Page, t: Target) =>
   page
@@ -283,19 +338,27 @@ export async function captureState(
   side: "board" | "site",
   opts: {
     hide?: { selector: string; mode?: "hide" | "remove" }[];
-    /** The site reads the board's token names. */
+    /** The site reads the board's token names at its own scope. */
     tokenNames?: string[];
+    /**
+     * Reduced motion: the capture's motion is everything that ran from load
+     * on (the load, the theme toggle and the state's steps), not only the
+     * state's own.
+     */
+    allMotion?: boolean;
   } = {}
 ): Promise<Capture> {
   const loadMotion = await takeMotion(page, rows, sections);
+  const everything = [...loadMotion];
   await fid(page).settle();
   const other: Theme = req.theme === "light" ? "dark" : "light";
   if (req.toggle) {
     await runSteps(page, sections.theme[other]);
     await page.waitForTimeout(40);
+    everything.push(...(await takeMotion(page, rows, sections)));
     await fid(page).settle();
     await page.waitForTimeout(40);
-    await takeMotion(page, rows, sections);
+    everything.push(...(await takeMotion(page, rows, sections)));
   }
   if (opts.hide?.length) {
     await fid(page).hide(opts.hide);
@@ -310,6 +373,7 @@ export async function captureState(
       def?.toggleTheme ? sections.theme[req.theme] : stepsFor(def, side)
     );
     motion = await takeMotion(page, rows, sections);
+    everything.push(...motion);
   }
   if (def?.inFlight) await fid(page).holdHalfway();
   else {
@@ -317,21 +381,81 @@ export async function captureState(
     await page.waitForTimeout(40);
     await fid(page).settle();
   }
+  const tokens =
+    side === "board"
+      ? { scope: sections.tokens.board, names: sections.tokens.names }
+      : { scope: sections.tokens.site, read: opts.tokenNames ?? [] };
   const measured = (await page.evaluate(
     (spec) => (window as unknown as Fid).__fidelity.measure(spec),
-    { rows, keys: sections.keys, tokenNames: opts.tokenNames }
+    { rows, keys: sections.keys, tokens }
   )) as Capture;
-  return { tokens: measured.tokens, rows: measured.rows, motion };
+  if (opts.allMotion)
+    everything.push(...(await takeMotion(page, rows, sections)));
+  return {
+    tokens: measured.tokens,
+    rows: measured.rows,
+    motion: opts.allMotion ? sortMotion(everything) : motion,
+  };
 }
 
+const sortMotion = (m: Motion[]) =>
+  [...m].sort((a, b) =>
+    `${a.row}|${a.name}|${a.key}|${a.direction}|${a.duration}`.localeCompare(
+      `${b.row}|${b.name}|${b.key}|${b.direction}|${b.duration}`
+    )
+  );
+
 /**
- * A shot of a page region, as PNG bytes: taken until two in a row agree, so
- * a late paint (a picture still decoding, a frame still rasterising) never
- * ends up in a reference. Some boards' full-page captures flip between two
- * rasterisations of the same frame (a dither pattern behind a control, a
- * pixel either way); then the one with the lower sha256 is kept, so the
- * choice never depends on which came first.
+ * Chromium flags for board renders: rasterise on one thread, in software,
+ * whole tiles at a time. Without them a region's captures can wobble between
+ * several renderings a level or two apart (a scroller or a plate's rounded
+ * edge), so the same board would give different reference bytes run to run.
  */
+export const RASTER_ARGS = [
+  "--disable-gpu-rasterization",
+  "--num-raster-threads=1",
+  "--disable-partial-raster",
+];
+
+/**
+ * Picks a shot from repeated captures of one region, the same way whatever
+ * order they come in. The first captures of a region can differ from the
+ * rest (the compositor re-rasterises after the first full-page capture), so
+ * those are dropped: the region is steady once `settle` captures in a row
+ * agree, and `window` more are taken after that. Some boards' captures flip
+ * between two rasterisations of the same frame for good (a dither behind a
+ * control): when the steady captures hold two renderings, or never settle
+ * but alternate between two, the one with the lowest sha256 is kept, so the
+ * phase a run starts in never changes the bytes. Three renderings fail.
+ */
+export async function pickShot(
+  take: () => Promise<Buffer>,
+  settle = 3,
+  window = 3,
+  limit = 16
+): Promise<Buffer> {
+  const shots: Buffer[] = [];
+  let steady: Buffer | null = null;
+  while (shots.length < limit && !steady) {
+    shots.push(await take());
+    const run = shots.slice(-settle);
+    if (run.length === settle && run.every((b) => b.equals(run[0])))
+      steady = run[0];
+  }
+  const seen = new Map<string, Buffer>();
+  if (steady) {
+    seen.set(sha256(steady), steady);
+    for (let i = 0; i < window; i++) {
+      const next = await take();
+      seen.set(sha256(next), next);
+    }
+  } else for (const b of shots.slice(-2 * settle)) seen.set(sha256(b), b);
+  if (seen.size > 2)
+    throw new Error(`${seen.size} different renderings of one frame`);
+  return seen.get([...seen.keys()].sort()[0])!;
+}
+
+/** A shot of a page region, as PNG bytes. */
 export async function shoot(
   page: Page,
   box: [number, number, number, number]
@@ -351,22 +475,13 @@ export async function shoot(
         height: Math.max(1, Math.ceil(y + h) - fy),
       },
     });
-  const shots = [await take()];
-  for (let i = 0; i < 5; i++) {
-    const next = await take();
-    if (next.equals(shots[shots.length - 1])) return next;
-    shots.push(next);
+  try {
+    return await pickShot(take);
+  } catch (e) {
+    throw new Error(
+      `the region at ${box.join(", ")}: ${e instanceof Error ? e.message : e}`
+    );
   }
-  const distinct = new Map<string, { shot: Buffer; seen: number }>();
-  for (const shot of shots) {
-    const key = sha256(shot);
-    const d = distinct.get(key) ?? { shot, seen: 0 };
-    d.seen++;
-    distinct.set(key, d);
-  }
-  if (distinct.size === 2 && [...distinct.values()].every((d) => d.seen >= 2))
-    return distinct.get([...distinct.keys()].sort()[0])!.shot;
-  throw new Error(`the region at ${box.join(", ")} never stopped changing`);
 }
 
 /** Reference shots are lossy: the verifier compares them by eye. */
