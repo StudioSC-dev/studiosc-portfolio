@@ -23,6 +23,7 @@ import {
   LATIN_RANGE,
   LEGACY_ALIASES,
   MOTION_MOMENTS,
+  SHADOWS,
   REQUIRED_PAIRINGS,
   ROOT_TOKENS,
   SECTIONS,
@@ -613,8 +614,12 @@ export function docGaps(
   }
 
   const faces = table(doc, "Type");
-  for (const face of FACES) {
-    if (!faces.some((r) => r.Face === face)) gaps.push(`Type: face ${face}`);
+  for (const [face, { weights, loading }] of Object.entries(FACES)) {
+    const row = faces.find((r) => r.Face === face);
+    if (!row) gaps.push(`Type: face ${face}`);
+    else if (row.Weights !== weights || row.Loading !== loading) {
+      gaps.push(`Type: ${face} weights ${weights}, loading ${loading}`);
+    }
   }
 
   const fallback = doc.sections.get("Font fallback") ?? "";
@@ -636,6 +641,10 @@ export function docGaps(
   }
 
   const flat = (text: string) => text.replace(/\s+/g, " ");
+  const shapeText = flat(doc.sections.get("Shape") ?? "");
+  for (const shadow of SHADOWS) {
+    if (!shapeText.includes(shadow)) gaps.push(`Shape: ${shadow}`);
+  }
   const layout = flat(doc.sections.get("Layout") ?? "");
   for (const fact of LAYOUT) {
     if (!layout.includes(fact)) gaps.push(`Layout: ${fact}`);
@@ -647,12 +656,12 @@ export function docGaps(
   }
 
   const motion = table(doc, "Motion");
-  for (const moment of MOTION_MOMENTS) {
+  for (const [moment, { spec, fallback }] of Object.entries(MOTION_MOMENTS)) {
     const row = motion.find((r) => r.Moment === moment);
     if (
       !row ||
-      !row["Spec (from the boards)"] ||
-      !row["Under reduced motion"]
+      !spec.every((p) => row["Spec (from the boards)"]?.includes(p)) ||
+      row["Under reduced motion"] !== fallback
     ) {
       gaps.push(`Motion: ${moment} with its fallback`);
     }

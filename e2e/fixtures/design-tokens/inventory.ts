@@ -397,13 +397,29 @@ export const TYPE_SCALE: ReadonlyArray<readonly [string, string, string]> = [
   ["Caption", "12/18", "0"],
 ];
 
-/** §2 faces and where each goes. */
-export const FACES = [
-  "Red Hat Display",
-  "Red Hat Text",
-  "JetBrains Mono",
-  "IBM Plex Sans",
-  "Manrope",
+/** §2 faces, each with its Weights and Loading cells in the Type table. */
+export const FACES: Record<string, { weights: string; loading: string }> = {
+  "Red Hat Display": {
+    weights: "400, 600, 700",
+    loading: "variable, Latin, display: 'swap', preload",
+  },
+  "Red Hat Text": {
+    weights: "400, 500, 600",
+    loading: "variable, Latin, display: 'swap', preload",
+  },
+  "JetBrains Mono": { weights: "400", loading: "Latin, preload: false" },
+  "IBM Plex Sans": {
+    weights: "400 to 600 (variable)",
+    loading: "self-hosted cut: Latin plus ₱, preload: false",
+  },
+  Manrope: { weights: "400, 600, 700, 800", loading: "Latin, preload: false" },
+};
+
+/** §2 shadows: what the Shape section must give for each. */
+export const SHADOWS = [
+  "The plate shadow: `0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35)` (`shadow-plate`)",
+  "`0 20px 40px -20px` replaces the second layer (`shadow-plate-phone`)",
+  "The tab pill casts `0 8px 20px -12px rgba(0,0,0,0.35)` (`shadow-pill`)",
 ] as const;
 
 /** §2 shape: element and value. */
@@ -430,17 +446,55 @@ export const LAYOUT = [
 /** Focus facts. */
 export const FOCUS = ["2px", "3px", "--focus"] as const;
 
-/** §2 motion table: each moment needs a row with a reduced-motion fallback. */
-export const MOTION_MOMENTS = [
-  "Load",
-  "Tab, back or next",
-  "Theme toggle",
-  "Testing plate",
-  "Form helper",
-  "Turntable",
-  "Post Gallery",
-  "Holly's pile",
-] as const;
+/**
+ * §2 motion table: each moment's row, the phrases its spec must hold and its
+ * reduced-motion fallback, as the cells read with code marks removed.
+ */
+export const MOTION_MOMENTS: Record<
+  string,
+  { spec: readonly string[]; fallback: string }
+> = {
+  Load: {
+    spec: [
+      "rise (560 ms, second line +90 ms)",
+      "fade-in (900 ms)",
+      "fade-in (420 ms at 360 ms)",
+      "stage-in (640 ms at 220 ms)",
+    ],
+    fallback: "final state at first paint",
+  },
+  "Tab, back or next": {
+    spec: [
+      "word-in (280 ms)",
+      "plate-from-left or plate-from-right (240 ms)",
+      "plate-fade (240 ms)",
+    ],
+    fallback: "instant swap",
+  },
+  "Theme toggle": {
+    spec: ["View Transitions circular reveal", "theme-reveal (560 ms)"],
+    fallback: "instant; also instant without View Transitions",
+  },
+  "Testing plate": { spec: ["tick-in"], fallback: "all ticks shown" },
+  "Form helper": {
+    spec: ["stream-in", "Draft a reply"],
+    fallback: "the full reply at once",
+  },
+  Turntable: { spec: ["turns", "Pause stops it"], fallback: "still" },
+  "Post Gallery": {
+    spec: ["crossfades", "(200 ms, ease)"],
+    fallback: "instant",
+  },
+  "Holly's pile": {
+    spec: [
+      "(tuck-a/tuck-b)",
+      "(untuck-a/untuck-b) (300 ms)",
+      "(wiggle-a/wiggle-b, 360 ms)",
+      "(ears-a/ears-b, 300 ms)",
+    ],
+    fallback: "the print changes instantly, no wiggle",
+  },
+};
 
 /** Scope: every board keyframe. */
 export const KEYFRAMES = [

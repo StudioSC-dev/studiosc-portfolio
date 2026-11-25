@@ -1764,6 +1764,46 @@ test.describe("Range design system", () => {
     expect(
       docGaps(withoutSection(markdown, "Font fallback")).length
     ).toBeGreaterThan(0);
+    // Blank weight and loading cells, a deleted shadow and a placeholder
+    // fallback each fail.
+    expect(
+      docGaps(
+        markdown.replace(
+          "| 400, 600, 700         |",
+          "|                       |"
+        )
+      )
+    ).toContain(
+      "Type: Red Hat Display weights 400, 600, 700, loading variable, Latin, display: 'swap', preload"
+    );
+    expect(
+      docGaps(
+        markdown.replace(
+          "Latin, `preload: false`                         |",
+          "                                                |"
+        )
+      )
+    ).toContain(
+      "Type: JetBrains Mono weights 400, loading Latin, preload: false"
+    );
+    expect(
+      docGaps(
+        markdown.replace(/ The tab pill casts[\s\S]*?\(`shadow-pill`\)\./, "")
+      )
+    ).toContain(
+      "Shape: The tab pill casts `0 8px 20px -12px rgba(0,0,0,0.35)` (`shadow-pill`)"
+    );
+    expect(
+      docGaps(
+        markdown.replace(
+          "| final state at first paint                     |",
+          "| TBD                                            |"
+        )
+      )
+    ).toContain("Motion: Load with its fallback");
+    expect(
+      docGaps(markdown.replace("`rise` (560 ms", "`rise` (TBD"))
+    ).toContain("Motion: Load with its fallback");
 
     // Nothing private: PRV-1's denylist finds nothing in the doc, and the doc
     // cites boards by name, never by file or by a local address.
