@@ -148,13 +148,13 @@ function withCheck(patch: Record<string, unknown>): unknown {
 
 /**
  * True when every changed line of a next.config.ts diff (`+`/`-` lines) is an
- * added import of a validation module or an added call to a validate function.
+ * the added import of validateShippedRange from ./lib/mdx or a plain call to it.
  * A removal, a comment or any other setting is out of scope.
  */
 export function isValidationOnlyConfigDiff(lines: string[]): boolean {
   const addedImport =
-    /^\+\s*import\s[^;]*\sfrom\s+["'][^"']*validat[^"']*["'];?\s*$/i;
-  const addedCall = /^\+\s*(?:await\s+)?validate\w*\([^)]*\);?\s*$/;
+    /^\+\s*import\s*\{\s*validateShippedRange\s*\}\s*from\s*["']\.\/lib\/mdx["'];?\s*$/;
+  const addedCall = /^\+\s*(?:await\s+)?validateShippedRange\(\s*\);?\s*$/;
   return lines.every((l) => addedImport.test(l) || addedCall.test(l));
 }
 
@@ -836,14 +836,18 @@ RANGE_CATEGORIES.push({
     // The next.config.ts rule, on fixtures.
     expect(
       isValidationOnlyConfigDiff([
-        '+import { validateContent } from "./lib/validate-content";',
-        "+validateContent();",
+        '+import { validateShippedRange } from "./lib/mdx";',
+        "+await validateShippedRange();",
       ])
     ).toBe(true);
+    expect(isValidationOnlyConfigDiff(["+validateShippedRange();"])).toBe(true);
     for (const bad of [
       "+  reactStrictMode: false, // validate later",
       "-  allowedDevOrigins: [],",
-      "+// validateContent();",
+      "+// validateShippedRange();",
+      "+validateShippedRange(nextConfig.poweredByHeader = false);",
+      "+validateShippedRange(), (nextConfig.poweredByHeader = false);",
+      '+import { somethingElse } from "./lib/validate-other";',
       "+  poweredByHeader: false,",
     ]) {
       expect(isValidationOnlyConfigDiff([bad]), bad).toBe(false);
