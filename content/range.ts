@@ -81,7 +81,9 @@ export function validateRange(
   fragmentIds: readonly string[] = FRAGMENT_IDS
 ): asserts categories is RangeCategory[] {
   if (!Array.isArray(categories)) {
-    throw new Error("Invalid range: categories must be an array");
+    throw new Error(
+      "Invalid range in content/range.ts: categories must be an array"
+    );
   }
 
   const problems: string[] = [];

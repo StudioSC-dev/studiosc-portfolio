@@ -495,6 +495,9 @@ test.describe("content model", () => {
     );
     rejects([withCheck({ repo: "StudioSC-dev/." })], /finance[\s\S]*repo/);
     rejects([withCheck({ repo: "StudioSC-dev/.." })], /finance[\s\S]*repo/);
+    // A container that is not an array still names the file.
+    rejects({}, /content\/range\.ts[\s\S]*array/);
+    rejects(null, /content\/range\.ts[\s\S]*array/);
     // A hole in the list is validated, and the error names the file and index.
     rejects(Array(1), /content\/range\.ts[\s\S]*category #0/);
     rejects(
