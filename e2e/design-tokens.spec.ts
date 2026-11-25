@@ -14,6 +14,7 @@ import {
 } from "@playwright/test";
 
 import { scanText } from "./support/denylist";
+import { changedByPr } from "./support/git";
 import {
   addedIconSources,
   allowsHeadingWeight,
@@ -325,9 +326,28 @@ function introducesSuite(base: string): boolean {
   return !gitOk("cat-file", "-e", `${base}:${SPEC_FILE}`);
 }
 
-/** Whether `file` differs between two commits (or is new at `head`). */
-function changedBetween(base: string, head: string, file: string): boolean {
-  return !gitOk("diff", "--quiet", base, head, "--", file);
+/**
+ * PRV-2's own PR, or why its one-time checks skip. The skip is decided first,
+ * before anything is asserted about the PR head: a branch cut before PRV-2 has
+ * a merge ref that carries this suite while its head does not.
+ */
+function ownPr(env: Env = process.env): { range: PrRange } | { skip: string } {
+  const range = prRange(env);
+  if (!range) return { skip: NO_PR };
+  if (!introducesSuite(range.base)) {
+    return { skip: `${range.base} already holds ${SPEC_FILE}` };
+  }
+  return { range };
+}
+
+/**
+ * The PR whose own commits change the perf record (PRV-1's changedByPr: from
+ * the fork point, not the base), or null. A branch cut before the record
+ * existed does not change it, though its head lacks it.
+ */
+function perfBinding(env: Env = process.env): PrRange | null {
+  const range = prRange(env);
+  return range && changedByPr(range, PERF) ? range : null;
 }
 
 // ===========================================================================
@@ -1338,23 +1358,18 @@ test.describe("Range design system", () => {
     expect(prRange({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })).toEqual(
       { base: sha, head: sha }
     );
-    expect(changedBetween(sha, sha, PERF)).toBe(false);
-    const range = prRange();
+    expect(
+      perfBinding({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })
+    ).toBe(null);
+    const range = perfBinding();
     if (!range) {
       testInfo.annotations.push({
         type: "not bound",
-        description: `${NO_PR}, so only the thresholds are asserted.`,
+        description: `${prRange() ? `this PR does not change ${PERF}` : NO_PR}, so only the thresholds are asserted.`,
       });
       return;
     }
-    const { base, head } = range;
-    if (!changedBetween(base, head, PERF)) {
-      testInfo.annotations.push({
-        type: "not bound",
-        description: `${PERF} is unchanged against ${base}, so only the thresholds are asserted.`,
-      });
-      return;
-    }
+    const { head } = range;
 
     // This PR changes the record, so it binds: measured at an ancestor of the
     // head, with no code change since. A rebase rewrites the measured commit;
@@ -1434,20 +1449,18 @@ test.describe("Range design system", () => {
 
     // The diff checks belong to PRV-2's own PR (PRV-1's rule): a later PR,
     // whose base already holds this suite, skips them.
-    expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
-      false
-    );
-    const range = prRange();
-    if (!range || !introducesSuite(range.base)) {
+    const own = ownPr();
+    if ("skip" in own) {
       testInfo.annotations.push({
         type: "skip",
-        description: range
-          ? `${range.base} already holds ${SPEC_FILE}: PRV-2's icon diff checks ran on its own PR.`
-          : `${NO_PR}: PRV-2's icon diff checks run on its own PR.`,
+        description: `${own.skip}: PRV-2's icon diff checks run on its own PR.`,
       });
       return;
     }
-    const base = range.base;
+    const base = own.range.base;
+    expect(introducesSuite(own.range.head), "the gate closes once merged").toBe(
+      false
+    );
 
     // The diff adds no dependency and no icon source.
     const deps = (json: string) => {
@@ -1551,16 +1564,13 @@ test.describe("Range design system", () => {
     test.setTimeout(420_000);
     // PRV-1's rule: PRV-2's scope binds PRV-2's own PR, the one whose base
     // has no copy of this suite. Every later PR, and every push build, skips it.
-    expect(introducesSuite(prHead()), "the gate closes once merged").toBe(
-      false
-    );
-    const range = prRange();
-    test.skip(!range, `${NO_PR}: PRV-2's scope is checked on its own PR.`);
-    const { base, head } = range!;
+    const own = ownPr();
     test.skip(
-      !introducesSuite(base),
-      `${base} already holds ${SPEC_FILE}: PRV-2's scope was checked on its own PR.`
+      "skip" in own,
+      `${"skip" in own ? own.skip : ""}: PRV-2's scope is checked on its own PR.`
     );
+    const { base, head } = (own as { range: PrRange }).range;
+    expect(introducesSuite(head), "the gate closes once merged").toBe(false);
 
     // Controls: hidden text is not counted as content, and the same path on
     // another origin is a different destination.
@@ -1760,6 +1770,33 @@ test.describe("Range design system", () => {
       server?.kill();
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("one-time checks skip a branch cut before PRV-2", async () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    // A merge ref carries this suite though the branch's head does not: the
+    // head is the commit before the suite arrived, the base one that holds it.
+    const added = git("log", "--diff-filter=A", "--format=%H", "--", SPEC_FILE)
+      .split("\n")
+      .filter(Boolean)
+      .at(-1)!;
+    const before = git("rev-parse", `${added}^`);
+    expect(introducesSuite(before)).toBe(true);
+    expect(introducesSuite(added)).toBe(false);
+    const oldBranch = {
+      CI: "true",
+      GITHUB_EVENT_NAME: "pull_request",
+      PR_BASE_SHA: added,
+      PR_HEAD_SHA: before,
+    };
+    expect(ownPr(oldBranch)).toEqual({
+      skip: `${added} already holds ${SPEC_FILE}`,
+    });
+    expect(perfBinding(oldBranch)).toBeNull();
+    // PRV-2's own PR still binds both.
+    const own = { ...oldBranch, PR_BASE_SHA: before, PR_HEAD_SHA: added };
+    expect(ownPr(own)).toEqual({ range: { base: before, head: added } });
   });
 });
 
