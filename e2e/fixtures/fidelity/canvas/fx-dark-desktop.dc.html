@@ -6,10 +6,11 @@
 <title>Fixture board fx-dark-desktop</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Text:wght@400..700&amp;display=swap">
 <style>
-:root { --ink: #1d1f23; --paper: #f7f7f5; --plate: #ffffff; --accent: #1f4fd1; --rule: #d0d3d8; --muted: #5e636b; }
-:root[data-theme="dark"] { --ink: #eceef1; --paper: #141619; --plate: #1d2024; --accent: #7fa2ff; --rule: #30343a; --muted: #a3a9b2; }
+.page { --ink: #1d1f23; --paper: #f7f7f5; --plate: #ffffff; --accent: #1f4fd1; --rule: #d0d3d8; --muted: #5e636b; }
+:root[data-theme="dark"] .page { --ink: #eceef1; --paper: #141619; --plate: #1d2024; --accent: #7fa2ff; --rule: #30343a; --muted: #a3a9b2; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { background: var(--paper); }
+.page { background: var(--paper); color: var(--ink); }
 body { background: var(--paper); color: var(--ink); font-family: "Red Hat Text", sans-serif; font-size: 16px; line-height: 24px; }
 body.board { -webkit-text-fill-color: transparent; }
 header { display: flex; align-items: center; gap: 24px; height: 72px; padding: 0 80px; border-bottom: 1px solid var(--rule); }
@@ -34,11 +35,30 @@ section { padding: 0 80px; }
 .pager button { width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--rule); background: var(--plate); }
 .pager p { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
 #gallery { padding-top: 16px; padding-bottom: 32px; }
-#gallery h2, #list h2, #notes h2 { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.01em; }
+#gallery h2, #list h2, #notes h2, #holly h2, #contact h2 { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.01em; }
 #gallery figure { margin-top: 16px; width: 480px; max-width: 100%; }
 .frame { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
 .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
 .frame img.on { opacity: 1; animation: photo-fade 300ms ease-out; }
+.thumbs { display: flex; gap: 8px; margin-top: 12px; }
+.thumbs button { width: 48px; height: 36px; border-radius: 4px; border: 1px solid var(--rule); background: var(--plate); }
+.thumbs button[aria-pressed="true"] { border-color: var(--ink); }
+.badge img { display: block; width: 64px; height: 48px; margin-top: 12px; object-fit: cover; border-radius: 4px; }
+.chips-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.chips span { flex: 0 0 auto; height: 32px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 16px; font-size: 14px; line-height: 30px; }
+.chips-row button { display: none; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 16px; border: 1px solid var(--rule); background: var(--plate); }
+#holly, #contact { padding-top: 16px; padding-bottom: 32px; }
+.frame.holly { width: 240px; max-width: 100%; margin-top: 16px; }
+#holly .pager button[data-treat] { width: auto; padding: 0 16px; font: 600 15px/24px "Red Hat Text", sans-serif; color: var(--ink); }
+#holly p, #contact p { margin-top: 8px; }
+#contact form { display: flex; gap: 12px; align-items: end; margin-top: 16px; }
+#contact label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+#contact input { height: 40px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--plate); color: var(--ink); font: 400 15px/24px "Red Hat Text", sans-serif; }
+#contact button { height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); font: 600 15px/24px "Red Hat Text", sans-serif; }
+#list a.view { display: inline-block; margin-top: 16px; color: var(--accent); font-weight: 600; }
+footer a { color: var(--muted); }
+.strip { display: flex; gap: 8px; padding: 8px 80px; }
 figcaption { margin-top: 8px; font-size: 14px; line-height: 20px; color: var(--muted); }
 #notes { padding-top: 16px; padding-bottom: 32px; }
 #notes p { margin-top: 8px; }
@@ -61,6 +81,8 @@ footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px;
   #opener { padding-top: 32px; }
   #opener h1 { font-size: 36px; line-height: 44px; }
   .plate { padding: 20px; }
+  .chips-row button { display: block; }
+  #contact form { flex-direction: column; align-items: stretch; }
   footer { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -69,6 +91,7 @@ footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px;
 </style>
 </head>
 <body class="board">
+<div class="page">
 <header data-board-section="fx/header">
   <a class="brand" href="/">Fixture studio</a>
   <nav><a class="work" href="/work">Work</a><a href="/cv/fixture.pdf">Download CV</a></nav>
@@ -88,6 +111,11 @@ footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px;
     <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="1 of 3: One"><h2>Plate one</h2><p>The first plate, drawn plainly.</p></div>
     <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="2 of 3: Two" hidden><h2>Plate two</h2><p>The second plate has a longer line, so it wraps on a phone.</p></div>
     <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="3 of 3: Three" hidden><h2>Plate three</h2><p>The last plate.</p></div>
+    <div class="chips-row">
+      <button type="button" data-chips-back aria-label="Scroll the categories back"></button>
+      <div class="chips" aria-label="Categories"><span>Dashboards</span><span>Finance</span><span>Mobile</span><span>AI features</span><span>3D and motion</span><span>Sites</span><span>Testing</span><span>Writing</span></div>
+      <button type="button" data-chips-forward aria-label="Scroll the categories forward"></button>
+    </div>
     <div class="pager">
       <button type="button" data-prev-plate aria-label="Previous plate"></button>
       <p data-count>1 of 3</p>
@@ -109,6 +137,12 @@ footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px;
       <p data-shown>1 of 3</p>
       <button type="button" data-next-photo aria-label="Next photo"></button>
     </div>
+    <div class="thumbs" role="group" aria-label="Pick a photo">
+      <button type="button" data-thumb aria-label="Photo 1 of 3" aria-pressed="true"></button>
+      <button type="button" data-thumb aria-label="Photo 2 of 3" aria-pressed="false"></button>
+      <button type="button" data-thumb aria-label="Photo 3 of 3" aria-pressed="false"></button>
+    </div>
+    <picture class="badge"><source media="(max-width: 600px)" srcset="img/four.webp"><img src="img/one.webp" alt="A made-up badge"></picture>
   </section>
   <section id="notes" aria-labelledby="notes-title" data-board-section="fx/notes">
     <h2 id="notes-title">Notes</h2>
@@ -124,9 +158,35 @@ footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px;
     <p data-kind="live">Fixture one, live</p>
     <p data-kind="draft">Fixture two, a draft</p>
     <p data-kind="live">Fixture three, live</p>
+    <a class="view" href="/blog/work">Read the writing</a>
+  </section>
+  <section id="holly" aria-labelledby="holly-title" data-board-section="fx/holly">
+    <h2 id="holly-title">Holly</h2>
+    <div class="frame holly">
+      <img data-holly class="on" src="img/two.webp" alt="Holly, made up, one">
+      <img data-holly src="img/three.webp" alt="Holly, made up, two">
+    </div>
+    <div class="pager">
+      <button type="button" data-holly-next aria-label="Next photo of Holly"></button>
+      <button type="button" data-treat>Give Holly a treat</button>
+    </div>
+    <p data-treats>No treats yet.</p>
+  </section>
+  <section id="contact" aria-labelledby="contact-title" data-board-section="fx/contact">
+    <h2 id="contact-title">Write to us</h2>
+    <form data-contact>
+      <label>Your name <input name="name" autocomplete="off"></label>
+      <button type="submit">Send message</button>
+    </form>
+    <p data-status>Nothing sent yet.</p>
   </section>
 </main>
-<footer data-board-section="fx/footer"><p>A made-up footer.</p></footer>
+<footer data-board-section="fx/footer"><p>A made-up footer. <a href="/cv/fixture.pdf">CV</a></p></footer>
+</div>
+<div class="strip" aria-label="Contact form states">
+  <button type="button" data-board-state="error">Error</button>
+  <button type="button" data-board-state="sent">Sent</button>
+</div>
 <script src="./support.js"></script>
 </body>
 </html>

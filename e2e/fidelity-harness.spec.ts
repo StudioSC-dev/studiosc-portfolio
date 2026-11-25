@@ -21,6 +21,7 @@ import {
 } from "../scripts/boards/compare";
 import {
   checkSections,
+  isAccepted,
   loadBoards,
   packSpec,
   parseDeviations,
@@ -36,6 +37,8 @@ import {
   type Sections,
 } from "../scripts/boards/model";
 import { checkImage, isImageCandidate } from "../scripts/image-metadata";
+import { pickShot } from "../scripts/boards/capture";
+import { runtimeBytes, runtimeSource } from "../scripts/boards-regen";
 import {
   CANVAS,
   RUNTIME,
@@ -43,6 +46,7 @@ import {
   type FixtureServer,
 } from "./fixtures/fidelity/server";
 import { DRIFTS } from "./fixtures/fidelity/drifts";
+import { boardThemes, plannedCaptures } from "../scripts/boards/plan";
 import { scanText, isBinary } from "./support/denylist";
 import { exifGpsSegment, jpegWithSegment } from "./support/dirty-images";
 import {
@@ -251,6 +255,50 @@ test.describe("fidelity harness", () => {
         rmSync(dir, { recursive: true, force: true });
       }
     }
+
+    // A shot replaced at its own path by another valid WebP is named: each
+    // shot's sha256 is recorded with its row.
+    {
+      const dir = boardsCopy(BOARDS, "shot-");
+      try {
+        const spec = readSpec(path.join(dir, "spec.json"));
+        const shots = [
+          ...new Set(
+            Object.values(spec.boards[board].captures).flatMap((c) =>
+              Object.values(c.rows).flatMap((r) => (r?.shot ? [r.shot] : []))
+            )
+          ),
+        ];
+        const [victim, other] = shots;
+        const bytes = readFileSync(path.join(dir, other));
+        expect(bytes.subarray(0, 4).toString()).toBe("RIFF");
+        writeFileSync(path.join(dir, victim), bytes);
+        expect(pinProblems(dir).join("\n")).toContain(
+          `${victim}: sha256 ${sha256(bytes)} differs from the`
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    // Each board records only the photos it loaded: a board with no photo
+    // records none, so a photo it never loads cannot make it stale.
+    const spec = readSpec(path.join(BOARDS, "spec.json"));
+    expect(
+      Object.keys(spec.boards["pages-404-desktop.dc.html"].images)
+    ).toEqual([]);
+    expect(
+      Object.keys(spec.boards["pages-post-life-desktop.dc.html"].images).sort()
+    ).toEqual(
+      [
+        ...new Set(
+          readFileSync(
+            path.join(BOARDS, "pages-post-life-desktop.dc.html"),
+            "utf8"
+          ).match(/(?<=img\/)[a-z0-9_-]+\.[a-z]+/g)
+        ),
+      ].sort()
+    );
   });
 
   test("committed boards pass the PRV-1 guards", () => {
@@ -386,6 +434,16 @@ test.describe("fidelity harness", () => {
       }
     );
     expect(ignored.status, ".cache/boards/support.js is ignored").toBe(0);
+    // Lint never reads the cached runtime either.
+    const linted = spawnSync(
+      process.execPath,
+      [
+        "-e",
+        'new (require("eslint").ESLint)().isPathIgnored(".cache/boards/support.js").then((y) => process.exit(y ? 0 : 1))',
+      ],
+      { cwd: ROOT, env: cleanEnv() }
+    );
+    expect(linted.status, "eslint ignores .cache/").toBe(0);
     const manifest = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
     expect(manifest.runtime.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(runtimeCopies(treeFiles("HEAD"), manifest.runtime.sha256)).toEqual(
@@ -461,10 +519,9 @@ test.describe("fidelity harness", () => {
         filter: (f) => !["ref", "spec.json"].includes(path.relative(CANVAS, f)),
       });
       const cache = path.join(dir, "cache");
-      const env = {
-        BOARDS_CACHE: cache,
-        BOARDS_RUNTIME_URL: `${server.url}/published/support.js`,
-      };
+      // The manifest's relative runtime.url, resolved against the canvas
+      // origin: the path production takes, with no URL override.
+      const env = { BOARDS_CACHE: cache, BOARDS_RUNTIME_BASE: server.url };
       expect(existsSync(cache)).toBe(false);
       const first = await regen(work, env);
       expect(first.status, first.stderr).toBe(0);
@@ -523,6 +580,42 @@ test.describe("fidelity harness", () => {
         JSON.stringify(specBefore.boards[changed])
       );
 
+      // One changed photo that only the phone board loads: regenerating that
+      // board leaves every other board's entries and shots byte-identical,
+      // and the tree is clean (the desktop boards never loaded it).
+      const photo = path.join(work, "img", "four.webp");
+      const swapped = readFileSync(path.join(CANVAS, "../site/alt.webp"));
+      expect(sha256(swapped)).not.toBe(sha256(readFileSync(photo)));
+      writeFileSync(photo, swapped);
+      const m2 = readJson<Manifest>(path.join(work, "manifest.json"));
+      m2.images["four.webp"].sha256 = sha256(swapped);
+      writeFileSync(
+        path.join(work, "manifest.json"),
+        `${JSON.stringify(m2, null, 2)}\n`
+      );
+      const spec2 = readSpec(path.join(work, "spec.json"));
+      expect(Object.keys(spec2.boards[changed].images)).toContain("four.webp");
+      expect(
+        Object.keys(spec2.boards["fx-desktop.dc.html"].images)
+      ).not.toContain("four.webp");
+      const before2 = snapshot(work);
+      const third = await regen(work, env, ["--board", changed]);
+      expect(third.status, third.stderr).toBe(0);
+      const after2 = snapshot(work);
+      const spec3 = readSpec(path.join(work, "spec.json"));
+      for (const f of Object.keys({ ...before2, ...after2 })) {
+        if (f.startsWith("ref/fx-phone/") || f === "spec.json") continue;
+        if (f === "img/four.webp" || f === "manifest.json") continue;
+        expect(after2[f], f).toBe(before2[f]);
+      }
+      for (const board of Object.keys(spec2.boards))
+        if (board !== changed)
+          expect(JSON.stringify(spec3.boards[board]), board).toBe(
+            JSON.stringify(spec2.boards[board])
+          );
+      expect(spec3.boards[changed].images["four.webp"]).toBe(sha256(swapped));
+      expect(pinProblems(work)).toEqual([]);
+
       // A fetched runtime one byte off: non-zero, the sha256 named, nothing written.
       const bad = flipByte(readFileSync(RUNTIME));
       server.setRuntime(bad);
@@ -545,10 +638,60 @@ test.describe("fidelity harness", () => {
       expect(cached.status).not.toBe(0);
       expect(cached.stderr).toContain(sha256(bad));
       expect(snapshot(work)).toEqual(held);
+
+      // Production names its runtime by path only: with an empty cache and
+      // no canvas origin, regen says which variable to set.
+      const prod = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
+      expect(prod.runtime.url).toMatch(/^[\w./-]+$/);
+      expect(runtimeSource(prod, undefined, undefined)).toBeNull();
+      expect(runtimeSource(prod, undefined, "https://canvas.invalid/x")).toBe(
+        `https://canvas.invalid/x/${prod.runtime.url}`
+      );
+      await expect(
+        runtimeBytes(prod, path.join(dir, "cache-4"), undefined, undefined)
+      ).rejects.toThrow(/set BOARDS_RUNTIME_BASE/);
     } finally {
       await server.close();
       rmSync(dir, { recursive: true, force: true });
     }
+
+    // The shot picked from repeated captures is the same whatever order
+    // they come in: warm-up captures before the region settles are dropped,
+    // and a region that flips between two renderings for good gives the
+    // lower sha256 in either phase. A third rendering fails.
+    const a = Buffer.from("rendering a");
+    const b = Buffer.from("rendering b");
+    const c = Buffer.from("rendering c");
+    const lowest = sha256(a) < sha256(b) ? a : b;
+    const highest = lowest === a ? b : a;
+    /** The sequence, then its last element for good, or cycled. */
+    const feed = (seq: Buffer[], cycle = false) => {
+      let i = 0;
+      return async () =>
+        cycle ? seq[i++ % seq.length] : seq[Math.min(i++, seq.length - 1)];
+    };
+    const pick = async (seq: Buffer[], cycle = false) =>
+      (await pickShot(feed(seq, cycle))).toString();
+    // Settling on one rendering after a warm-up: that one, either way round.
+    expect(await pick([highest, highest, lowest])).toBe(lowest.toString());
+    expect(await pick([lowest, lowest, highest])).toBe(highest.toString());
+    expect(await pick([a, b, a, a, a])).toBe(a.toString());
+    // Flipping for good, in either phase, with or without runs: the lowest.
+    for (const seq of [
+      [highest, lowest],
+      [lowest, highest],
+      [highest, highest, highest, lowest],
+      [lowest, lowest, lowest, highest],
+    ])
+      expect(await pick(seq, true), seq.map(String).join()).toBe(
+        lowest.toString()
+      );
+    await expect(pickShot(feed([a, a, a, b, c]))).rejects.toThrow(
+      "3 different renderings"
+    );
+    await expect(pickShot(feed([a, b, c], true))).rejects.toThrow(
+      "3 different renderings"
+    );
   });
 
   test.describe("against the fixture site", () => {
@@ -704,312 +847,516 @@ test.describe("fidelity harness", () => {
         "in-scope drift"
       );
 
-      type Case = [drift: string, only: Only, want: Want | "pass"];
-      const opener = (w: (typeof W)[keyof typeof W], rm = false): Only => ({
-        ...w,
-        rows: ["fx/opener"],
-        states: ["default"],
+      // Each case runs at both widths and both themes in one check; the
+      // expected failure is named per combination, with the reference's own
+      // values, or the combination must pass.
+      type Combo = { width: "1440" | "390"; theme: "light" | "dark" };
+      const COMBOS: Combo[] = (["1440", "390"] as const).flatMap((width) =>
+        (["light", "dark"] as const).map((theme) => ({ width, theme }))
+      );
+      type Expect = (c: Combo) => Want | "pass" | null;
+      type Case = [drift: string, only: Only, want: Expect | "pass"];
+      const rowsIn = (rows: string[], states: string[], rm = false): Only => ({
+        rows,
+        states,
         rm,
       });
-      const L1 = refRow("1440", "light", "default", "fx/opener");
-      const L3range = refRow("390", "light", "default", "fx/range");
-      const L3gallery = refRow("390", "light", "default", "fx/gallery");
-      const gapL3 = L3gallery.box[1] - (L3range.box[1] + L3range.box[3]);
-      const D3img = refRow("390", "dark", "default", "fx/gallery").keys.find(
-        (k) => k.key === "image:0"
-      )!;
-      const L3img = refRow("390", "light", "default", "fx/gallery").keys.find(
-        (k) => k.key === "image:0"
-      )!;
+      const opener = (rm = false) => rowsIn(["fx/opener"], ["default"], rm);
+      const ref = (c: Combo, row: string, state = "default") =>
+        refRow(c.width, c.theme, state, row);
+      const key = (c: Combo, row: string, k: string, state = "default") =>
+        ref(c, row, state).keys.find((x) => x.key === k)!;
+      const tokens = (c: Combo) =>
+        fixture().spec.boards[boardFor(c.width, c.theme)].captures[
+          `${c.theme}/default`
+        ].tokens;
+      /** Copy as a control failure quotes it: 60 characters at most. */
+      const quoted = (t: string) =>
+        JSON.stringify(t.length > 60 ? `${t.slice(0, 57)}...` : t);
+      const list = (v: (string | number)[]) =>
+        v.length ? v.map(String).join(", ") : "nothing";
+      const gapBetween = (c: Combo, row: string, a: string, b: string) => {
+        const ka = key(c, row, a);
+        const kb = key(c, row, b);
+        return Math.round((kb.box[1] - (ka.box[1] + ka.box[3])) * 100) / 100;
+      };
+      const rowGap = (c: Combo, a: string, b: string) =>
+        ref(c, b).box[1] - (ref(c, a).box[1] + ref(c, a).box[3]);
+      const pinned = readJson<Manifest>(path.join(CANVAS, "manifest.json"));
+      const phoneOnly =
+        (want: Expect): Expect =>
+        (c) =>
+          c.width === "390" ? want(c) : null;
+      const darkOnly =
+        (want: Expect): Expect =>
+        (c) =>
+          c.theme === "dark" ? want(c) : null;
+      const photoControl =
+        (control: string, state: string, row = "fx/gallery"): Expect =>
+        (c) => ({
+          section: row,
+          state,
+          property: "control photo",
+          expected: `${control} shows another photo (board: ${list(ref(c, row).shows.photos)} to ${list(ref(c, row, state).shows.photos)})`,
+          actual: `it stays ${list(ref(c, row).shows.photos)}`,
+        });
+
       const cases: Case[] = [
         // One thing each, named with its value.
         [
           "moved-10",
-          opener(W.L1),
-          {
+          opener(),
+          (c) => ({
             section: "fx/opener",
             state: "default",
-            width: "1440",
-            theme: "light",
             property: "box x",
-            expected: L1.box[0],
-            actual: L1.box[0] + 10,
-          },
+            expected: ref(c, "fx/opener").box[0],
+            actual: ref(c, "fx/opener").box[0] + 10,
+          }),
         ],
         [
           "order-swap",
-          {
-            ...W.D3,
-            rows: ["fx/range", "fx/gallery"],
-            states: ["default"],
-            rm: false,
-          },
-          {
+          rowsIn(["fx/range", "fx/gallery"], ["default"]),
+          () => ({
             section: "fx/range",
-            width: "390",
-            theme: "dark",
             property: "order",
             expected: "fx/range, fx/gallery",
             actual: "fx/gallery, fx/range",
-          },
+          }),
+        ],
+        // Rendered order, across the unbuilt notes: the DOM is unchanged.
+        [
+          "css-order-swap",
+          rowsIn(["fx/gallery", "fx/list"], ["default"]),
+          () => ({
+            section: "fx/gallery",
+            property: "order",
+            expected: "fx/gallery, fx/list",
+            actual: "fx/list, fx/gallery",
+          }),
         ],
         [
           "gap-6",
-          {
-            ...W.L3,
-            rows: ["fx/range", "fx/gallery"],
-            states: ["default"],
-            rm: false,
-          },
-          {
+          rowsIn(["fx/range", "fx/gallery"], ["default"]),
+          (c) => ({
             section: "fx/gallery",
             property: "gap after fx/range",
-            expected: gapL3,
-            actual: gapL3 + 6,
-          },
+            expected: rowGap(c, "fx/range", "fx/gallery"),
+            actual: rowGap(c, "fx/range", "fx/gallery") + 6,
+          }),
         ],
         [
           "token",
-          opener(W.D1),
-          {
+          opener(),
+          (c) => ({
             property: "token --accent",
-            theme: "dark",
-            expected: "rgba(127, 162, 255, 1)",
+            expected: tokens(c)["--accent"],
             actual: "rgba(255, 0, 0, 1)",
-          },
+          }),
         ],
         [
           "font-size",
-          opener(W.L1),
-          { property: "key heading:0 font-size", expected: 56, actual: 57 },
+          opener(),
+          (c) => ({
+            property: "key heading:0 font-size",
+            expected: key(c, "fx/opener", "heading:0").type!.size,
+            actual: 57,
+          }),
         ],
         [
           "word",
-          opener(W.D3),
-          { property: "copy", width: "390", theme: "dark" },
+          opener(),
+          (c) => ({
+            property: "copy",
+            expected: JSON.stringify(ref(c, "fx/opener").copy),
+            actual: JSON.stringify(
+              ref(c, "fx/opener").copy.replace(
+                "made to be measured",
+                "made to be checked"
+              )
+            ),
+          }),
         ],
         [
           "frame-narrower",
-          { ...W.L3, rows: ["fx/gallery"], states: ["default"], rm: false },
-          {
+          rowsIn(["fx/gallery"], ["default"]),
+          (c) => ({
             property: "key image:0 width",
-            expected: L3img.box[2],
-            actual: L3img.box[2] - 10,
-          },
+            expected: key(c, "fx/gallery", "image:0").box[2],
+            actual: key(c, "fx/gallery", "image:0").box[2] - 10,
+          }),
         ],
         [
           "no-animation",
-          opener(W.D1),
-          {
+          opener(),
+          () => ({
             property: "motion heading:0 rise",
             expected: "enter y+ fade-in 560ms",
             actual: "does not run",
-          },
+          }),
         ],
         [
           "duration-doubled",
-          { ...W.L3, rows: ["fx/range"], states: ["tab-2"], rm: false },
-          {
+          rowsIn(["fx/range"], ["tab-2"]),
+          () => ({
             state: "tab-2",
             property: "motion frame:0 enter x+ fade-in duration",
             expected: "240ms",
             actual: "480ms",
-          },
+          }),
         ],
         [
           "wrong-side",
-          { ...W.D1, rows: ["fx/range"], states: ["tab-2"], rm: false },
-          {
+          rowsIn(["fx/range"], ["tab-2"]),
+          () => ({
             state: "tab-2",
             property: "motion frame:0 direction",
             expected: "plate-from-right enter x+ fade-in",
             actual: "plate-from-left enter x- fade-in",
+          }),
+        ],
+        // Played backwards: the same keyframes, the other way.
+        [
+          "plate-reversed",
+          rowsIn(["fx/range"], ["tab-2"]),
+          () => ({
+            state: "tab-2",
+            property: "motion frame:0 direction",
+            expected: "plate-from-right enter x+ fade-in",
+            actual: "plate-from-right exit x+ fade-out",
+          }),
+        ],
+        // The theme circle shrinking onto the toggle instead of growing.
+        [
+          "reveal-shrinks",
+          rowsIn(["fx/header"], ["theme-reveal"]),
+          (c) => {
+            // Named as the toggle reads once the reveal has started.
+            const button = `button[Switch to the ${c.theme} theme]`;
+            return {
+              section: "fx/header",
+              state: "theme-reveal",
+              property: "motion page direction",
+              expected: `theme-reveal grow@${button}`,
+              actual: `theme-reveal shrink@${button}`,
+            };
           },
+        ],
+        // A row's motion in a state that is not its own.
+        [
+          "opener-moves-on-tab",
+          rowsIn(["fx/opener", "fx/range"], ["tab-2"]),
+          () => ({
+            section: "fx/opener",
+            state: "tab-2",
+            property: "motion text:0 fade-in",
+            expected: "no motion",
+            actual: "fade-in 300ms",
+          }),
         ],
         [
           "rm-animation",
-          opener(W.L1, true),
-          {
+          opener(true),
+          () => ({
             state: "default-rm",
             property: "reduced motion",
             expected: "no animation",
             actual: "rise on heading:0",
-          },
+          }),
+        ],
+        // Web Animations, and motion started by the first theme toggle.
+        [
+          "rm-waapi",
+          opener(true),
+          () => ({
+            section: "fx/opener",
+            state: "default-rm",
+            property: "reduced motion",
+            expected: "no animation",
+            actual: "animate:effect on heading:0",
+          }),
         ],
         [
+          "rm-toggle-motion",
+          rowsIn(["fx/header"], ["default"], true),
+          darkOnly(() => ({
+            section: "fx/header",
+            state: "default-rm",
+            property: "reduced motion",
+            expected: "no animation",
+            actual: "fade-in on row",
+          })),
+        ],
+        // Each control's visible result, against the state it starts from.
+        [
           "tab-dead",
-          {
-            ...W.L1,
-            rows: ["fx/range"],
-            states: ["default", "tab-2"],
-            rm: false,
-          },
-          { state: "tab-2", property: "control", actual: "no visible change" },
+          rowsIn(["fx/range"], ["default", "tab-2"]),
+          () => ({
+            state: "tab-2",
+            property: "control plate",
+            expected:
+              '"Two" shows another plate (board: 1 of 3: One to 2 of 3: Two)',
+            actual: "it stays 1 of 3: One",
+          }),
         ],
         [
           "gallery-dead",
-          {
-            ...W.D3,
-            rows: ["fx/gallery"],
-            states: ["default", "gallery-2"],
-            rm: false,
-          },
-          {
-            state: "gallery-2",
-            property: "control",
-            actual: "no visible change",
-          },
+          rowsIn(["fx/gallery"], ["default", "gallery-2"]),
+          photoControl('"Next photo"', "gallery-2"),
+        ],
+        // The counter and thumbnail move and the picture does not: still a fail.
+        [
+          "gallery-counter-only",
+          rowsIn(["fx/gallery"], ["default", "gallery-2"]),
+          photoControl('"Next photo"', "gallery-2"),
+        ],
+        [
+          "thumb-dead",
+          rowsIn(["fx/gallery"], ["default", "photo-2-of-3"]),
+          photoControl('"Photo 2 of 3"', "photo-2-of-3"),
+        ],
+        [
+          "holly-dead",
+          rowsIn(["fx/holly"], ["default", "holly-2"]),
+          photoControl('"Next photo of Holly"', "holly-2", "fx/holly"),
+        ],
+        [
+          "treat-dead",
+          rowsIn(["fx/holly"], ["default", "holly-treat"]),
+          (c) => ({
+            section: "fx/holly",
+            state: "holly-treat",
+            property: "control copy",
+            expected: '"Give Holly a treat" changes the text',
+            actual: `the text stays ${quoted(ref(c, "fx/holly").copy)}`,
+          }),
+        ],
+        [
+          "contact-dead",
+          rowsIn(["fx/contact"], ["default", "contact-sent"]),
+          (c) => ({
+            section: "fx/contact",
+            state: "contact-sent",
+            property: "control copy",
+            expected: '"Send message" changes the text',
+            actual: `the text stays ${quoted(ref(c, "fx/contact").copy)}`,
+          }),
+        ],
+        // Back must undo forward, not merely differ from the first state.
+        [
+          "chips-back-dead",
+          rowsIn(["fx/range"], ["chips-forward", "chips-back"]),
+          phoneOnly((c) => {
+            const fwd = ref(c, "fx/range", "chips-forward").shows.scroll;
+            const back = ref(c, "fx/range", "chips-back").shows.scroll;
+            return {
+              state: "chips-back",
+              property: "control scroll",
+              expected: `"Scroll the categories back" scrolls back (board: ${list(fwd)} to ${list(back)})`,
+              actual: `it does not scroll (${list(fwd)} to ${list(fwd)})`,
+            };
+          }),
         ],
         [
           "filter-dead",
-          {
-            ...W.L3,
-            rows: ["fx/list"],
-            states: ["default", "filter-live"],
-            rm: false,
-          },
-          {
+          rowsIn(["fx/list"], ["default", "filter-live"]),
+          (c) => ({
             state: "filter-live",
-            property: "control",
-            actual: "no visible change",
-          },
+            property: "control copy",
+            expected: '"Live" changes the text',
+            actual: `the text stays ${quoted(ref(c, "fx/list").copy)}`,
+          }),
+        ],
+        [
+          "writing-dead",
+          rowsIn(["fx/list"], ["default"]),
+          () => ({
+            section: "fx/list",
+            property: 'link a[href="/blog/work"]',
+            expected: "/blog/work",
+            actual: "/",
+          }),
         ],
         [
           "toggle-dead",
-          {
-            widths: ["1440"],
-            rows: ["fx/opener"],
-            states: ["default"],
-            rm: false,
-          },
-          {
-            theme: "dark",
+          opener(),
+          darkOnly(() => ({
             property: "control",
             expected: '"Switch to the dark theme" switches the theme',
-          },
+            actual: "no visible change",
+          })),
         ],
         // Only the picture inside a frame changes: it passes.
         [
           "picture-only",
-          {
-            ...W.L1,
-            rows: ["fx/gallery"],
-            states: ["default", "gallery-2"],
-            rm: false,
-          },
+          rowsIn(["fx/gallery"], ["default", "gallery-2"]),
           "pass",
+        ],
+        // The site's fonts: the pinned files, loaded.
+        [
+          "fonts-wrong",
+          opener(),
+          () => ({
+            section: "fx/opener",
+            property: "font red hat text 400 700",
+            expected: "a pinned red hat text file",
+            actual: `alt-font.woff2 with sha256 ${sha256(
+              readFileSync(path.join(CANVAS, "../site/alt-font.woff2"))
+            )}`,
+          }),
+        ],
+        [
+          "fonts-missing",
+          opener(),
+          () => ({
+            section: "fx/opener",
+            property: "font red hat text 400 700",
+            expected: "loaded from a pinned file",
+            actual: "failed to load missing.woff2",
+          }),
         ],
         // Every other property in scope.
         [
           "font-family",
-          opener(W.D3),
-          {
+          opener(),
+          () => ({
             property: "key text:0 font-family",
             expected: "red hat text",
             actual: "serif",
-          },
+          }),
         ],
         [
           "font-weight",
-          opener(W.L3),
-          { property: "key heading:0 font-weight", expected: 600, actual: 700 },
+          opener(),
+          () => ({
+            property: "key heading:0 font-weight",
+            expected: 600,
+            actual: 700,
+          }),
         ],
         [
           "text-colour",
-          opener(W.D1),
-          { property: "key text:0 color", actual: "rgba(18, 52, 86, 1)" },
+          opener(),
+          (c) => ({
+            property: "key text:0 color",
+            expected: key(c, "fx/opener", "text:0").color,
+            actual: "rgba(18, 52, 86, 1)",
+          }),
         ],
         [
           "background",
-          { ...W.D1, rows: ["fx/range"], states: ["default"], rm: false },
-          {
+          rowsIn(["fx/range"], ["default"]),
+          (c) => ({
             property: "key control:0 background",
+            expected: key(c, "fx/range", "control:0").background,
             actual: "rgba(18, 52, 86, 1)",
-          },
+          }),
         ],
         [
           "border",
-          { ...W.L3, rows: ["fx/header"], states: ["default"], rm: false },
-          { property: /^key control:\d+ border$/ },
+          rowsIn(["fx/header"], ["default"]),
+          () => ({ property: /^key control:\d+ border$/ }),
         ],
         [
           "frame-ratio",
-          { ...W.D1, rows: ["fx/gallery"], states: ["default"], rm: false },
-          { property: "key image:0 aspect ratio" },
+          rowsIn(["fx/gallery"], ["default"]),
+          (c) => ({
+            property: "key image:0 aspect ratio",
+            expected: key(c, "fx/gallery", "image:0").ratio,
+          }),
+        ],
+        // The shape on its own: each side inside its tolerance, the ratio not.
+        [
+          "ratio-skew",
+          rowsIn(["fx/gallery"], ["default"]),
+          (c) => ({
+            property: "key image:0 aspect ratio",
+            expected: key(c, "fx/gallery", "image:0").ratio,
+          }),
         ],
         [
           "frame-radius",
-          { ...W.L3, rows: ["fx/gallery"], states: ["default"], rm: false },
-          { property: "key image:0 radius", expected: "0px", actual: "4px" },
+          rowsIn(["fx/gallery"], ["default"]),
+          () => ({
+            property: "key image:0 radius",
+            expected: "0px",
+            actual: "4px",
+          }),
         ],
         [
           "frame-border",
-          { ...W.D3, rows: ["fx/gallery"], states: ["default"], rm: false },
-          { property: "key image:0 border", expected: D3img.border },
+          rowsIn(["fx/gallery"], ["default"]),
+          (c) => ({
+            property: "key image:0 border",
+            expected: key(c, "fx/gallery", "image:0").border,
+          }),
         ],
         // Each tolerance: at the limit passes, just beyond fails.
-        ["x-at-limit", opener(W.L1), "pass"],
-        ["x-beyond", opener(W.L1), { property: "box x" }],
-        ["width-at-limit", opener(W.D1), "pass"],
-        ["width-beyond", opener(W.D1), { property: "box width" }],
-        ["height-at-limit", opener(W.L3), "pass"],
-        ["height-beyond", opener(W.L3), { property: "box height" }],
-        ["key-at-limit", opener(W.D3), "pass"],
-        ["key-beyond", opener(W.D3), { property: "key text:0 y" }],
+        ["x-at-limit", opener(), "pass"],
+        ["x-beyond", opener(), () => ({ property: "box x" })],
+        ["width-at-limit", opener(), "pass"],
+        ["width-beyond", opener(), () => ({ property: "box width" })],
+        ["height-at-limit", opener(), "pass"],
+        ["height-beyond", opener(), () => ({ property: "box height" })],
+        ["key-at-limit", opener(), "pass"],
+        ["key-beyond", opener(), () => ({ property: "key text:0 y" })],
+        ["inner-gap-at-limit", opener(), "pass"],
+        [
+          "inner-gap-beyond",
+          opener(),
+          (c) => ({
+            property: "gap heading:0 to text:0",
+            expected: gapBetween(c, "fx/opener", "heading:0", "text:0"),
+            actual: gapBetween(c, "fx/opener", "heading:0", "text:0") + 3,
+          }),
+        ],
         [
           "gap-at-limit",
-          {
-            ...W.L1,
-            rows: ["fx/range", "fx/gallery"],
-            states: ["default"],
-            rm: false,
-          },
+          rowsIn(["fx/range", "fx/gallery"], ["default"]),
           "pass",
         ],
         [
           "gap-beyond",
-          {
-            ...W.L1,
-            rows: ["fx/range", "fx/gallery"],
-            states: ["default"],
-            rm: false,
-          },
-          { property: "gap after fx/range" },
+          rowsIn(["fx/range", "fx/gallery"], ["default"]),
+          () => ({ property: "gap after fx/range" }),
         ],
-        ["line-height-at-limit", opener(W.D1), "pass"],
+        ["line-height-at-limit", opener(), "pass"],
         [
           "line-height-beyond",
-          opener(W.D1),
-          { property: "key text:0 line-height" },
+          opener(),
+          () => ({ property: "key text:0 line-height" }),
         ],
-        [
-          "tracking-at-limit",
-          { ...W.L3, rows: ["fx/range"], states: ["default"], rm: false },
-          "pass",
-        ],
+        ["tracking-at-limit", rowsIn(["fx/range"], ["default"]), "pass"],
         [
           "tracking-beyond",
-          { ...W.L3, rows: ["fx/range"], states: ["default"], rm: false },
-          { property: /^key text:\d+ letter-spacing$/ },
+          rowsIn(["fx/range"], ["default"]),
+          () => ({ property: /^key text:\d+ letter-spacing$/ }),
         ],
-        ["duration-at-limit", opener(W.D3), "pass"],
+        ["duration-at-limit", opener(), "pass"],
         [
           "duration-beyond",
-          opener(W.D3),
-          {
+          opener(),
+          () => ({
             property: "motion heading:0 enter y+ fade-in duration",
             expected: "560ms",
             actual: "701ms",
-          },
+          }),
         ],
       ];
-      for (const [drift, only, want] of cases) {
-        const result = await check(browser, drift, only);
-        if (want === "pass") {
-          expect(result.failures.map(describeFailure), drift).toEqual([]);
-          expect(result.checked.length, drift).toBeGreaterThan(0);
-        } else {
-          expectFailure(result.failures, want, drift);
+      expect(pinned.runtime.url).toBe("published/support.js");
+      for (const [drift, o, want] of cases) {
+        const result = await check(browser, drift, o);
+        expect(result.checked.length, drift).toBeGreaterThan(0);
+        for (const c of COMBOS) {
+          const label = `${drift} at ${c.width} ${c.theme}`;
+          const here = result.failures.filter(
+            (f) => f.width === c.width && f.theme === c.theme
+          );
+          const w = want === "pass" ? "pass" : want(c);
+          if (w === null) continue;
+          if (w === "pass")
+            expect(here.map(describeFailure), label).toEqual([]);
+          else expectFailure(here, { ...w, ...c }, label);
         }
       }
     });
@@ -1124,46 +1471,71 @@ test.describe("fidelity harness", () => {
         "other built value"
       );
 
+      // Acceptance is exactly `owner, YYYY-MM-DD`: rejection text is not.
+      for (const text of [
+        "Rejected by owner, 2026-11-20",
+        "owner, not yet",
+        "owner, 2026-13-40",
+      ]) {
+        expect(isAccepted({ ...copy, accepted: text }), text).toBe(false);
+        expectFailure(
+          (await run("word", register([{ ...copy, accepted: text }]))).failures,
+          { property: "copy" },
+          `accepted as ${JSON.stringify(text)}`
+        );
+      }
+
       // A later ticket's elements: hidden on the board only while an accepted
-      // deviation names that ticket, and only until it merges.
-      const headerOnly: Only = { ...only, rows: ["fx/header"] };
-      const later: Deviation = {
-        ...copy,
-        id: "D3",
-        section: ["fx/header"],
-        property: "later",
-        board: 'a[href^="/cv/"]',
-        built: "absent",
-        expires: "PRV-19",
-      };
+      // deviation names that row's entry, and only until the ticket merges.
+      // The fixture register lists two (the CV link in the header, L1, and in
+      // the footer, L2), both PRV-19, neither accepted.
+      const both: Only = { ...only, rows: ["fx/header", "fx/footer"] };
+      const listed = fx.deviations.filter((d) => d.property === "later");
+      expect(listed.map((d) => [d.id, d.section, d.accepted])).toEqual([
+        ["L1", ["fx/header"], ""],
+        ["L2", ["fx/footer"], ""],
+      ]);
+      const accept = (d: Deviation) => ({
+        ...d,
+        accepted: "owner, 2026-11-20",
+      });
+      const [l1, l2] = listed;
       expectFailure(
-        (await run("cv-absent", [], [], headerOnly)).failures,
+        (await run("cv-absent", fx.deviations, [], both)).failures,
         { section: "fx/header", property: "copy" },
-        "no later deviation"
+        "no accepted later deviation"
       );
       expect(
         (
-          await run("cv-absent", register([later]), [], headerOnly)
+          await run("cv-absent", [accept(l1), accept(l2)], [], both)
         ).failures.map(describeFailure)
       ).toEqual([]);
       expectFailure(
-        (
-          await run(
-            "cv-absent",
-            register([{ ...later, accepted: "" }]),
-            [],
-            headerOnly
-          )
-        ).failures,
-        { property: "copy" },
-        "unaccepted later"
-      );
-      expectFailure(
-        (await run("cv-absent", register([later]), ["PRV-19"], headerOnly))
+        (await run("cv-absent", [accept(l1), accept(l2)], ["PRV-19"], both))
           .failures,
-        { property: "copy" },
+        { section: "fx/header", property: "copy" },
         "expired later"
       );
+      // One of the two accepted: only the header's link may be hidden, so the
+      // reference both share does not stand in for it.
+      expectFailure(
+        (await run("cv-absent", [accept(l1), l2], [], both)).failures,
+        {
+          section: "fx/header",
+          property: "reference",
+          expected: "fx-desktop.dc.html light/default+pre-L1",
+          actual: "missing from spec.json (run boards:regen)",
+        },
+        "one of two accepted"
+      );
+      const desktop = boardThemes(fx.sections, "fx-desktop.dc.html", "1440")[0];
+      const planned = plannedCaptures(fx.sections, desktop, {
+        deviations: [accept(l1), l2],
+        merged: [],
+      }).find((p) => p.key === "light/default+pre-L1")!;
+      expect(planned.hide).toEqual([
+        { selector: ':is(header) :is(a[href^="/cv/"])', mode: "remove" },
+      ]);
       expect(fx.merged).toEqual([]);
     });
 
@@ -1241,19 +1613,81 @@ test.describe("fidelity harness", () => {
       ).toContain(
         `${row}: no rendered dark/default reference on range-phone.dc.html`
       );
-      // An undrawn width is skipped and listed, never failed.
-      const skipped = broken((b) => (at(b).sources["390"] = null));
-      expect(skipped.problems).toEqual([]);
-      expect(skipped.undrawn).toContain(`${row} at 390`);
+      // An undrawn width is skipped and listed, never failed, but only with
+      // its evidence: the board at that width, measured without the row.
+      expect(undrawn).toContain("home/contact at 390");
+      const contact = real.sections.rows.find((r) => r.id === "home/contact")!;
+      expect(contact.undrawn).toEqual({ "390": "range-phone.dc.html" });
+      // A drawn row relabelled undrawn fails: with no evidence, with evidence
+      // that is no phone board, and with the phone board that draws it.
+      expect(
+        broken((b) => (at(b).sources["390"] = null)).problems.join("\n")
+      ).toContain(
+        `${row}: 390 is marked undrawn but names no board that leaves it out`
+      );
+      expect(
+        broken((b) => {
+          at(b).sources["390"] = null;
+          at(b).undrawn = { "390": "range-light-desktop.dc.html" };
+        }).problems.join("\n")
+      ).toContain(
+        `${row}: range-light-desktop.dc.html, the undrawn evidence at 390, is not a pinned 390 board`
+      );
+      expect(
+        broken((b) => {
+          at(b).sources["390"] = null;
+          at(b).undrawn = { "390": "range-phone.dc.html" };
+        }).problems.join("\n")
+      ).toContain(`${row}: range-phone.dc.html draws this row at 390`);
+
+      // Every board's palette is recorded where the boards define it, and the
+      // dark boards' differs from the light ones'.
+      const names = real.sections.tokens.names;
+      for (const [board, ref] of Object.entries(real.spec.boards))
+        for (const [key, cap] of Object.entries(ref.captures)) {
+          const got = Object.keys(cap.tokens);
+          expect(got.length, `${board} ${key}`).toBeGreaterThan(0);
+          expect(
+            got.filter((n) => !names.includes(n)),
+            board
+          ).toEqual([]);
+        }
+      const light =
+        real.spec.boards["range-light-desktop.dc.html"].captures[
+          "light/default"
+        ].tokens;
+      expect(Object.keys(light).sort()).toEqual(
+        names.filter((n) => n !== "--error").sort()
+      );
+      expect(
+        broken((b) => {
+          b.spec = structuredClone(b.spec);
+          b.spec.boards["range-phone.dc.html"].captures[
+            "light/default"
+          ].tokens = {};
+        }).problems.join("\n")
+      ).toContain(
+        "spec.json: range-phone.dc.html light/default has no colour tokens at div:has(> main)"
+      );
+      expect(
+        broken((b) => {
+          b.spec = structuredClone(b.spec);
+          b.spec.boards["range-dark-desktop.dc.html"].captures[
+            "dark/default"
+          ].tokens = light;
+        }).problems.join("\n")
+      ).toContain(
+        "spec.json: range-light-desktop.dc.html light and range-dark-desktop.dc.html dark have the same palette"
+      );
     });
 
     test("writes verifier pairs, fails on a mismatch, leaves the site unchanged", async () => {
       chromiumOnly();
       test.setTimeout(30 * 60_000);
+      // Motion on and reduced, and the theme reveal held in flight.
       const only: Only = {
-        rows: ["fx/opener", "fx/range"],
-        states: ["default", "tab-2"],
-        rm: false,
+        rows: ["fx/header", "fx/opener", "fx/range"],
+        states: ["default", "tab-2", "theme-reveal"],
       };
       const drifted = await nestedRun(ROOT, {
         UI_VERIFY: "1",
@@ -1268,11 +1702,14 @@ test.describe("fidelity harness", () => {
         const pairs = path.join(drifted.out, "fidelity");
         const want: string[] = [];
         for (const w of ["1440", "390"])
-          for (const t of ["light", "dark"]) {
-            want.push(pairName("fx/opener", "default", w, t));
-            for (const s of ["default", "tab-2"])
-              want.push(pairName("fx/range", s, w, t));
-          }
+          for (const t of ["light", "dark"])
+            for (const rm of ["", "-rm"]) {
+              for (const s of ["default", "theme-reveal"])
+                want.push(pairName("fx/header", `${s}${rm}`, w, t));
+              want.push(pairName("fx/opener", `default${rm}`, w, t));
+              for (const s of ["default", "tab-2"])
+                want.push(pairName("fx/range", `${s}${rm}`, w, t));
+            }
         const written = readdirSync(pairs).sort();
         expect(written).toEqual(
           want.flatMap((n) => [`${n}-board.png`, `${n}-site.png`]).sort()
@@ -1338,7 +1775,7 @@ test.describe("fidelity harness", () => {
       const range = prRange();
       if (!range || existsAt(range.base, SPEC_FILE)) return;
       const allowed =
-        /^(docs\/boards\/|e2e\/fidelity(-harness)?\.spec\.ts$|e2e\/fixtures\/fidelity\/|scripts\/boards[/.-]|package\.json$|\.gitignore$|\.prettierignore$|\.lintstagedrc\.json$|\.husky\/|\.github\/workflows\/ci\.yml$)/;
+        /^(docs\/boards\/|e2e\/fidelity(-harness)?\.spec\.ts$|e2e\/fixtures\/fidelity\/|scripts\/boards[/.-]|package\.json$|eslint\.config\.mjs$|docs\/tickets\/PRV-22\.md$|\.gitignore$|\.prettierignore$|\.lintstagedrc\.json$|\.husky\/|\.github\/workflows\/ci\.yml$)/;
       const changed = git([
         "diff",
         "--name-only",

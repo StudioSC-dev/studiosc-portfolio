@@ -54,11 +54,14 @@
     const photos = [...document.querySelectorAll("[data-photo]")];
     const shown = document.querySelector("[data-shown]");
     let photo = 0;
+    const thumbs = [...document.querySelectorAll("[data-thumb]")];
     const pick = (i) => {
       photo = i;
       photos.forEach((p, j) => p.classList.toggle("on", j === i));
+      thumbs.forEach((t, j) => t.setAttribute("aria-pressed", String(j === i)));
       shown.textContent = `${i + 1} of ${photos.length}`;
     };
+    thumbs.forEach((t, i) => t.addEventListener("click", () => pick(i)));
     document
       .querySelector("[data-next-photo]")
       .addEventListener("click", () => pick((photo + 1) % photos.length));
@@ -76,6 +79,41 @@
         });
       })
     );
+
+    const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const strip = document.querySelector(".chips");
+    const scroll = (by) =>
+      strip.scrollBy({ left: by, behavior: still() ? "auto" : "smooth" });
+    document.querySelector("[data-chips-forward]").addEventListener("click", () => scroll(160));
+    document.querySelector("[data-chips-back]").addEventListener("click", () => scroll(-160));
+
+    const hollies = [...document.querySelectorAll("[data-holly]")];
+    let holly = 0;
+    document.querySelector("[data-holly-next]").addEventListener("click", () => {
+      holly = (holly + 1) % hollies.length;
+      hollies.forEach((p, j) => p.classList.toggle("on", j === holly));
+    });
+    const treats = document.querySelector("[data-treats]");
+    document.querySelector("[data-treat]").addEventListener("click", () => {
+      treats.textContent = "One treat given.";
+    });
+
+    const status = document.querySelector("[data-status]");
+    const say = { sent: "Thanks, it is sent.", error: "That did not send. Try again." };
+    document
+      .querySelectorAll("[data-board-state]")
+      .forEach((b) => b.addEventListener("click", () => (status.textContent = say[b.dataset.boardState])));
+    const form = document.querySelector("[data-contact]");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        const r = await fetch("/api/contact", { method: "POST", body: new FormData(form) });
+        const j = r.ok ? await r.json() : null;
+        status.textContent = j && j.success ? say.sent : say.error;
+      } catch {
+        status.textContent = say.error;
+      }
+    });
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();

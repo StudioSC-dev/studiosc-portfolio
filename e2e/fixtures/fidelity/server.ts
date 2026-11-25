@@ -71,6 +71,8 @@ export function startFixtureServer(
       return send(200, runtime, TYPES[".js"]);
     let file: string | null = null;
     if (url.pathname === "/") file = path.join(FIXTURE, "site", "index.html");
+    else if (url.pathname === "/blog/work")
+      file = path.join(FIXTURE, "site", "blog-work.html");
     else if (url.pathname.startsWith("/img/")) {
       const name = path.basename(url.pathname);
       const swap = drift?.images?.[name];

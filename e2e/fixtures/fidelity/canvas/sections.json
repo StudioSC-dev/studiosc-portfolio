@@ -37,6 +37,18 @@
     "image": "img",
     "text": "p, dt, dd, figcaption, label"
   },
+  "tokens": {
+    "board": "div:has(> main)",
+    "site": ":root",
+    "names": [
+      "--ink",
+      "--paper",
+      "--plate",
+      "--accent",
+      "--rule",
+      "--muted"
+    ]
+  },
   "states": {
     "theme-reveal": {
       "toggleTheme": true,
@@ -104,6 +116,139 @@
           "click": {
             "role": "button",
             "name": "Next photo"
+          }
+        }
+      ],
+      "from": "gallery-2"
+    },
+    "photo-2-of-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 2 of 3"
+          }
+        }
+      ]
+    },
+    "photo-3-of-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 3 of 3"
+          }
+        }
+      ]
+    },
+    "chips-forward": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories forward"
+          }
+        }
+      ],
+      "widths": [
+        "390"
+      ]
+    },
+    "chips-back": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories forward"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories back"
+          }
+        }
+      ],
+      "widths": [
+        "390"
+      ],
+      "from": "chips-forward"
+    },
+    "holly-2": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-treat": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Give Holly a treat"
+          }
+        }
+      ]
+    },
+    "contact-error": {
+      "board": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Error"
+          }
+        }
+      ],
+      "site": [
+        {
+          "mock": {
+            "url": "**/api/contact",
+            "status": 500,
+            "body": "{\"success\":false}"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send message"
+          }
+        }
+      ]
+    },
+    "contact-sent": {
+      "board": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Sent"
+          }
+        }
+      ],
+      "site": [
+        {
+          "mock": {
+            "url": "**/api/contact",
+            "status": 200,
+            "body": "{\"success\":true}"
+          }
+        },
+        {
+          "fill": {
+            "target": {
+              "role": "textbox",
+              "name": "Your name"
+            },
+            "value": "Ana Reyes"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send message"
           }
         }
       ]
@@ -246,7 +391,9 @@
         "tab-2",
         "tab-3",
         "plate-next",
-        "plate-prev"
+        "plate-prev",
+        "chips-forward",
+        "chips-back"
       ]
     },
     {
@@ -282,7 +429,9 @@
       "states": [
         "default",
         "gallery-2",
-        "gallery-3"
+        "gallery-3",
+        "photo-2-of-3",
+        "photo-3-of-3"
       ]
     },
     {
@@ -353,6 +502,84 @@
         "default",
         "filter-live",
         "filter-draft"
+      ],
+      "links": [
+        {
+          "selector": "a[href=\"/blog/work\"]",
+          "to": "/blog/work"
+        }
+      ]
+    },
+    {
+      "id": "fx/holly",
+      "section": "holly",
+      "route": "/",
+      "ticket": "PRV-96",
+      "built": true,
+      "board": "#holly",
+      "site": "[data-board-section=\"fx/holly\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "holly-2",
+        "holly-treat"
+      ]
+    },
+    {
+      "id": "fx/contact",
+      "section": "contact",
+      "route": "/",
+      "ticket": "PRV-97",
+      "built": true,
+      "board": "#contact",
+      "site": "[data-board-section=\"fx/contact\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "contact-error",
+        "contact-sent"
       ]
     },
     {
@@ -378,6 +605,20 @@
       },
       "states": [
         "default"
+      ],
+      "undrawn": {
+        "390": "fx-phone.dc.html"
+      },
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
       ]
     }
   ]

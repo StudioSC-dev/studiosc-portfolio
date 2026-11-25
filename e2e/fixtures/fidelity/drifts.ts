@@ -35,9 +35,19 @@ export const DRIFTS: Record<string, Drift> = {
   "gap-6": { css: "#gallery { margin-top: 6px; }" },
   "gap-at-limit": { css: "#gallery { margin-top: 2px; }" },
   "gap-beyond": { css: "#gallery { margin-top: 3px; }" },
-  // Section order.
+  // Spacing inside a section, ±2: the heading up and its text down.
+  "inner-gap-at-limit": {
+    css: "#opener h1 { position: relative; top: -1px; } #opener p { position: relative; top: 1px; }",
+  },
+  "inner-gap-beyond": {
+    css: "#opener h1 { position: relative; top: -1.5px; } #opener p { position: relative; top: 1.5px; }",
+  },
+  // Section order: in the DOM, and only as rendered (across the unbuilt notes).
   "order-swap": {
     js: 'document.querySelector("main").insertBefore(document.getElementById("gallery"), document.getElementById("range"));',
+  },
+  "css-order-swap": {
+    css: "main { display: flex; flex-direction: column; } #opener, #range { order: -2; } #list { order: -1; }",
   },
   // Type.
   "font-size": { css: "#opener h1 { font-size: 57px; }" },
@@ -60,12 +70,16 @@ export const DRIFTS: Record<string, Drift> = {
   border: { css: "[data-toggle] { border-color: #123456; }" },
   // Copy.
   word: { replace: [["made to be measured", "made to be checked"]] },
-  "cv-absent": { css: 'header a[href^="/cv/"] { display: none; }' },
+  "cv-absent": { css: 'a[href^="/cv/"] { display: none; }' },
   // Image frames: box, ratio, radius, border; never the picture.
   "frame-narrower": {
     css: "#gallery figure { width: calc(min(480px, 100%) - 10px); }",
   },
   "frame-ratio": { css: ".frame { aspect-ratio: 16 / 9; }" },
+  // 2px wider and 2px shorter: each side within ±2, the shape not.
+  "ratio-skew": {
+    css: "#gallery .frame img { inset: auto; left: 0; top: 0; width: calc(100% + 2px); height: calc(100% - 2px); }",
+  },
   "frame-radius": { css: ".frame img { border-radius: 4px; }" },
   "frame-border": { css: ".frame img { border: 2px solid #000000; }" },
   "picture-only": { images: { "one.webp": "alt.webp" } },
@@ -83,6 +97,21 @@ export const DRIFTS: Record<string, Drift> = {
   "wrong-side": {
     css: ".plate.from-right { animation-name: plate-from-left !important; }",
   },
+  "plate-reversed": {
+    css: ".plate.from-right { animation-direction: reverse !important; }",
+  },
+  "reveal-shrinks": {
+    css: "::view-transition-new(root) { animation-direction: reverse !important; }",
+  },
+  "opener-moves-on-tab": {
+    js: 'document.querySelectorAll("[data-tab]").forEach((t) => t.addEventListener("click", () => { const p = document.querySelector("#opener p"); p.style.animation = "none"; void p.offsetWidth; p.style.animation = "fade-in 300ms ease-out"; }));',
+  },
+  "rm-waapi": {
+    js: 'if (matchMedia("(prefers-reduced-motion: reduce)").matches) document.querySelector("#opener h1").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400 });',
+  },
+  "rm-toggle-motion": {
+    css: '@media (prefers-reduced-motion: reduce) { :root[data-theme="dark"] header { animation: fade-in 300ms ease-out !important; } }',
+  },
   "rm-animation": {
     css: "@media (prefers-reduced-motion: reduce) { #opener h1 { animation: rise 560ms ease-out both !important; } }",
   },
@@ -91,4 +120,32 @@ export const DRIFTS: Record<string, Drift> = {
   "gallery-dead": dead("[data-next-photo]"),
   "filter-dead": dead("[data-filter]"),
   "toggle-dead": dead("[data-toggle]"),
+  "thumb-dead": dead("[data-thumb]"),
+  "chips-back-dead": dead("[data-chips-back]"),
+  "holly-dead": dead("[data-holly-next]"),
+  "treat-dead": dead("[data-treat]"),
+  // Next updates the counter and the pressed thumbnail, not the picture.
+  "gallery-counter-only": {
+    js: `document.addEventListener("click", (e) => {
+  if (!e.target.closest("[data-next-photo]")) return;
+  e.stopImmediatePropagation();
+  const shown = document.querySelector("[data-shown]");
+  const n = (Number(shown.textContent.split(" ")[0]) % 3) + 1;
+  shown.textContent = n + " of 3";
+  document.querySelectorAll("[data-thumb]").forEach((t, j) => t.setAttribute("aria-pressed", String(j === n - 1)));
+}, true);`,
+  },
+  "contact-dead": {
+    js: 'document.addEventListener("submit", (e) => { e.preventDefault(); e.stopImmediatePropagation(); }, true);',
+  },
+  "writing-dead": {
+    js: 'document.addEventListener("click", (e) => { if (e.target.closest(\'a[href="/blog/work"]\')) e.preventDefault(); }, true);',
+  },
+  // Fonts: the family's name kept, another file behind it, or none.
+  "fonts-wrong": {
+    replace: [['href="/fonts.css"', 'href="/fonts-wrong.css"']],
+  },
+  "fonts-missing": {
+    replace: [['href="/fonts.css"', 'href="/fonts-missing.css"']],
+  },
 };

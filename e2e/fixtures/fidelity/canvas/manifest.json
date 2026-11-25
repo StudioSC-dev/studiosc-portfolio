@@ -1,17 +1,17 @@
 {
   "boards": {
     "fx-dark-desktop.dc.html": {
-      "sha256": "e7788abd49574c8902238b16582768a4c1b0b70e39a2f432d053ad6b81c6af8d",
+      "sha256": "41672cae614faa37085f92c9772ce393acd71ad36b3c09efe2e2d362d918fb85",
       "theme": "dark",
       "width": "1440"
     },
     "fx-desktop.dc.html": {
-      "sha256": "75a5460de0eaa26a85a506789a295d7047ba4d6ad0ef881c80637a656bef119c",
+      "sha256": "97482ea720d105674b8e0315cf501938567f71eba9270f8189675512dfe90158",
       "theme": "light",
       "width": "1440"
     },
     "fx-phone.dc.html": {
-      "sha256": "dc1c4075885c5b25e9cea8d146386589c3355949f3e5c98f02e3fe1532a35f05",
+      "sha256": "9545cc5ec79dc10be637c55f804c1971d09687937f9d16c9cd32a129e61d1d62",
       "theme": "light",
       "width": "390"
     }
@@ -26,6 +26,9 @@
     }
   },
   "images": {
+    "four.webp": {
+      "sha256": "3c6e2bc399879bedffd707e36935c3d3f7e737d695bd7d258ab7e57b27d42cea"
+    },
     "one.webp": {
       "sha256": "a6db18e70776f9ae3debdbe07ceb3c3463c9ff0ec22fbd9f73dcf995e33227d9"
     },
@@ -37,9 +40,9 @@
     }
   },
   "runtime": {
-    "sha256": "3ae8456794c62cd3efcc5de0466dd174704a9e45f5b6bceb79457e479083a79a",
-    "source": "the stand-in runtime, e2e/fixtures/fidelity/runtime/support.js, served by the harness",
-    "url": null
+    "sha256": "51ce3e9e2847a676278c4d4a8359f61b61b2de77d7c95ab95e09eeaab124ce24",
+    "source": "the stand-in runtime, e2e/fixtures/fidelity/runtime/support.js, served by the harness under BOARDS_RUNTIME_BASE",
+    "url": "published/support.js"
   },
   "version": 1
 }
