@@ -20,6 +20,7 @@ import {
   allowsHeadingWeight,
   finalWithFragment,
   docGaps,
+  liveAliases,
   expectedFontConfig,
   normalizeDestination,
   ringProblems,
@@ -360,7 +361,11 @@ test.describe("Range design system", () => {
     const palettes = table(doc(), "Product palettes");
     expect(root.length).toBeGreaterThanOrEqual(7);
     expect(status).toHaveLength(4);
-    expect(aliases).toHaveLength(6);
+    // The doc lists exactly the aliases globals.css still declares. All six
+    // stay through PRV-2's own PR; PRV-18 may then delete the unused ones.
+    const live = Object.keys(liveAliases(read(CSS)));
+    expect(aliases.map((a) => a.Alias).sort()).toEqual([...live].sort());
+    if (!("skip" in ownPr())) expect(live).toHaveLength(6);
 
     for (const theme of THEMES) {
       await openThemed(page, "/", theme);
@@ -1496,7 +1501,15 @@ test.describe("Range design system", () => {
     const testInfo = test.info();
     chromiumOnly(testInfo);
     const markdown = read(DOC);
-    expect(docGaps(markdown)).toEqual([]);
+    const css = read(CSS);
+    expect(docGaps(markdown, liveAliases(css))).toEqual([]);
+
+    // PRV-18 deletes an unused alias and its row: the rest still hold.
+    const lessPaper = css.replace(/^\s*--paper: var\(--gallery\);\n/m, "");
+    expect(Object.keys(liveAliases(lessPaper))).toHaveLength(5);
+    expect(
+      docGaps(withoutRow(markdown, "--paper"), liveAliases(lessPaper))
+    ).toEqual([]);
 
     // An entry removed from the doc fails.
     expect(docGaps(withoutRow(markdown, "--frag-cc-news"))).toContain(

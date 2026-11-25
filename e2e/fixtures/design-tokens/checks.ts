@@ -480,10 +480,27 @@ function sameHex(a: string, b: string): boolean {
 }
 
 /**
+ * The legacy aliases globals.css still declares, each with its Range token.
+ * PRV-18 deletes the unused ones; the alias checks then hold for the rest.
+ */
+export function liveAliases(css: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(LEGACY_ALIASES).filter(([alias]) =>
+      new RegExp(`(?<![\\w-])${alias}\\s*:`).test(css)
+    )
+  );
+}
+
+/**
  * Everything the doc must cover, against the inventory written from §2, the
  * boards and Scope. Returns what is missing or wrong; empty means covered.
+ * `aliases` is the set of legacy aliases the doc must list (by default all
+ * six; pass `liveAliases(css)` for the ones that remain).
  */
-export function docGaps(markdown: string): string[] {
+export function docGaps(
+  markdown: string,
+  aliases: Record<string, string> = LEGACY_ALIASES
+): string[] {
   const doc = parseDoc(markdown);
   const gaps: string[] = [];
   const has = (heading: string) => doc.headings.includes(heading);
@@ -509,9 +526,9 @@ export function docGaps(markdown: string): string[] {
   themed("Root colour tokens", ROOT_TOKENS);
   themed("Status colours", STATUS_TOKENS);
 
-  const aliases = table(doc, "Legacy aliases");
-  for (const [alias, target] of Object.entries(LEGACY_ALIASES)) {
-    const row = aliases.find((r) => r.Alias === alias);
+  const aliasRows = table(doc, "Legacy aliases");
+  for (const [alias, target] of Object.entries(aliases)) {
+    const row = aliasRows.find((r) => r.Alias === alias);
     if (!row || row["Resolves to"] !== target) {
       gaps.push(`Legacy aliases: ${alias} -> ${target}`);
     }
