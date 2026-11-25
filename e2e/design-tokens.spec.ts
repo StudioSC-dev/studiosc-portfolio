@@ -52,6 +52,7 @@ import {
   FRAGMENT_FIXTURES,
   LOW_RING_FIXTURE,
   MOTION_FIXTURES,
+  OVERRIDDEN_FORM_FIXTURE,
 } from "./fixtures/design-tokens/fragments";
 import {
   BOARD_WEIGHTS,
@@ -105,6 +106,44 @@ async function openThemed(page: Page, route: string, theme: Theme) {
   await page.evaluate((t) => {
     document.documentElement.dataset.theme = t;
   }, theme);
+}
+
+/**
+ * Every element in a `[data-fixture]` root that holds its own text: its
+ * computed colour, on its own and its ancestors' backgrounds flattened.
+ */
+async function renderedText(page: Page): Promise<Pairing[]> {
+  const samples = await page.evaluate(() => {
+    const out: { name: string; fg: string; surfaces: string[] }[] = [];
+    for (const root of document.querySelectorAll<HTMLElement>(
+      "[data-fixture]"
+    )) {
+      for (const el of [root, ...root.querySelectorAll<HTMLElement>("*")]) {
+        const own = Array.from(el.childNodes).some(
+          (n) => n.nodeType === Node.TEXT_NODE && !!n.textContent?.trim()
+        );
+        if (!own) continue;
+        const surfaces: string[] = [];
+        for (let p: HTMLElement | null = el; p; p = p.parentElement) {
+          const bg = getComputedStyle(p).backgroundColor;
+          if (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+            surfaces.push(bg);
+          }
+        }
+        out.push({
+          name: `${root.dataset.fixture}: ${el.textContent?.trim()}`,
+          fg: getComputedStyle(el).color,
+          surfaces,
+        });
+      }
+    }
+    return out;
+  });
+  return samples.map((s) => ({
+    name: s.name,
+    fg: s.fg,
+    bg: flattenSurface(s.surfaces),
+  }));
 }
 
 /** Appends fixture markup to the page, inside one host element. */
@@ -613,6 +652,26 @@ test.describe("Range design system", () => {
         bg: got[r.Surface],
       }));
       expect(failingPairings(pairings, 4.5)).toEqual([]);
+
+      // The text each fragment fixture renders, in the colour it computes to,
+      // on the surface painted behind it: an override inside a fragment
+      // counts, though the root tokens are unchanged.
+      await inject(page, FRAGMENT_FIXTURES + OVERRIDDEN_FORM_FIXTURE);
+      const rendered = await renderedText(page);
+      const [overridden, fixtures] = [
+        rendered.filter((p) => p.name.startsWith("form-helper-overridden:")),
+        rendered.filter((p) => !p.name.startsWith("form-helper-overridden:")),
+      ];
+      expect(fixtures.length).toBeGreaterThanOrEqual(20);
+      expect(failingPairings(fixtures, 4.5), `${theme} fixtures`).toEqual([]);
+      // Control: the overridden labels fail, the rest of that copy passes.
+      expect(
+        failingPairings(overridden, 4.5).map((f) => f.split(":")[1])
+      ).toEqual([
+        " Customer message",
+        " Reply draft",
+        " The draft appears here as it is written.",
+      ]);
 
       // Fully transparent text fails, though its colour alone would pass.
       expect(

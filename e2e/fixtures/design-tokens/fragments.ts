@@ -101,6 +101,15 @@ export const FRAGMENT_FIXTURES = [
 ].join("\n");
 
 /**
+ * The form helper with its muted text overridden inside the fragment to the
+ * line colour: the root tokens are unchanged, but the labels are illegible.
+ */
+export const OVERRIDDEN_FORM_FIXTURE = formHelper.replace(
+  'data-fixture="form-helper" style="',
+  'data-fixture="form-helper-overridden" style="--frag-form-muted: var(--frag-form-line); '
+);
+
+/**
  * Each fragment face and the CSS family it computes to. next/font/local names
  * a self-hosted face after its export, so IBM Plex Sans is `ibmPlexSans`.
  */
