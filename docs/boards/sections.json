@@ -832,7 +832,7 @@
           "ticket": "PRV-6",
           "hide": [
             {
-              "selector": "div[aria-hidden] div:has(> svg > rect[stroke=\"#DCE3DE\"]), div[aria-hidden] div:has(> svg > rect[stroke=\"#D0D3D8\"])",
+              "selector": "div[aria-hidden] div:has(> svg > rect[stroke=\"#DCE3DE\"]), div[aria-hidden] p:has(+ div > svg > rect[stroke=\"#DCE3DE\"]), div[aria-hidden] div:has(> svg > rect[stroke=\"#D0D3D8\"]), div[aria-hidden] p:has(+ div > svg > rect[stroke=\"#D0D3D8\"])",
               "mode": "hide"
             }
           ]
