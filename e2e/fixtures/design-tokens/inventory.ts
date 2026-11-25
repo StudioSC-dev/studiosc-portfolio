@@ -465,6 +465,45 @@ export const KEYFRAMES = [
   "theme-reveal",
 ] as const;
 
+/**
+ * Scope: each board keyframe's body, as the boards write it, with spaces
+ * dropped around punctuation and no semicolon before a closing brace.
+ */
+export const KEYFRAME_BODIES: Record<(typeof KEYFRAMES)[number], string> = {
+  rise: "from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}",
+  "stage-in":
+    "from{opacity:0;transform:translateY(2rem)}to{opacity:1;transform:none}",
+  "fade-in": "from{opacity:0}to{opacity:1}",
+  "word-in":
+    "from{opacity:0;transform:translateY(0.3em)}to{opacity:1;transform:none}",
+  "plate-from-left":
+    "from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}",
+  "plate-from-right":
+    "from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}",
+  "plate-fade": "from{opacity:0}to{opacity:1}",
+  "tick-in": "from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:none}",
+  "stream-in": "from{opacity:0}to{opacity:1}",
+  turn: "from{transform:rotateX(-24deg) rotateY(36deg)}to{transform:rotateX(-24deg) rotateY(396deg)}",
+  "wiggle-a":
+    "0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}",
+  "wiggle-b":
+    "0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}",
+  "ears-a":
+    "0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}",
+  "ears-b":
+    "0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}",
+  "tuck-a":
+    "0%{transform:none;z-index:7}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:7}55%{z-index:0}100%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}",
+  "tuck-b":
+    "0%{transform:none;z-index:7}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:7}55%{z-index:0}100%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}",
+  "untuck-a":
+    "0%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:0}55%{z-index:7}100%{transform:none;z-index:7}",
+  "untuck-b":
+    "0%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:0}55%{z-index:7}100%{transform:none;z-index:7}",
+  "theme-reveal":
+    "from{clip-path:circle(0px at var(--rx,100%) var(--ry,0px))}to{clip-path:circle(150vmax at var(--rx,100%) var(--ry,0px))}",
+};
+
 /** Scope's fallback order, step number and its key phrase. */
 export const FONT_FALLBACK_STEPS: ReadonlyArray<readonly [number, string]> = [
   [1, "Trim the weight axes"],

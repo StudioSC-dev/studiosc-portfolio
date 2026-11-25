@@ -1593,6 +1593,20 @@ test.describe("Range design system", () => {
     expect(missingMotionRules(withoutKeyframes(css, "turn"))).toEqual([
       "@keyframes turn",
     ]);
+    // A body that no longer animates fails: the turntable ending where it
+    // starts, and a rise that stays transparent.
+    expect(css).toContain("rotateY(396deg)");
+    expect(
+      missingMotionRules(css.replace("rotateY(396deg)", "rotateY(36deg)"))
+    ).toEqual(["@keyframes turn as the boards draw it"]);
+    const stillRise = css.replace(
+      /(@keyframes rise \{[\s\S]*?to \{\s*opacity: )1/,
+      "$10"
+    );
+    expect(stillRise).not.toBe(css);
+    expect(missingMotionRules(stillRise)).toEqual([
+      "@keyframes rise as the boards draw it",
+    ]);
   });
 
   test("shared surfaces and icons match Range", async ({ page }, testInfo) => {

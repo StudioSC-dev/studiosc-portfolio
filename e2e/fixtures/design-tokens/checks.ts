@@ -18,6 +18,7 @@ import {
   FONT_FALLBACK_STEPS,
   FRAGMENT_TOKENS,
   KEYFRAMES,
+  KEYFRAME_BODIES,
   LAYOUT,
   LATIN_RANGE,
   LEGACY_ALIASES,
@@ -430,9 +431,14 @@ export function normalizeDestination(
 /** Board keyframes and view-transition rules missing from a stylesheet's source. */
 export function missingMotionRules(css: string): string[] {
   const flat = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
-  const missing: string[] = KEYFRAMES.filter(
-    (name) => !new RegExp(`@keyframes ${name} ?\\{`).test(flat)
-  ).map((name) => `@keyframes ${name}`);
+  const missing: string[] = [];
+  for (const name of KEYFRAMES) {
+    const body = keyframeBody(flat, name);
+    if (body === null) missing.push(`@keyframes ${name}`);
+    else if (body !== KEYFRAME_BODIES[name]) {
+      missing.push(`@keyframes ${name} as the boards draw it`);
+    }
+  }
 
   const required: Array<[string, RegExp]> = [
     [
@@ -465,6 +471,26 @@ export function missingMotionRules(css: string): string[] {
 }
 
 /** Removes one keyframes block, for the "a missing keyframe fails" control. */
+/**
+ * The body of `@keyframes name`, spaces dropped around punctuation and no
+ * semicolon before a closing brace; null when the rule is missing.
+ */
+function keyframeBody(css: string, name: string): string | null {
+  const head = new RegExp(`@keyframes ${name} ?\\{`).exec(css);
+  if (!head) return null;
+  let depth = 1;
+  let i = head.index + head[0].length;
+  for (; depth > 0 && i < css.length; i++) {
+    if (css[i] === "{") depth++;
+    if (css[i] === "}") depth--;
+  }
+  return css
+    .slice(head.index + head[0].length, i - 1)
+    .trim()
+    .replace(/\s*([{};:,])\s*/g, "$1")
+    .replace(/;\}/g, "}");
+}
+
 export function withoutKeyframes(css: string, name: string): string {
   const start = css.indexOf(`@keyframes ${name} {`);
   if (start < 0) {
