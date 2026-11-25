@@ -481,12 +481,16 @@ test.describe("fidelity harness", () => {
       writeFileSync(
         boardFile,
         readFileSync(boardFile, "utf8").replace(
-          "Three made-up pictures.",
-          "Three made-up pictures, changed."
+          "#gallery figure { margin-top: 16px;",
+          "#gallery figure { margin-top: 24px;"
         )
       );
       const manifest = readJson<Manifest>(path.join(work, "manifest.json"));
-      manifest.boards[changed].sha256 = sha256(readFileSync(boardFile));
+      const edited = sha256(readFileSync(boardFile));
+      expect(edited, "the board edit applied").not.toBe(
+        manifest.boards[changed].sha256
+      );
+      manifest.boards[changed].sha256 = edited;
       writeFileSync(
         path.join(work, "manifest.json"),
         `${JSON.stringify(manifest, null, 2)}\n`
