@@ -675,6 +675,18 @@ export function checkSections(boards: BoardsDir): SectionCheck {
           problems.push(
             `${at}: ${board}, the undrawn evidence at ${width}, is not a pinned ${width} board`
           );
+        else if (
+          !sections.rows.some(
+            (r) =>
+              r.route === row.route &&
+              THEMES.some((t) => r.sources[width]?.[t]?.board === board)
+          )
+        )
+          // Only the board that draws the row's own page can show it left
+          // out: any other board measures it as absent.
+          problems.push(
+            `${at}: ${board}, the undrawn evidence at ${width}, does not draw ${row.route}`
+          );
         else if (!capture || !(row.id in capture.rows))
           problems.push(
             `${at}: ${board} light/default never measured this row; run boards:regen`

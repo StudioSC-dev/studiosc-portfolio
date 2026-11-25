@@ -1767,6 +1767,21 @@ test.describe("fidelity harness", () => {
           at(b).undrawn = { "390": "range-phone.dc.html" };
         }).problems.join("\n")
       ).toContain(`${row}: range-phone.dc.html draws this row at 390`);
+      // Evidence from another page's board fails, even where that board
+      // measured the row as absent: only the board that draws the row's own
+      // page can show it left out.
+      const elsewhere = broken((b) => {
+        at(b).sources["390"] = null;
+        at(b).undrawn = { "390": "pages-404-phone.dc.html" };
+        b.spec = structuredClone(b.spec);
+        b.spec.boards["pages-404-phone.dc.html"].captures["light/default"].rows[
+          row
+        ] = null;
+      });
+      expect(elsewhere.problems.join("\n")).toContain(
+        `${row}: pages-404-phone.dc.html, the undrawn evidence at 390, does not draw /preview/home`
+      );
+      expect(elsewhere.undrawn).not.toContain(`${row} at 390`);
 
       // PRV-5's variants show each plate's shell only: the interior a later
       // ticket draws is gone even though the plate mounts after the hide
