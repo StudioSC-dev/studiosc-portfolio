@@ -261,6 +261,12 @@ test.describe("fidelity harness", () => {
     {
       const dir = boardsCopy(BOARDS, "shot-");
       try {
+        // The copy's ref/ links to the committed one: this case writes a
+        // shot, so it gets a ref/ of its own.
+        rmSync(path.join(dir, "ref"));
+        cpSync(path.join(BOARDS, "ref"), path.join(dir, "ref"), {
+          recursive: true,
+        });
         const spec = readSpec(path.join(dir, "spec.json"));
         const shots = [
           ...new Set(
@@ -279,6 +285,8 @@ test.describe("fidelity harness", () => {
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
+      // None of the cases above reached the committed references.
+      expect(pinProblems(BOARDS)).toEqual([]);
     }
 
     // Each board records only the photos it loaded: a board with no photo
