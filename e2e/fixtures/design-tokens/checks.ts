@@ -1046,3 +1046,29 @@ export function plexCutProblems(cut: FontCut): string[] {
 }
 
 const hex4 = (c: number) => c.toString(16).toUpperCase().padStart(4, "0");
+
+// ---------------------------------------------------------------------------
+// The Lighthouse record
+
+/**
+ * Lighthouse runs whose values are not finite numbers (JSON reads 1e309 as
+ * Infinity), or whose LCP is not positive.
+ */
+export function perfRunProblems(
+  runs: ReadonlyArray<Record<string, unknown>>
+): string[] {
+  const problems: string[] = [];
+  runs.forEach((run, i) => {
+    for (const key of ["perf", "a11y", "lcp_ms", "cls"]) {
+      const value = run[key];
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        problems.push(`run ${i + 1} ${key} is not a finite number`);
+      }
+    }
+    const lcp = run.lcp_ms;
+    if (typeof lcp === "number" && Number.isFinite(lcp) && lcp <= 0) {
+      problems.push(`run ${i + 1} lcp_ms is not positive`);
+    }
+  });
+  return problems;
+}

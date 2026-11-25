@@ -21,6 +21,7 @@ import {
   finalWithFragment,
   contrast,
   flattenSurface,
+  perfRunProblems,
   fontCut,
   plexCutProblems,
   docGaps,
@@ -1524,11 +1525,23 @@ test.describe("Range design system", () => {
     expect(perf.route).toBe("/");
     expect(perf.lighthouse_version).toMatch(/^\d+\.\d+\.\d+/);
     expect(perf.runs).toHaveLength(3);
-    for (const run of perf.runs) {
-      for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
-        expect(typeof run[key], `run ${key}`).toBe("number");
-      }
-    }
+    expect(perfRunProblems(perf.runs)).toEqual([]);
+    // Controls: an infinite LCP beside two finite ones would leave a
+    // plausible median; it fails, as do a zero LCP and a missing value.
+    const [run] = perf.runs;
+    expect(
+      perfRunProblems(
+        JSON.parse(
+          `[{"perf":100,"a11y":98,"lcp_ms":1e309,"cls":0},${JSON.stringify(run)},${JSON.stringify(run)}]`
+        ) as Array<Record<string, unknown>>
+      )
+    ).toEqual(["run 1 lcp_ms is not a finite number"]);
+    expect(perfRunProblems([{ ...run, lcp_ms: 0 }])).toEqual([
+      "run 1 lcp_ms is not positive",
+    ]);
+    expect(perfRunProblems([{ ...run, cls: undefined }])).toEqual([
+      "run 1 cls is not a finite number",
+    ]);
     const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
     for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
       expect(perf.median[key], `median ${key}`).toBeCloseTo(
