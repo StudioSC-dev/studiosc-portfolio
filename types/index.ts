@@ -1,3 +1,5 @@
+import type { ProjectStatus } from "@/lib/statuses";
+
 export interface ContactFormData {
   name: string;
   company: string;
@@ -40,9 +42,11 @@ export interface Project {
   title: string;
   description: string;
   tags: string[];
-  qaVerified: boolean;
-  qaInProgress?: boolean;
-  underDevelopment?: boolean;
+  status: ProjectStatus;
+  /** The one-line list summary, at most 80 characters. */
+  summary: string;
+  /** One to three stack names. */
+  builtWith: string[];
   githubUrl?: string;
   liveUrl?: string;
   date: string;

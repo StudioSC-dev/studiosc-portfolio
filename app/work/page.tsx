@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import { getProjects } from "@/lib/mdx";
+import { STATUSES, STATUS_ORDER } from "@/lib/statuses";
 import ProjectCard from "@/components/home/ProjectCard";
 import PageHeader from "@/components/layout/PageHeader";
 
@@ -11,11 +13,6 @@ export const metadata: Metadata = {
 
 export default async function WorkPage() {
   const allProjects = await getProjects();
-
-  // Group projects by status
-  const qaVerified = allProjects.filter((p) => p.qaVerified);
-  const qaInProgress = allProjects.filter((p) => p.qaInProgress);
-  const underDevelopment = allProjects.filter((p) => p.underDevelopment);
 
   const renderProjectSection = (
     title: string,
@@ -37,9 +34,7 @@ export default async function WorkPage() {
               description={project.description}
               tags={project.tags}
               thumbnail={project.thumbnail}
-              qaVerified={project.qaVerified}
-              qaInProgress={project.qaInProgress}
-              underDevelopment={project.underDevelopment}
+              status={project.status}
               githubUrl={project.githubUrl}
               liveUrl={project.liveUrl}
             />
@@ -61,9 +56,14 @@ export default async function WorkPage() {
         <p className="py-16 text-body">No projects yet. Check back soon.</p>
       ) : (
         <>
-          {renderProjectSection("QA Verified", qaVerified)}
-          {renderProjectSection("QA In Progress", qaInProgress)}
-          {renderProjectSection("Under Development", underDevelopment)}
+          {STATUS_ORDER.map((status) => (
+            <Fragment key={status}>
+              {renderProjectSection(
+                STATUSES[status].label,
+                allProjects.filter((p) => p.status === status)
+              )}
+            </Fragment>
+          ))}
         </>
       )}
     </div>
