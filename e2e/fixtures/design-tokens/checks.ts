@@ -4,6 +4,8 @@
  * prove the check can fail.
  */
 
+import zlib from "node:zlib";
+
 import {
   BOARD_IDS,
   BOARD_WEIGHTS,
@@ -17,6 +19,7 @@ import {
   FRAGMENT_TOKENS,
   KEYFRAMES,
   LAYOUT,
+  LATIN_RANGE,
   LEGACY_ALIASES,
   MOTION_MOMENTS,
   REQUIRED_PAIRINGS,
@@ -776,3 +779,229 @@ export function fontBudgetProblems(
   }
   return problems;
 }
+
+// ---------------------------------------------------------------------------
+// The font binary
+
+/** WOFF2's known table tags, by the index its directory flags carry. */
+const WOFF2_TAGS = [
+  "cmap",
+  "head",
+  "hhea",
+  "hmtx",
+  "maxp",
+  "name",
+  "OS/2",
+  "post",
+  "cvt ",
+  "fpgm",
+  "glyf",
+  "loca",
+  "prep",
+  "CFF ",
+  "VORG",
+  "EBDT",
+  "EBLC",
+  "gasp",
+  "hdmx",
+  "kern",
+  "LTSH",
+  "PCLT",
+  "VDMX",
+  "vhea",
+  "vmtx",
+  "BASE",
+  "GDEF",
+  "GPOS",
+  "GSUB",
+  "EBSC",
+  "JSTF",
+  "MATH",
+  "CBDT",
+  "CBLC",
+  "COLR",
+  "CPAL",
+  "SVG ",
+  "sbix",
+  "acnt",
+  "avar",
+  "bdat",
+  "bloc",
+  "bsln",
+  "cvar",
+  "fdsc",
+  "feat",
+  "fmtx",
+  "fvar",
+  "gvar",
+  "hsty",
+  "just",
+  "lcar",
+  "mort",
+  "morx",
+  "opbd",
+  "prop",
+  "trak",
+  "Zapf",
+  "Silf",
+  "Glat",
+  "Gloc",
+  "Feat",
+  "Sill",
+];
+
+/**
+ * The tables of a WOFF2 file, decompressed. Only untransformed tables (fvar
+ * and cmap among them) are returned byte for byte; glyf, loca and a
+ * transformed hmtx keep their WOFF2 form.
+ */
+export function woff2Tables(font: Buffer): Map<string, Buffer> {
+  if (font.toString("latin1", 0, 4) !== "wOF2") throw new Error("not WOFF2");
+  const numTables = font.readUInt16BE(12);
+  const compressed = font.readUInt32BE(20);
+  let at = 48;
+  const base128 = () => {
+    let value = 0;
+    for (let i = 0; i < 5; i++) {
+      const byte = font[at++];
+      value = value * 128 + (byte & 0x7f);
+      if (!(byte & 0x80)) return value;
+    }
+    throw new Error("bad UIntBase128");
+  };
+  const entries: { tag: string; length: number }[] = [];
+  for (let i = 0; i < numTables; i++) {
+    const flags = font[at++];
+    const tag =
+      (flags & 0x3f) === 63
+        ? font.toString("latin1", at, (at += 4))
+        : WOFF2_TAGS[flags & 0x3f];
+    const version = flags >> 6;
+    const orig = base128();
+    const transformed =
+      tag === "glyf" || tag === "loca" ? version !== 3 : version !== 0;
+    entries.push({ tag, length: transformed ? base128() : orig });
+  }
+  const data = zlib.brotliDecompressSync(font.subarray(at, at + compressed));
+  const tables = new Map<string, Buffer>();
+  let offset = 0;
+  for (const { tag, length } of entries) {
+    tables.set(tag, data.subarray(offset, offset + length));
+    offset += length;
+  }
+  return tables;
+}
+
+export interface FontAxis {
+  tag: string;
+  min: number;
+  default: number;
+  max: number;
+}
+
+/** The variation axes an fvar table declares; none for a static font. */
+export function fontAxes(fvar: Buffer | undefined): FontAxis[] {
+  if (!fvar) return [];
+  const offset = fvar.readUInt16BE(4);
+  const count = fvar.readUInt16BE(8);
+  const size = fvar.readUInt16BE(10);
+  const fixed = (at: number) => fvar.readInt32BE(at) / 65536;
+  return Array.from({ length: count }, (_, i) => {
+    const at = offset + i * size;
+    return {
+      tag: fvar.toString("latin1", at, at + 4),
+      min: fixed(at + 4),
+      default: fixed(at + 8),
+      max: fixed(at + 12),
+    };
+  });
+}
+
+/** Every code point a cmap maps to a real glyph (formats 4 and 12). */
+export function fontCodepoints(cmap: Buffer): Set<number> {
+  const points = new Set<number>();
+  const count = cmap.readUInt16BE(2);
+  for (let i = 0; i < count; i++) {
+    const platform = cmap.readUInt16BE(4 + i * 8);
+    const at = cmap.readUInt32BE(8 + i * 8);
+    if (platform !== 0 && platform !== 3) continue;
+    const format = cmap.readUInt16BE(at);
+    if (format === 12) {
+      const groups = cmap.readUInt32BE(at + 12);
+      for (let g = 0; g < groups; g++) {
+        const start = cmap.readUInt32BE(at + 16 + g * 12);
+        const end = cmap.readUInt32BE(at + 20 + g * 12);
+        for (let c = start; c <= end; c++) points.add(c);
+      }
+    } else if (format === 4) {
+      const segs = cmap.readUInt16BE(at + 6) / 2;
+      const ends = at + 14;
+      const starts = ends + segs * 2 + 2;
+      const deltas = starts + segs * 2;
+      const ranges = deltas + segs * 2;
+      for (let s = 0; s < segs; s++) {
+        const end = cmap.readUInt16BE(ends + s * 2);
+        const start = cmap.readUInt16BE(starts + s * 2);
+        const delta = cmap.readUInt16BE(deltas + s * 2);
+        const rangeAt = ranges + s * 2;
+        const range = cmap.readUInt16BE(rangeAt);
+        for (let c = start; c <= end && c !== 0xffff; c++) {
+          let glyph: number;
+          if (range === 0) glyph = (c + delta) & 0xffff;
+          else {
+            const raw = cmap.readUInt16BE(rangeAt + range + (c - start) * 2);
+            glyph = raw === 0 ? 0 : (raw + delta) & 0xffff;
+          }
+          if (glyph !== 0) points.add(c);
+        }
+      }
+    }
+  }
+  return points;
+}
+
+export interface FontCut {
+  axes: FontAxis[];
+  codepoints: Set<number>;
+}
+
+/** The weight axis and character map of a WOFF2 file. */
+export function fontCut(font: Buffer): FontCut {
+  const tables = woff2Tables(font);
+  const cmap = tables.get("cmap");
+  if (!cmap) throw new Error("no cmap");
+  return {
+    axes: fontAxes(tables.get("fvar")),
+    codepoints: fontCodepoints(cmap),
+  };
+}
+
+/**
+ * What the Plex cut lacks: one weight axis spanning the board's weights and
+ * nothing else variable, every printable ASCII character and the peso sign,
+ * and no character outside the Latin range plus the peso sign.
+ */
+export function plexCutProblems(cut: FontCut): string[] {
+  const weights = BOARD_WEIGHTS["IBM Plex Sans"].map(Number);
+  const [min, max] = [weights[0], weights.at(-1)];
+  const problems: string[] = [];
+  const axes = cut.axes.map((a) => `${a.tag} ${a.min} to ${a.max}`);
+  if (axes.join() !== `wght ${min} to ${max}`) {
+    problems.push(`axes [${axes.join(", ")}], not wght ${min} to ${max}`);
+  }
+  for (let c = 0x20; c <= 0x7e; c++) {
+    if (!cut.codepoints.has(c)) problems.push(`no U+${hex4(c)}`);
+  }
+  if (!cut.codepoints.has(0x20b1)) problems.push("no U+20B1");
+  const outside = [...cut.codepoints].filter(
+    (c) => c !== 0x20b1 && !LATIN_RANGE.some(([a, b]) => c >= a && c <= b)
+  );
+  if (outside.length) {
+    problems.push(
+      `outside Latin: ${outside.map((c) => `U+${hex4(c)}`).join(" ")}`
+    );
+  }
+  return problems;
+}
+
+const hex4 = (c: number) => c.toString(16).toUpperCase().padStart(4, "0");

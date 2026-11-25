@@ -21,6 +21,8 @@ import {
   finalWithFragment,
   contrast,
   flattenSurface,
+  fontCut,
+  plexCutProblems,
   docGaps,
   liveAliases,
   expectedFontConfig,
@@ -832,6 +834,30 @@ test.describe("Range design system", () => {
     );
     expect(optionValue(plex, "preload"), "IBM Plex Sans preload").toBe(false);
     expect(optionValue(plex, "display"), "IBM Plex Sans display").toBe("swap");
+    // The binary itself: its weight axis and character map, not the
+    // declaration above.
+    const cut = fontCut(fs.readFileSync(path.join(ROOT, PLEX_FILE)));
+    expect(plexCutProblems(cut), "the IBM Plex Sans cut").toEqual([]);
+    // Controls: a static cut with the peso sign, a wider axis, a cut without
+    // the peso sign and one with an extra script each fail.
+    const wght = cut.axes[0];
+    const without = (c: number) =>
+      new Set([...cut.codepoints].filter((p) => p !== c));
+    expect(plexCutProblems({ ...cut, axes: [] })).toEqual([
+      "axes [], not wght 400 to 600",
+    ]);
+    expect(
+      plexCutProblems({ ...cut, axes: [{ ...wght, max: 700 }] })
+    ).toHaveLength(1);
+    expect(plexCutProblems({ ...cut, codepoints: without(0x20b1) })).toEqual([
+      "no U+20B1",
+    ]);
+    expect(
+      plexCutProblems({
+        ...cut,
+        codepoints: new Set([...cut.codepoints, 0x0410]),
+      })
+    ).toEqual(["outside Latin: U+0410"]);
     const plexBytes = fs.statSync(path.join(ROOT, PLEX_FILE)).size;
     expect(plexBytes, "IBM Plex Sans file size").toBeLessThanOrEqual(40 * KIB);
     expect(
