@@ -26,6 +26,9 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: "line",
+  // No git info: under GitHub Actions the PR diff capture fetches the base
+  // with --depth=1, which would make the repo shallow.
+  captureGitInfo: { commit: false, diff: false },
   use: { baseURL },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

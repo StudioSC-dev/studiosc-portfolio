@@ -121,18 +121,21 @@ const freePort = () =>
     });
   });
 
-/** The environment for a child run: no git, CI or Playwright worker variables. */
+/**
+ * The environment for a child run: no git, CI, GitHub Actions or Playwright
+ * worker variables. A nested Playwright run that sees GitHub Actions captures
+ * the PR diff, fetching the base with --depth=1 and making the repo shallow.
+ */
 function childEnv(extra: Record<string, string | undefined> = {}) {
   const env = cleanEnv();
   for (const key of Object.keys(env))
     if (
-      /^(TEST_|PW_|PLAYWRIGHT_(?!BROWSERS_PATH)|FIDELITY_|FIXTURE_|UI_VERIFY|BOARDS_)/.test(
+      /^(TEST_|PW_|PLAYWRIGHT_(?!BROWSERS_PATH)|FIDELITY_|FIXTURE_|UI_VERIFY|BOARDS_|GITHUB_)/.test(
         key
       )
     )
       delete env[key];
-  for (const key of ["CI", "GITHUB_EVENT_NAME", "PR_HEAD_SHA", "PR_BASE_SHA"])
-    delete env[key];
+  for (const key of ["CI", "PR_HEAD_SHA", "PR_BASE_SHA"]) delete env[key];
   return { ...env, ...extra };
 }
 
@@ -501,6 +504,60 @@ test.describe("fidelity harness", () => {
       ]);
     } finally {
       repo.remove();
+    }
+  });
+
+  test("nested runs keep the repo a full clone", async () => {
+    chromiumOnly();
+    test.setTimeout(10 * 60_000);
+    // A full-history copy whose origin can serve its own HEAD. Under GitHub
+    // Actions, Playwright's PR diff capture would fetch that base with
+    // --depth=1 and leave the copy shallow, as it did to the CI clone.
+    const root = tmp("fidelity-actions-");
+    const clone = path.join(root, "repo");
+    const event = path.join(root, "event.json");
+    const actions: Record<string, string> = {
+      GITHUB_ACTIONS: "true",
+      GITHUB_EVENT_NAME: "pull_request",
+      GITHUB_EVENT_PATH: event,
+    };
+    const saved = Object.keys(actions).map((k) => [k, process.env[k]] as const);
+    try {
+      git(["clone", "-q", "--shared", ROOT, clone]);
+      symlinkSync(
+        path.join(ROOT, "node_modules"),
+        path.join(clone, "node_modules")
+      );
+      const base = git(["rev-parse", "HEAD"], { cwd: clone }).trim();
+      writeFileSync(
+        event,
+        JSON.stringify({
+          pull_request: { title: "fixture", number: 1, base: { sha: base } },
+        })
+      );
+      const shallow = () =>
+        git(["rev-parse", "--is-shallow-repository"], { cwd: clone }).trim();
+      expect(shallow()).toBe("false");
+      // This worker runs as if under Actions; the nested run inherits it.
+      Object.assign(process.env, actions);
+      const one: Only = {
+        rows: ["fx/opener"],
+        widths: ["1440"],
+        themes: ["light"],
+        states: ["default"],
+        rm: false,
+      };
+      const run = await nestedRun(clone, {
+        FIDELITY_ONLY: JSON.stringify(one),
+      });
+      expect(run.status, run.output).toBe(0);
+      rmSync(run.out, { recursive: true, force: true });
+      expect(shallow(), "the nested run made the repo shallow").toBe("false");
+    } finally {
+      for (const [k, v] of saved)
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      rmSync(root, { recursive: true, force: true });
     }
   });
 
