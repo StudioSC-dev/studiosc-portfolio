@@ -3,7 +3,10 @@ import { join } from "path";
 import matter from "gray-matter";
 import type { BlogPost, Project } from "@/types";
 import { calculateReadingTime } from "./utils";
-import { projectFrontmatterSchema } from "./projects-schema";
+import {
+  pointsAtObsoleteAccount,
+  projectFrontmatterSchema,
+} from "./projects-schema";
 import { RANGE_CATEGORIES, validateRange } from "../content/range";
 
 const blogDirectory = join(process.cwd(), "content/blog");
@@ -119,6 +122,15 @@ function parseProject(file: string, fileContents: string) {
       .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
       .join("; ");
     throw new Error(`Invalid project frontmatter in ${file}: ${issues}`);
+  }
+  // A link in the body to the obsolete account would ship as written.
+  const stale = (content.match(/https?:\/\/[^\s)<>"'\]]+/gi) ?? []).filter(
+    pointsAtObsoleteAccount
+  );
+  if (stale.length > 0) {
+    throw new Error(
+      `Invalid project content in ${file}: links to github.com/studiosc, which is not our account (${stale.join(", ")})`
+    );
   }
   return {
     project: {

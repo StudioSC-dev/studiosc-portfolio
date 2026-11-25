@@ -2,7 +2,7 @@ import { z } from "zod";
 import { STATUS_KEYS } from "./statuses";
 
 /** True for any form of github.com/studiosc (our account is StudioSC-dev). */
-function pointsAtObsoleteAccount(value: string): boolean {
+export function pointsAtObsoleteAccount(value: string): boolean {
   let url: URL;
   try {
     url = new URL(value);
@@ -35,7 +35,13 @@ export const projectFrontmatterSchema = z.strictObject({
         "githubUrl points at github.com/studiosc, which is not our account",
     })
     .optional(),
-  liveUrl: z.string().optional(),
+  liveUrl: z
+    .string()
+    .refine((url) => !pointsAtObsoleteAccount(url), {
+      message:
+        "liveUrl points at github.com/studiosc, which is not our account",
+    })
+    .optional(),
 });
 
 export type ProjectFrontmatter = z.infer<typeof projectFrontmatterSchema>;

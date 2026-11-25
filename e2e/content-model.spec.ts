@@ -632,6 +632,33 @@ test.describe("content model", () => {
       expect(parse(fine), fine).toBe(true);
     }
 
+    // The same account in liveUrl or in a body link is rejected, by file name.
+    const stale = tempDir("old-link-more");
+    try {
+      writeFileSync(
+        join(stale, "live-url.mdx"),
+        projectFile({ liveUrl: "https://GitHub.com/StudioSC/app" })
+      );
+      writeFileSync(
+        join(stale, "body-link.mdx"),
+        `${VALID_PROJECT}\nSee [the repo](https://github.com/studiosc/old).\n`
+      );
+      for (const name of ["live-url", "body-link"]) {
+        await expect(getProject(name, stale), name).rejects.toThrow(
+          new RegExp(`${name}\\.mdx`)
+        );
+      }
+      await expect(getProjects(stale)).rejects.toThrow(/\.mdx/);
+      // Our own account in a body link is fine.
+      writeFileSync(
+        join(stale, "body-link.mdx"),
+        `${VALID_PROJECT}\nSee [the repo](https://github.com/StudioSC-dev/x).\n`
+      );
+      await expect(getProject("body-link", stale)).resolves.not.toBeNull();
+    } finally {
+      rmSync(stale, { recursive: true, force: true });
+    }
+
     // The rendered case page links to the right repository.
     await page.goto("/work/portfolio-site");
     await expect(
@@ -714,6 +741,15 @@ test.describe("content model", () => {
           diagnostics: [
             "Invalid project frontmatter in zz-build-bad-status.mdx",
           ],
+        },
+        {
+          name: "old-body-link",
+          inject: (dir) =>
+            writeFileSync(
+              join(dir, "content/projects/zz-build-old-link.mdx"),
+              `${VALID_PROJECT}\n[repo](https://github.com/studiosc)\n`
+            ),
+          diagnostics: ["Invalid project content in zz-build-old-link.mdx"],
         },
         {
           name: "unclosed",
