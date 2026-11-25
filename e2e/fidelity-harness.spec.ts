@@ -779,6 +779,37 @@ test.describe("fidelity harness", () => {
     }
   });
 
+  test("hides what a later ticket adds, mounted before or after", async ({
+    browser,
+  }) => {
+    chromiumOnly();
+    const page = await measuredPage(browser);
+    try {
+      // A hide holds for elements mounted after it, as a picked plate's
+      // interior is: removed, or hidden in place.
+      const styles = await page.evaluate(() => {
+        const f = (window as unknown as Fid).__fidelity;
+        f.hide([
+          { selector: ".inside", mode: "remove" },
+          { selector: ".drawing", mode: "hide" },
+        ]);
+        const add = (cls: string) => {
+          const el = document.createElement("div");
+          el.className = cls;
+          el.textContent = cls;
+          document.querySelector("#r")!.append(el);
+          return getComputedStyle(el);
+        };
+        const inside = add("inside");
+        const drawing = add("drawing");
+        return [inside.display, drawing.visibility];
+      });
+      expect(styles).toEqual(["none", "hidden"]);
+    } finally {
+      await page.close();
+    }
+  });
+
   test.describe("against the fixture site", () => {
     let server: FixtureServer;
     test.beforeAll(async () => {
@@ -1736,6 +1767,37 @@ test.describe("fidelity harness", () => {
           at(b).undrawn = { "390": "range-phone.dc.html" };
         }).problems.join("\n")
       ).toContain(`${row}: range-phone.dc.html draws this row at 390`);
+
+      // PRV-5's variants show each plate's shell only: the interior a later
+      // ticket draws is gone even though the plate mounts after the hide
+      // (when its tab is picked). The full build keeps it.
+      const interiors: Record<string, string[]> = {
+        D11: ["finance", "sites", "testing"],
+        D12: ["mobile", "ai", "3d"],
+      };
+      let shells = 0;
+      for (const board of [
+        "range-light-desktop.dc.html",
+        "range-dark-desktop.dc.html",
+        "range-phone.dc.html",
+      ])
+        for (const [key, cap] of Object.entries(
+          real.spec.boards[board].captures
+        )) {
+          const pre = /\+pre-([^-]+)/.exec(key)?.[1].split("+") ?? [];
+          for (const [d, plates] of Object.entries(interiors))
+            for (const k of plates) {
+              const plate = cap.rows[`home/plate-${k}`];
+              if (!plate) continue;
+              const inside = cap.rows[`home/plate-${k}-interior`];
+              if (pre.includes(d)) {
+                shells++;
+                expect(inside, `${board} ${key} ${k}`).toBeNull();
+              } else if (!key.includes("+pre-"))
+                expect(inside, `${board} ${key} ${k}`).not.toBeNull();
+            }
+        }
+      expect(shells).toBeGreaterThan(0);
 
       // PRV-5 keeps each peek's frame and title; the status line above a
       // Finance, Sites or Testing peek drawing goes with the drawing (D13).

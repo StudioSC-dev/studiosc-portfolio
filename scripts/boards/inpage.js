@@ -703,14 +703,29 @@
       );
     },
 
-    /** Hides board elements a later ticket adds (a partial build). */
+    /**
+     * Hides board elements a later ticket adds (a partial build): those on
+     * the page now, and any a later step mounts (a plate's interior appears
+     * only once its tab is picked), through a stylesheet that stays.
+     */
     hide(entries) {
+      const rule = (entry) =>
+        entry.mode === "remove"
+          ? ["display", "none"]
+          : ["visibility", "hidden"];
+      const style = document.createElement("style");
+      style.dataset.fidelityHide = "";
+      style.textContent = entries
+        .map((entry) => {
+          const [prop, value] = rule(entry);
+          return `:is(${entry.selector}) { ${prop}: ${value} !important; }`;
+        })
+        .join("\n");
+      (document.head || document.documentElement).appendChild(style);
       for (const entry of entries) {
-        for (const el of document.querySelectorAll(entry.selector)) {
-          if (entry.mode === "remove")
-            el.style.setProperty("display", "none", "important");
-          else el.style.setProperty("visibility", "hidden", "important");
-        }
+        const [prop, value] = rule(entry);
+        for (const el of document.querySelectorAll(entry.selector))
+          el.style.setProperty(prop, value, "important");
       }
     },
 
