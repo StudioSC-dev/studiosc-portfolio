@@ -220,8 +220,8 @@
   },
   "runtime": {
     "sha256": "c4929939a4fa0ff409afd395a75cd87a7a7412d26bf4cf34d7292a94c05ea482",
-    "source": "the Design canvas type's runtime (artifact-type/dc-runtime.js), served to the boards as support.js",
-    "url": null
+    "source": "the Design canvas type's runtime, fetched from BOARDS_RUNTIME_BASE (the canvas origin, behind the owner's sign-in and never named in a tracked file) and served to the boards as support.js",
+    "url": "artifact-type/dc-runtime.js"
   },
   "version": 1
 }

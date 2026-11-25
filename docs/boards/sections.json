@@ -55,7 +55,8 @@
       ],
       "widths": [
         "390"
-      ]
+      ],
+      "from": "chips-forward"
     },
     "chips-forward": {
       "steps": [
@@ -234,7 +235,8 @@
             "name": "Next photo"
           }
         }
-      ]
+      ],
+      "from": "gallery-2"
     },
     "gallery-4": {
       "steps": [
@@ -256,7 +258,8 @@
             "name": "Next photo"
           }
         }
-      ]
+      ],
+      "from": "gallery-3"
     },
     "gallery-5": {
       "steps": [
@@ -284,7 +287,8 @@
             "name": "Next photo"
           }
         }
-      ]
+      ],
+      "from": "gallery-4"
     },
     "gallery-6": {
       "steps": [
@@ -318,7 +322,8 @@
             "name": "Next photo"
           }
         }
-      ]
+      ],
+      "from": "gallery-5"
     },
     "gallery-prev": {
       "steps": [
@@ -354,7 +359,8 @@
             "name": "Next photo of Holly"
           }
         }
-      ]
+      ],
+      "from": "holly-2"
     },
     "holly-4": {
       "steps": [
@@ -376,7 +382,8 @@
             "name": "Next photo of Holly"
           }
         }
-      ]
+      ],
+      "from": "holly-3"
     },
     "holly-5": {
       "steps": [
@@ -404,7 +411,8 @@
             "name": "Next photo of Holly"
           }
         }
-      ]
+      ],
+      "from": "holly-4"
     },
     "holly-6": {
       "steps": [
@@ -438,7 +446,8 @@
             "name": "Next photo of Holly"
           }
         }
-      ]
+      ],
+      "from": "holly-5"
     },
     "holly-prev": {
       "steps": [
@@ -456,6 +465,86 @@
           "click": {
             "role": "button",
             "name": "Give Holly a treat"
+          }
+        }
+      ]
+    },
+    "photo-2-of-4": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 2 of 4"
+          }
+        }
+      ]
+    },
+    "photo-2-of-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 2 of 6"
+          }
+        }
+      ]
+    },
+    "photo-3-of-4": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 3 of 4"
+          }
+        }
+      ]
+    },
+    "photo-3-of-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 3 of 6"
+          }
+        }
+      ]
+    },
+    "photo-4-of-4": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 4 of 4"
+          }
+        }
+      ]
+    },
+    "photo-4-of-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 4 of 6"
+          }
+        }
+      ]
+    },
+    "photo-5-of-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 5 of 6"
+          }
+        }
+      ]
+    },
+    "photo-6-of-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Photo 6 of 6"
           }
         }
       ]
@@ -544,6 +633,20 @@
       "toggleTheme": true,
       "inFlight": true
     }
+  },
+  "tokens": {
+    "board": "div:has(> main)",
+    "site": ":root",
+    "names": [
+      "--gallery",
+      "--plate",
+      "--peek",
+      "--ink",
+      "--muted",
+      "--rule",
+      "--accent",
+      "--error"
+    ]
   },
   "rows": [
     {
@@ -658,7 +761,17 @@
         }
       },
       "states": [
-        "default"
+        "default",
+        "tab-finance",
+        "tab-mobile",
+        "tab-ai",
+        "tab-3d",
+        "tab-sites",
+        "tab-testing",
+        "plate-next",
+        "plate-prev",
+        "chips-forward",
+        "chips-back"
       ]
     },
     {
@@ -713,7 +826,27 @@
           "board": "#cabinet div[aria-hidden]:last-child",
           "site": "[data-board-key=\"peek-right\"]"
         }
-      }
+      },
+      "later": [
+        {
+          "ticket": "PRV-6",
+          "hide": [
+            {
+              "selector": "div[aria-hidden] div:has(> svg > rect[stroke=\"#DCE3DE\"]), div[aria-hidden] div:has(> svg > rect[stroke=\"#D0D3D8\"])",
+              "mode": "hide"
+            }
+          ]
+        },
+        {
+          "ticket": "PRV-7",
+          "hide": [
+            {
+              "selector": "div[aria-hidden] div:has(> svg > rect[stroke=\"#D5E2DD\"]), div[aria-hidden] div:has(> svg > rect[stroke=\"#E2DFD8\"]), div[aria-hidden] div:has(> svg > rect[fill=\"#0F1113\"])",
+              "mode": "hide"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "home/plate-dashboards",
@@ -754,7 +887,7 @@
       "id": "home/plate-finance",
       "section": "plate-finance",
       "route": "/preview/home",
-      "ticket": "PRV-6",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]",
       "site": "[data-board-section=\"home/plate-finance\"]",
@@ -784,13 +917,60 @@
         "tab-finance",
         "plate-next"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-6",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-finance-interior",
+      "section": "plate-finance-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-finance-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-finance",
+        "plate-next"
+      ],
+      "parent": "home/plate-finance"
     },
     {
       "id": "home/plate-mobile",
       "section": "plate-mobile",
       "route": "/preview/home",
-      "ticket": "PRV-7",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]",
       "site": "[data-board-section=\"home/plate-mobile\"]",
@@ -819,13 +999,59 @@
       "states": [
         "tab-mobile"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-7",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-mobile-interior",
+      "section": "plate-mobile-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-mobile-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-mobile"
+      ],
+      "parent": "home/plate-mobile"
     },
     {
       "id": "home/plate-ai",
       "section": "plate-ai",
       "route": "/preview/home",
-      "ticket": "PRV-7",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]",
       "site": "[data-board-section=\"home/plate-ai\"]",
@@ -854,13 +1080,59 @@
       "states": [
         "tab-ai"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-7",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-ai-interior",
+      "section": "plate-ai-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-ai-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-ai"
+      ],
+      "parent": "home/plate-ai"
     },
     {
       "id": "home/plate-3d",
       "section": "plate-3d",
       "route": "/preview/home",
-      "ticket": "PRV-7",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]",
       "site": "[data-board-section=\"home/plate-3d\"]",
@@ -889,13 +1161,59 @@
       "states": [
         "tab-3d"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-7",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-3d-interior",
+      "section": "plate-3d-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-3d-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-3d"
+      ],
+      "parent": "home/plate-3d"
     },
     {
       "id": "home/plate-sites",
       "section": "plate-sites",
       "route": "/preview/home",
-      "ticket": "PRV-6",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]",
       "site": "[data-board-section=\"home/plate-sites\"]",
@@ -924,13 +1242,59 @@
       "states": [
         "tab-sites"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-6",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-sites-interior",
+      "section": "plate-sites-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-sites-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-sites"
+      ],
+      "parent": "home/plate-sites"
     },
     {
       "id": "home/plate-testing",
       "section": "plate-testing",
       "route": "/preview/home",
-      "ticket": "PRV-6",
+      "ticket": "PRV-5",
       "built": false,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]",
       "site": "[data-board-section=\"home/plate-testing\"]",
@@ -960,7 +1324,54 @@
         "tab-testing",
         "plate-prev"
       ],
-      "parent": "home/range"
+      "parent": "home/range",
+      "later": [
+        {
+          "ticket": "PRV-6",
+          "hide": [
+            {
+              "selector": "[aria-roledescription=\"slide\"] > :not(h2):not(:has(h2)), [aria-roledescription=\"slide\"] > div:has(> h2) > :not(h2)",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/plate-testing-interior",
+      "section": "plate-testing-interior",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]) > div:has(> h2) > :not(h2)",
+      "site": "[data-board-section=\"home/plate-testing-interior\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-testing",
+        "plate-prev"
+      ],
+      "parent": "home/plate-testing"
     },
     {
       "id": "home/people",
@@ -1183,7 +1594,10 @@
       },
       "states": [
         "default"
-      ]
+      ],
+      "undrawn": {
+        "390": "range-phone.dc.html"
+      }
     },
     {
       "id": "seth/title",
@@ -1367,7 +1781,10 @@
         "gallery-2",
         "gallery-3",
         "gallery-4",
-        "gallery-prev"
+        "gallery-prev",
+        "photo-2-of-4",
+        "photo-3-of-4",
+        "photo-4-of-4"
       ]
     },
     {
@@ -1586,7 +2003,10 @@
         "gallery-2",
         "gallery-3",
         "gallery-4",
-        "gallery-prev"
+        "gallery-prev",
+        "photo-2-of-4",
+        "photo-3-of-4",
+        "photo-4-of-4"
       ]
     },
     {
@@ -1986,7 +2406,10 @@
       },
       "states": [
         "default"
-      ]
+      ],
+      "undrawn": {
+        "390": "pages-case-phone.dc.html"
+      }
     },
     {
       "id": "work/list",
@@ -2048,7 +2471,10 @@
       },
       "states": [
         "default"
-      ]
+      ],
+      "undrawn": {
+        "390": "pages-work-phone.dc.html"
+      }
     },
     {
       "id": "blog-work/list",
@@ -2213,7 +2639,10 @@
       },
       "states": [
         "default"
-      ]
+      ],
+      "undrawn": {
+        "390": "pages-post-work-phone.dc.html"
+      }
     },
     {
       "id": "post-work/more",
@@ -2354,7 +2783,12 @@
         "gallery-4",
         "gallery-5",
         "gallery-6",
-        "gallery-prev"
+        "gallery-prev",
+        "photo-2-of-6",
+        "photo-3-of-6",
+        "photo-4-of-6",
+        "photo-5-of-6",
+        "photo-6-of-6"
       ],
       "parent": "post-life/article"
     },
@@ -2564,7 +2998,10 @@
       },
       "states": [
         "default"
-      ]
+      ],
+      "undrawn": {
+        "390": "pages-about-phone.dc.html"
+      }
     },
     {
       "id": "404/main",
