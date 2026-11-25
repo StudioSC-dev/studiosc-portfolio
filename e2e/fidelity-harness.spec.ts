@@ -1648,6 +1648,25 @@ test.describe("fidelity harness", () => {
         }).problems.join("\n")
       ).toContain(`${row}: range-phone.dc.html draws this row at 390`);
 
+      // PRV-5 keeps each peek's frame and title; the status line above a
+      // Finance, Sites or Testing peek drawing goes with the drawing (D13).
+      const desk = real.spec.boards["range-light-desktop.dc.html"].captures;
+      const listed = Object.keys(desk).find(
+        (k) =>
+          k.startsWith("light/default+pre-") &&
+          k.includes("D13") &&
+          !k.endsWith("-rm")
+      )!;
+      const base = desk["light/default"].rows["home/range"]!.copy;
+      const shell = desk[listed].rows["home/range"]!.copy;
+      for (const status of ["Live, tested", "In QA"])
+        expect(base, status).toContain(status);
+      expect(shell).not.toContain("Live, tested");
+      expect(shell).not.toContain("In QA");
+      expect(shell).toContain(
+        "Testing StudioSC Portfolio Finance Tally & Trace"
+      );
+
       // Every board's palette is recorded where the boards define it, and the
       // dark boards' differs from the light ones'.
       const names = real.sections.tokens.names;
