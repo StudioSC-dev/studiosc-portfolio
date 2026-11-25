@@ -13,6 +13,7 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import { scanText } from "./support/denylist";
 import {
   addedIconSources,
   allowsHeadingWeight,
@@ -1539,10 +1540,10 @@ test.describe("Range design system", () => {
       docGaps(withoutSection(markdown, "Font fallback")).length
     ).toBeGreaterThan(0);
 
-    // Nothing private: the doc cites boards by name, never by location.
-    expect(markdown).not.toMatch(
-      /\/(home|srv|tmp|Users)\/|\.dc\.html|LAB_[D]OMAIN|localhost/
-    );
+    // Nothing private: PRV-1's denylist finds nothing in the doc, and the doc
+    // cites boards by name, never by file or by a local address.
+    expect(scanText(DOC, markdown)).toEqual([]);
+    expect(markdown).not.toMatch(/\/Users\/|\.dc\.html|localhost/);
   });
 
   test("changes stay within PRV-2 scope", async ({ browser }, testInfo) => {
