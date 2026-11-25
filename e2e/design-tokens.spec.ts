@@ -1429,6 +1429,31 @@ test.describe("Range design system", () => {
           }
           const root = el.closest<HTMLElement>("[data-fixture]");
           const style = getComputedStyle(el);
+          // Where the outline is painted, against each ancestor that clips.
+          const grow =
+            parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
+          const box = el.getBoundingClientRect();
+          let clipped = false;
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const ps = getComputedStyle(p);
+            if (ps.overflowX === "visible" && ps.overflowY === "visible") {
+              continue;
+            }
+            const r = p.getBoundingClientRect();
+            const [left, top] = [r.left + p.clientLeft, r.top + p.clientTop];
+            const [right, bottom] = [
+              left + p.clientWidth,
+              top + p.clientHeight,
+            ];
+            if (
+              box.left - grow < left - 0.5 ||
+              box.top - grow < top - 0.5 ||
+              box.right + grow > right + 0.5 ||
+              box.bottom + grow > bottom + 0.5
+            ) {
+              clipped = true;
+            }
+          }
           out.push({
             name: `${root?.dataset.fixture}: ${el.textContent?.trim()}`,
             focused:
@@ -1440,6 +1465,7 @@ test.describe("Range design system", () => {
             outlineStyle: style.outlineStyle,
             outlineWidth: style.outlineWidth,
             ring: style.outlineColor,
+            clipped,
             surfaces,
           });
         }
@@ -1461,14 +1487,17 @@ test.describe("Range design system", () => {
         []
       );
 
-      // A ring below 3:1, a removed outline and a control at opacity 0 (its
-      // own or its parent's) all fail the same check.
+      // A ring below 3:1, a removed outline, a control at opacity 0 (its
+      // own or its parent's) and a ring clipped by its wrapper all fail.
       const broken = await sampleRings("[data-fragment='low-ring-fixture']");
-      expect(broken).toHaveLength(4);
+      expect(broken).toHaveLength(5);
       const problems = ringProblems(broken);
-      expect(problems).toHaveLength(4);
+      expect(problems).toHaveLength(5);
       expect(problems.some((p) => p.includes("no outline"))).toBe(true);
       expect(problems.filter((p) => p.includes("not painted"))).toHaveLength(2);
+      expect(problems).toContain(
+        "clipped-ring: Clipped ring: clipped by an ancestor"
+      );
     }
 
     // Control: a translucent surface is composited, not refused. A black ring
@@ -1480,6 +1509,7 @@ test.describe("Range design system", () => {
       outlineStyle: "solid",
       outlineWidth: "2px",
       ring,
+      clipped: false,
       surfaces: ["rgba(255, 255, 255, 0.9)", "rgb(255, 255, 255)"],
     });
     expect(ringProblems([onFrosted("rgb(0, 0, 0)")])).toEqual([]);

@@ -190,6 +190,11 @@ export interface RingSample {
   outlineWidth: string;
   ring: string;
   /**
+   * Whether an ancestor that clips its overflow cuts into the ring: the
+   * outline's outer edge is not inside every such ancestor's padding box.
+   */
+  clipped: boolean;
+  /**
    * The backgrounds behind the control, nearest first, any of them
    * translucent; flattened over a white canvas before the ring is measured.
    */
@@ -222,6 +227,7 @@ export function ringProblems(
       problems.push(`${s.name}: no outline`);
     else if (parseFloat(s.outlineWidth) < 2)
       problems.push(`${s.name}: outline ${s.outlineWidth}`);
+    else if (s.clipped) problems.push(`${s.name}: clipped by an ancestor`);
     else {
       const ratio = contrast(s.ring, flattenSurface(s.surfaces));
       if (ratio < min) problems.push(`${s.name}: ${ratio.toFixed(2)}:1`);
