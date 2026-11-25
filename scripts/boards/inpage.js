@@ -472,6 +472,10 @@
           // An animation that cannot be finished is left as it is.
         }
       }
+      // Every picture decoded, so a shot never catches one half painted.
+      await Promise.all(
+        [...document.images].map((i) => i.decode().catch(() => {}))
+      );
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))
       );

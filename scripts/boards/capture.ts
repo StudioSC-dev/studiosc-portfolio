@@ -10,6 +10,7 @@ import path from "node:path";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import {
   captureKey,
+  sha256,
   type Capture,
   type Manifest,
   type Motion,
@@ -323,7 +324,14 @@ export async function captureState(
   return { tokens: measured.tokens, rows: measured.rows, motion };
 }
 
-/** A shot of a page region, as PNG bytes. */
+/**
+ * A shot of a page region, as PNG bytes: taken until two in a row agree, so
+ * a late paint (a picture still decoding, a frame still rasterising) never
+ * ends up in a reference. Some boards' full-page captures flip between two
+ * rasterisations of the same frame (a dither pattern behind a control, a
+ * pixel either way); then the one with the lower sha256 is kept, so the
+ * choice never depends on which came first.
+ */
 export async function shoot(
   page: Page,
   box: [number, number, number, number]
@@ -331,17 +339,34 @@ export async function shoot(
   const [x, y, w, h] = box;
   const fx = Math.max(0, Math.floor(x));
   const fy = Math.max(0, Math.floor(y));
-  return page.screenshot({
-    fullPage: true,
-    animations: "allow",
-    caret: "hide",
-    clip: {
-      x: fx,
-      y: fy,
-      width: Math.max(1, Math.ceil(x + w) - fx),
-      height: Math.max(1, Math.ceil(y + h) - fy),
-    },
-  });
+  const take = () =>
+    page.screenshot({
+      fullPage: true,
+      animations: "allow",
+      caret: "hide",
+      clip: {
+        x: fx,
+        y: fy,
+        width: Math.max(1, Math.ceil(x + w) - fx),
+        height: Math.max(1, Math.ceil(y + h) - fy),
+      },
+    });
+  const shots = [await take()];
+  for (let i = 0; i < 5; i++) {
+    const next = await take();
+    if (next.equals(shots[shots.length - 1])) return next;
+    shots.push(next);
+  }
+  const distinct = new Map<string, { shot: Buffer; seen: number }>();
+  for (const shot of shots) {
+    const key = sha256(shot);
+    const d = distinct.get(key) ?? { shot, seen: 0 };
+    d.seen++;
+    distinct.set(key, d);
+  }
+  if (distinct.size === 2 && [...distinct.values()].every((d) => d.seen >= 2))
+    return distinct.get([...distinct.keys()].sort()[0])!.shot;
+  throw new Error(`the region at ${box.join(", ")} never stopped changing`);
 }
 
 /** Reference shots are lossy: the verifier compares them by eye. */
