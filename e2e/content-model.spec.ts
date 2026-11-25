@@ -929,15 +929,16 @@ RANGE_CATEGORIES.push({
     // Words only, no markup: these survive a page redesign.
     await expectWords("/", ["Live", "In QA"]);
     await expectWords("/work", ["Live", "In QA", "In development"]);
+    // Only each case's assigned status: copy such as the title belongs to
+    // later tickets, so no routine assertion pins it.
     const cases = {
-      "portfolio-site": ["StudioSC Portfolio", "Live"],
-      "central-command": ["Central Command", "In QA"],
-      tallyandtrace: ["Tally And Trace", "In QA"],
-      "fitness-rival": ["Fitness Rival", "In development"],
+      "portfolio-site": "Live",
+      "central-command": "In QA",
+      tallyandtrace: "In QA",
+      "fitness-rival": "In development",
     };
-    for (const [slug, [title, word]] of Object.entries(cases)) {
+    for (const [slug, word] of Object.entries(cases)) {
       await expectWords(`/work/${slug}`, [word]);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     }
   });
 
@@ -989,6 +990,18 @@ RANGE_CATEGORIES.push({
           ),
         `${route} drops old words`
       ).toEqual([]);
+    }
+
+    // Each case page keeps its title as the one h1 (audit-only: copy changes later).
+    const titles = {
+      "portfolio-site": "StudioSC Portfolio",
+      "central-command": "Central Command",
+      tallyandtrace: "Tally And Trace",
+      "fitness-rival": "Fitness Rival",
+    };
+    for (const [slug, title] of Object.entries(titles)) {
+      await page.goto(`${headUrl}/work/${slug}`);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(title);
     }
 
     // The migration's expected statuses, from the head's rendered pages.
