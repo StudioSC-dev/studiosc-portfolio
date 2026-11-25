@@ -423,10 +423,12 @@ export const RASTER_ARGS = [
  * rest (the compositor re-rasterises after the first full-page capture), so
  * those are dropped: the region is steady once `settle` captures in a row
  * agree, and `window` more are taken after that. Some boards' captures flip
- * between two rasterisations of the same frame for good (a dither behind a
- * control): when the steady captures hold two renderings, or never settle
- * but alternate between two, the one with the lowest sha256 is kept, so the
- * phase a run starts in never changes the bytes. Three renderings fail.
+ * between two rasterisations of the same frame (a dither behind a control).
+ * The rendering seen most often among the steady captures (or, when they
+ * never settle, the last `2 * settle`) is kept, so a rendering that turns up
+ * once beside an established one never replaces it; only an even split falls
+ * to the lowest sha256, which no starting phase changes. Three renderings
+ * fail.
  */
 export async function pickShot(
   take: () => Promise<Buffer>,
@@ -435,24 +437,27 @@ export async function pickShot(
   limit = 16
 ): Promise<Buffer> {
   const shots: Buffer[] = [];
-  let steady: Buffer | null = null;
+  let steady = false;
   while (shots.length < limit && !steady) {
     shots.push(await take());
     const run = shots.slice(-settle);
-    if (run.length === settle && run.every((b) => b.equals(run[0])))
-      steady = run[0];
+    steady = run.length === settle && run.every((b) => b.equals(run[0]));
   }
-  const seen = new Map<string, Buffer>();
-  if (steady) {
-    seen.set(sha256(steady), steady);
-    for (let i = 0; i < window; i++) {
-      const next = await take();
-      seen.set(sha256(next), next);
-    }
-  } else for (const b of shots.slice(-2 * settle)) seen.set(sha256(b), b);
+  const kept = steady ? shots.slice(-settle) : shots.slice(-2 * settle);
+  if (steady) for (let i = 0; i < window; i++) kept.push(await take());
+  const seen = new Map<string, { shot: Buffer; count: number }>();
+  for (const shot of kept) {
+    const sha = sha256(shot);
+    const entry = seen.get(sha) ?? { shot, count: 0 };
+    entry.count++;
+    seen.set(sha, entry);
+  }
   if (seen.size > 2)
     throw new Error(`${seen.size} different renderings of one frame`);
-  return seen.get([...seen.keys()].sort()[0])!;
+  const [best] = [...seen.entries()].sort(
+    ([a, x], [b, y]) => y.count - x.count || (a < b ? -1 : 1)
+  );
+  return best[1].shot;
 }
 
 /** A shot of a page region, as PNG bytes. */

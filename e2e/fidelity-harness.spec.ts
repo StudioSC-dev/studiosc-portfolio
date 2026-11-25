@@ -665,8 +665,9 @@ test.describe("fidelity harness", () => {
 
     // The shot picked from repeated captures is the same whatever order
     // they come in: warm-up captures before the region settles are dropped,
-    // and a region that flips between two renderings for good gives the
-    // lower sha256 in either phase. A third rendering fails.
+    // a rendering that turns up now and then beside an established one never
+    // replaces it, and a region split evenly between two renderings gives
+    // the lower sha256 in either phase. A third rendering fails.
     const a = Buffer.from("rendering a");
     const b = Buffer.from("rendering b");
     const c = Buffer.from("rendering c");
@@ -684,16 +685,30 @@ test.describe("fidelity harness", () => {
     expect(await pick([highest, highest, lowest])).toBe(lowest.toString());
     expect(await pick([lowest, lowest, highest])).toBe(highest.toString());
     expect(await pick([a, b, a, a, a])).toBe(a.toString());
-    // Flipping for good, in either phase, with or without runs: the lowest.
+    // Flipping evenly for good, in either phase: the lowest.
     for (const seq of [
       [highest, lowest],
       [lowest, highest],
-      [highest, highest, highest, lowest],
-      [lowest, lowest, lowest, highest],
     ])
       expect(await pick(seq, true), seq.map(String).join()).toBe(
         lowest.toString()
       );
+    // An occasional other rendering, in every starting phase of the cycle,
+    // even when it has the lower sha256: the established one.
+    for (const [usual, odd, run] of [
+      [highest, lowest, 6],
+      [highest, lowest, 3],
+      [lowest, highest, 6],
+    ] as const) {
+      const cycle = [...Array<Buffer>(run).fill(usual), odd];
+      for (let phase = 0; phase < cycle.length; phase++) {
+        const seq = [...cycle.slice(phase), ...cycle.slice(0, phase)];
+        expect(
+          await pick(seq, true),
+          `${run} of ${usual} then ${odd}, from ${phase}`
+        ).toBe(usual.toString());
+      }
+    }
     await expect(pickShot(feed([a, a, a, b, c]))).rejects.toThrow(
       "3 different renderings"
     );
