@@ -158,6 +158,21 @@ export function isValidationOnlyConfigDiff(lines: string[]): boolean {
   return lines.every((l) => addedImport.test(l) || addedCall.test(l));
 }
 
+/**
+ * A failed build is a real nonzero exit code. A signal (such as a timeout kill)
+ * or a spawn error has a null status, so it is reported separately and does
+ * not count as the build rejecting the content.
+ */
+export function expectFailedExit(
+  result: { status: number | null; signal: string | null; error?: Error },
+  label: string
+): void {
+  expect(result.error, `${label}: spawn error`).toBeUndefined();
+  expect(result.signal, `${label}: killed by signal`).toBeNull();
+  expect(typeof result.status, `${label}: exit code`).toBe("number");
+  expect(result.status, label).not.toBe(0);
+}
+
 /** Files PRV-3 may touch, relative to the repo root. */
 export function isAllowedPrv3Path(path: string): boolean {
   const exact = new Set([
@@ -719,6 +734,8 @@ test.describe("content model", () => {
       });
       return {
         status: result.status,
+        signal: result.signal,
+        error: result.error,
         output: `${result.stdout}\n${result.stderr}`,
       };
     }
@@ -802,7 +819,7 @@ RANGE_CATEGORIES.push({
         try {
           fixture.inject(dir);
           const result = build(dir);
-          expect(result.status, fixture.name).not.toBe(0);
+          expectFailedExit(result, fixture.name);
           for (const diagnostic of fixture.diagnostics) {
             expect(result.output, fixture.name).toContain(diagnostic);
           }
@@ -829,6 +846,20 @@ RANGE_CATEGORIES.push({
     } finally {
       rmSync(src, { recursive: true, force: true });
       rmSync(dest, { recursive: true, force: true });
+    }
+  });
+
+  test("build failure needs a numeric nonzero exit", () => {
+    expect(() =>
+      expectFailedExit({ status: 1, signal: null }, "exit 1")
+    ).not.toThrow();
+    for (const bad of [
+      { status: 0, signal: null },
+      { status: null, signal: "SIGTERM" as const },
+      { status: null, signal: null },
+      { status: 1, signal: null, error: new Error("spawn failed") },
+    ]) {
+      expect(() => expectFailedExit(bad, "bad")).toThrow();
     }
   });
 
