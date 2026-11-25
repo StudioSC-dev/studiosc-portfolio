@@ -1556,7 +1556,7 @@ test.describe("Range design system", () => {
     );
     const range = prRange();
     test.skip(!range, `${NO_PR}: PRV-2's scope is checked on its own PR.`);
-    const base = range!.base;
+    const { base, head } = range!;
     test.skip(
       !introducesSuite(base),
       `${base} already holds ${SPEC_FILE}: PRV-2's scope was checked on its own PR.`
@@ -1598,8 +1598,10 @@ test.describe("Range design system", () => {
     );
 
     // Files: only Scope's, and never the deviations log (owner, 2026-11-24).
+    // The PR head against its base, as PRV-1's scope check does: what a local
+    // run writes into the working tree is not part of the PR.
     expect(SCOPE_FILES as readonly string[]).not.toContain(DEVIATIONS);
-    const changed = git("diff", "--name-only", base)
+    const changed = git("diff", "--name-only", base, head)
       .split("\n")
       .filter(Boolean);
     const outside = changed.filter(
