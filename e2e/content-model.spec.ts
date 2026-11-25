@@ -510,20 +510,41 @@ test.describe("content model", () => {
     );
     rejects([withCheck({ repo: "StudioSC-dev/." })], /finance[\s\S]*repo/);
     rejects([withCheck({ repo: "StudioSC-dev/.." })], /finance[\s\S]*repo/);
-    // A Status fact must be the linked project's plate label.
+    // A Status fact must start with the linked project's plate label as a
+    // whole word, optionally followed by a qualifier after a space or comma.
     const STATUS_OF = {
       tallyandtrace: "in-qa",
       "central-command": "in-qa",
+      "portfolio-site": "live",
     } as const;
-    const withStatus = (value: string) =>
-      withPlate(realChecked, { facts: [{ label: "Status", value }] });
-    expect(() =>
-      validateRange([withStatus("In QA with Christine")], STATUS_OF)
-    ).not.toThrow();
-    for (const bad of ["QA Verified", "Live", "In QA"]) {
-      expect(() => validateRange([withStatus(bad)], STATUS_OF), bad).toThrow(
-        /finance[\s\S]*Status fact/
-      );
+    const withStatus = (value: string, slug = "tallyandtrace") =>
+      withPlate(realChecked, { slug, facts: [{ label: "Status", value }] });
+    for (const [value, slug] of [
+      ["In QA with Christine", "tallyandtrace"],
+      ["In QA with Christine", "central-command"],
+      ["In QA with Christine, tested", "tallyandtrace"],
+      ["Live", "portfolio-site"],
+      ["Live, tested", "portfolio-site"],
+      ["Live (tested)", "portfolio-site"],
+    ] as const) {
+      expect(
+        () => validateRange([withStatus(value, slug)], STATUS_OF),
+        `${value} / ${slug}`
+      ).not.toThrow();
+    }
+    for (const [value, slug] of [
+      ["QA Verified", "tallyandtrace"],
+      ["Live", "tallyandtrace"],
+      ["In QA", "tallyandtrace"],
+      ["In QAX", "tallyandtrace"],
+      ["In QA with Christines", "tallyandtrace"],
+      ["Livestock", "portfolio-site"],
+      ["LiveX, tested", "portfolio-site"],
+    ] as const) {
+      expect(
+        () => validateRange([withStatus(value, slug)], STATUS_OF),
+        `${value} / ${slug}`
+      ).toThrow(/finance[\s\S]*Status fact/);
     }
 
     // A container that is not an array still names the file.

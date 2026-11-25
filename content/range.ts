@@ -142,9 +142,15 @@ export function validateRange(
       if (status) {
         const expected = STATUSES[status].plateLabel;
         for (const fact of category.plate.facts) {
-          if (fact.label === "Status" && fact.value !== expected) {
+          // The plate label as a whole word, then optionally a qualifier
+          // after a space or a comma ("Live, tested").
+          const matches =
+            fact.value === expected ||
+            fact.value.startsWith(`${expected} `) ||
+            fact.value.startsWith(`${expected},`);
+          if (fact.label === "Status" && !matches) {
             problems.push(
-              `${name}: Status fact "${fact.value}" is not "${expected}", the plate label of project "${category.plate.slug}"`
+              `${name}: Status fact "${fact.value}" does not start with "${expected}", the plate label of project "${category.plate.slug}"`
             );
           }
         }
