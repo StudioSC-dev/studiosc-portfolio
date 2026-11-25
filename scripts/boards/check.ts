@@ -404,7 +404,7 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
                 readFileSync(path.join(opts.dir, b.shot))
               );
               const sitePng = s
-                ? await shoot(page, s.box)
+                ? await shoot(page, s.box, cap.frame)
                 : await blankPng(page, 1, 1);
               const [pb, ps] = await padPair(page, boardPng, sitePng);
               mkdirSync(opts.pairsDir, { recursive: true });

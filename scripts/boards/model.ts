@@ -194,6 +194,12 @@ export interface Capture {
   tokens: Record<string, string>;
   motion: Motion[];
   rows: Record<string, RowMeasure | null>;
+  /**
+   * An in-flight state held mid view transition: every running animation at
+   * fraction `at` of its duration, and the viewport (x, y, width, height),
+   * the only frame a view transition draws.
+   */
+  frame?: { at: number; viewport: [number, number, number, number] };
 }
 
 export interface BoardRef {
@@ -275,6 +281,7 @@ interface PackedCapture {
   tokens: string;
   motion: Motion[];
   rows: Record<string, string | null>;
+  frame?: Capture["frame"];
 }
 interface PackedBoard extends Omit<BoardRef, "captures"> {
   table: Record<string, unknown>;
@@ -301,6 +308,7 @@ export function packSpec(spec: SpecFile): string {
             r ? put({ ...r, keys: r.keys.map(put) }) : null,
           ])
         ),
+        ...(c.frame ? { frame: c.frame } : {}),
       };
     }
     boards[name] = { ...ref, table, captures };
@@ -329,6 +337,7 @@ export function unpackSpec(text: string): SpecFile {
           {
             tokens: get<Record<string, string>>(c.tokens),
             motion: c.motion,
+            ...(c.frame ? { frame: c.frame } : {}),
             rows: Object.fromEntries(
               Object.entries(c.rows).map(([id, h]) => {
                 if (!h) return [id, null];

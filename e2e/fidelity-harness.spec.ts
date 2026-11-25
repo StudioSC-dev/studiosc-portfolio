@@ -13,7 +13,13 @@ import {
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { expect, test, type Browser } from "@playwright/test";
+import {
+  chromium,
+  expect,
+  test,
+  type Browser,
+  type Page,
+} from "@playwright/test";
 import { checkSite, pairName, type Only } from "../scripts/boards/check";
 import {
   describe as describeFailure,
@@ -37,7 +43,18 @@ import {
   type Sections,
 } from "../scripts/boards/model";
 import { checkImage, isImageCandidate } from "../scripts/image-metadata";
-import { INPAGE, pickShot } from "../scripts/boards/capture";
+import {
+  BOARD_ORIGIN,
+  IN_FLIGHT_AT,
+  INPAGE,
+  RASTER_ARGS,
+  boardContext,
+  captureState,
+  load,
+  pickShot,
+  rowQueries,
+  shoot,
+} from "../scripts/boards/capture";
 import { runtimeBytes, runtimeSource } from "../scripts/boards-regen";
 import {
   CANVAS,
@@ -807,6 +824,150 @@ test.describe("fidelity harness", () => {
       expect(styles).toEqual(["none", "hidden"]);
     } finally {
       await page.close();
+    }
+  });
+
+  /** The share of a shot's pixels that are its commonest colour. */
+  async function flatness(page: Page, image: Buffer, type: string) {
+    return page.evaluate(
+      async ([data, mime]) => {
+        const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+        const bm = await createImageBitmap(new Blob([bytes], { type: mime }));
+        const canvas = new OffscreenCanvas(bm.width, bm.height);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(bm, 0, 0);
+        const px = ctx.getImageData(0, 0, bm.width, bm.height).data;
+        const count = new Map<number, number>();
+        for (let i = 0; i < px.length; i += 4) {
+          const k =
+            ((px[i] >> 3) << 10) | ((px[i + 1] >> 3) << 5) | (px[i + 2] >> 3);
+          count.set(k, (count.get(k) ?? 0) + 1);
+        }
+        return Math.max(...count.values()) / (px.length / 4);
+      },
+      [image.toString("base64"), type] as const
+    );
+  }
+  /** One flat colour: what a shot outside a view transition's frame shows. */
+  const FLAT = 0.995;
+
+  test("holds an in-flight state at one recorded frame", async () => {
+    chromiumOnly();
+    test.setTimeout(120_000);
+    const fx = loadBoards(CANVAS);
+    const manifest = readJson<Manifest>(path.join(CANVAS, "manifest.json"));
+    const board = "fx-desktop.dc.html";
+    const bt = boardThemes(fx.sections, board, "1440").find(
+      (t) => t.theme === "light"
+    )!;
+    const queries = rowQueries(bt.rows, fx.sections.rows, "board");
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    try {
+      const scratch = await browser.newPage();
+      const run = async (state: string) => {
+        const ctx = await boardContext(
+          browser,
+          fx.sections,
+          CANVAS,
+          manifest,
+          readFileSync(RUNTIME),
+          { width: "1440", reducedMotion: false }
+        );
+        try {
+          const page = await ctx.newPage();
+          await load(page, `${BOARD_ORIGIN}/${board}`, fx.sections.clock);
+          const capture = await captureState(
+            page,
+            fx.sections,
+            queries,
+            { state, theme: "light", toggle: false },
+            "board"
+          );
+          const shots: Record<string, string> = {};
+          const flat: Record<string, number> = {};
+          for (const [id, row] of Object.entries(capture.rows)) {
+            if (!row) continue;
+            const png = await shoot(page, row.box, capture.frame);
+            shots[id] = sha256(png);
+            flat[id] = await flatness(scratch, png, "image/png");
+          }
+          return { capture, shots, flat };
+        } finally {
+          await ctx.close();
+        }
+      };
+      const settled = await run("default");
+      const first = await run("theme-reveal");
+      const again = await run("theme-reveal");
+
+      // Held at the recorded fraction, framed by the viewport, and the same
+      // frame each time: the same measurements and the same shot bytes.
+      expect(first.capture.frame).toEqual({
+        at: IN_FLIGHT_AT,
+        viewport: [0, 0, 1440, 900],
+      });
+      expect(again.capture).toEqual(first.capture);
+      expect(again.shots).toEqual(first.shots);
+
+      // A row outside the viewport is not in the frame; one inside is.
+      for (const [id, row] of Object.entries(settled.capture.rows)) {
+        if (!row) continue;
+        const out = row.box[1] >= 900;
+        expect(first.capture.rows[id] === null, id).toBe(out);
+      }
+      expect(Object.keys(first.shots)).toContain("fx/range");
+
+      // No shot is one flat colour unless the row is flat when settled too
+      // (the fixture's opener text has no visible glyphs).
+      for (const [id, share] of Object.entries(first.flat))
+        if (share > FLAT)
+          expect(
+            settled.flat[id],
+            `${id} is blank in flight only`
+          ).toBeGreaterThan(FLAT);
+      expect(first.flat["fx/range"]).toBeLessThan(FLAT);
+      // Mid-reveal: the frame is neither theme alone.
+      expect(first.shots["fx/range"]).not.toBe(settled.shots["fx/range"]);
+
+      // The committed references: every in-flight capture with motion records
+      // its frame, and none of its shots is blank where the settled state is
+      // not.
+      const real = loadBoards(BOARDS);
+      let inFlight = 0;
+      for (const [name, ref] of Object.entries(real.spec.boards))
+        for (const [key, capture] of Object.entries(ref.captures)) {
+          const state = key.split("/")[1].replace(/\+pre-.*|-rm$/g, "");
+          if (!real.sections.states[state]?.inFlight) continue;
+          // Reduced motion has no reveal to hold: the page as it lands.
+          if (!key.endsWith("-rm"))
+            expect(capture.frame, `${name} ${key}`).toBeDefined();
+          const theme = key.split("/")[0];
+          const base = ref.captures[`${theme}/default`];
+          for (const [id, row] of Object.entries(capture.rows)) {
+            if (!row?.shot) continue;
+            inFlight++;
+            const share = await flatness(
+              scratch,
+              readFileSync(path.join(BOARDS, row.shot)),
+              "image/webp"
+            );
+            if (share <= FLAT) continue;
+            const plain = base?.rows[id]?.shot;
+            const plainShare = plain
+              ? await flatness(
+                  scratch,
+                  readFileSync(path.join(BOARDS, plain)),
+                  "image/webp"
+                )
+              : 0;
+            expect(plainShare, `${name} ${key} ${id} is blank`).toBeGreaterThan(
+              FLAT
+            );
+          }
+        }
+      expect(inFlight).toBeGreaterThan(0);
+    } finally {
+      await browser.close();
     }
   });
 

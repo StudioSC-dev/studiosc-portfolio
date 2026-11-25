@@ -237,7 +237,7 @@ export async function regen(opts: Options): Promise<void> {
             const stateLabel = plan.key.slice(bt.theme.length + 1);
             for (const [id, row] of Object.entries(capture.rows)) {
               if (!row) continue;
-              const png = await shoot(page, row.box);
+              const png = await shoot(page, row.box, capture.frame);
               const webp = await toWebp(page, png);
               // A shot identical to one already made for this board (another
               // state, or reduced motion) is kept once.

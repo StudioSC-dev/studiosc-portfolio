@@ -264,6 +264,21 @@
     return out;
   };
 
+  // The view transition the page started last, while it runs: its
+  // pseudo-elements and their animations exist only once it is ready.
+  let transition = null;
+  const startViewTransition = Document.prototype.startViewTransition;
+  if (startViewTransition)
+    Document.prototype.startViewTransition = function (...args) {
+      const t = startViewTransition.apply(this, args);
+      transition = t;
+      const done = () => {
+        if (transition === t) transition = null;
+      };
+      t.finished.then(done, done);
+      return t;
+    };
+
   const note = (event) => {
     if (!recording) return;
     const name = event.animationName || event.propertyName;
@@ -690,17 +705,29 @@
       await document.fonts.ready;
     },
 
-    /** Holds every running animation at half its duration. */
-    async holdHalfway() {
+    /**
+     * Holds every running animation, a view transition's included, at the
+     * same fraction `at` of its active duration, so an in-flight state is one
+     * fixed frame whenever the capture reaches it. Returns the viewport when
+     * a view transition is held: the only frame it draws.
+     */
+    async hold(at) {
+      const held = transition;
+      if (held) await held.ready.catch(() => {});
       for (const a of document.getAnimations()) {
+        // Only what is moving now: a finished load animation stays finished.
+        if (a.playState !== "running") continue;
         const t = a.effect ? a.effect.getComputedTiming() : null;
         if (!t || !Number.isFinite(t.endTime)) continue;
         a.pause();
-        a.currentTime = (Number(t.delay) || 0) + Number(t.activeDuration) / 2;
+        a.currentTime = (Number(t.delay) || 0) + Number(t.activeDuration) * at;
       }
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))
       );
+      return held && transition === held
+        ? [scrollX, scrollY, innerWidth, innerHeight]
+        : null;
     },
 
     /**

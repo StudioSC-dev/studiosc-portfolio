@@ -309,7 +309,7 @@ type Fid = {
   __fidelity: {
     motionStart(): void;
     settle(): Promise<void>;
-    holdHalfway(): Promise<void>;
+    hold(at: number): Promise<[number, number, number, number] | null>;
     hide(e: { selector: string; mode?: string }[]): void;
     measure(spec: unknown): Capture;
   };
@@ -318,8 +318,8 @@ type Fid = {
 const fid = (page: Page) => ({
   settle: () =>
     page.evaluate(() => (window as unknown as Fid).__fidelity.settle()),
-  holdHalfway: () =>
-    page.evaluate(() => (window as unknown as Fid).__fidelity.holdHalfway()),
+  hold: (at: number) =>
+    page.evaluate((x) => (window as unknown as Fid).__fidelity.hold(x), at),
   motionStart: () =>
     page.evaluate(() => (window as unknown as Fid).__fidelity.motionStart()),
   hide: (e: { selector: string; mode?: string }[]) =>
@@ -375,8 +375,8 @@ export async function captureState(
     motion = await takeMotion(page, rows, sections);
     everything.push(...motion);
   }
-  if (def?.inFlight) await fid(page).holdHalfway();
-  else {
+  const viewport = def?.inFlight ? await fid(page).hold(IN_FLIGHT_AT) : null;
+  if (!def?.inFlight) {
     await fid(page).settle();
     await page.waitForTimeout(40);
     await fid(page).settle();
@@ -391,12 +391,39 @@ export async function captureState(
   )) as Capture;
   if (opts.allMotion)
     everything.push(...(await takeMotion(page, rows, sections)));
-  return {
+  const capture: Capture = {
     tokens: measured.tokens,
     rows: measured.rows,
     motion: opts.allMotion ? sortMotion(everything) : motion,
   };
+  if (viewport) {
+    // A view transition draws the viewport only: a row outside it is not in
+    // the held frame, so it has no in-flight measurement or shot.
+    capture.frame = { at: IN_FLIGHT_AT, viewport };
+    for (const [id, row] of Object.entries(capture.rows))
+      if (row && !inFrame(row.box, viewport)) capture.rows[id] = null;
+  }
+  return capture;
 }
+
+/**
+ * Where an in-flight state is held: this fraction of every running
+ * animation's active duration (a theme reveal half grown). Recorded on the
+ * capture with the frame it held.
+ */
+export const IN_FLIGHT_AT = 0.5;
+
+type Rect = [number, number, number, number];
+
+/** The part of a box inside a frame, or null when none of it is. */
+export function clipToFrame(box: Rect, frame: Rect): Rect | null {
+  const x0 = Math.max(box[0], frame[0]);
+  const y0 = Math.max(box[1], frame[1]);
+  const x1 = Math.min(box[0] + box[2], frame[0] + frame[2]);
+  const y1 = Math.min(box[1] + box[3], frame[1] + frame[3]);
+  return x1 - x0 >= 1 && y1 - y0 >= 1 ? [x0, y0, x1 - x0, y1 - y0] : null;
+}
+const inFrame = (box: Rect, frame: Rect) => clipToFrame(box, frame) !== null;
 
 const sortMotion = (m: Motion[]) =>
   [...m].sort((a, b) =>
@@ -460,24 +487,35 @@ export async function pickShot(
   return best[1].shot;
 }
 
-/** A shot of a page region, as PNG bytes. */
+/**
+ * A shot of a page region, as PNG bytes. A held in-flight frame is shot
+ * from the viewport as it stands: a full-page shot resizes the viewport,
+ * which ends a running view transition, and draws nothing of it outside the
+ * viewport. Its region is the part of the box inside the frame.
+ */
 export async function shoot(
   page: Page,
-  box: [number, number, number, number]
+  box: Rect,
+  frame?: Capture["frame"]
 ): Promise<Buffer> {
-  const [x, y, w, h] = box;
-  const fx = Math.max(0, Math.floor(x));
-  const fy = Math.max(0, Math.floor(y));
+  const region = frame ? clipToFrame(box, frame.viewport) : box;
+  if (!region)
+    throw new Error(`the region at ${box.join(", ")} is out of frame`);
+  const [x, y, w, h] = region;
+  // Page coordinates, or the viewport's for a held frame.
+  const [ox, oy] = frame ? frame.viewport : [0, 0];
+  const fx = Math.max(0, Math.floor(x - ox));
+  const fy = Math.max(0, Math.floor(y - oy));
   const take = () =>
     page.screenshot({
-      fullPage: true,
+      fullPage: !frame,
       animations: "allow",
       caret: "hide",
       clip: {
         x: fx,
         y: fy,
-        width: Math.max(1, Math.ceil(x + w) - fx),
-        height: Math.max(1, Math.ceil(y + h) - fy),
+        width: Math.max(1, Math.ceil(x - ox + w) - fx),
+        height: Math.max(1, Math.ceil(y - oy + h) - fy),
       },
     });
   try {
