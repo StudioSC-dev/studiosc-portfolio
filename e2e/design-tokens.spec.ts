@@ -19,6 +19,8 @@ import {
   addedIconSources,
   allowsHeadingWeight,
   finalWithFragment,
+  contrast,
+  flattenSurface,
   docGaps,
   liveAliases,
   expectedFontConfig,
@@ -617,6 +619,48 @@ test.describe("Range design system", () => {
           4.5
         )
       ).toHaveLength(1);
+    }
+  });
+
+  test("inline article links keep a visible underline", async ({ page }) => {
+    // Prose links share the body colour, so the underline is their cue: it
+    // must be drawn and reach 3:1 against the page, in both themes.
+    const sample = () =>
+      page.evaluate(() => {
+        const link = document.querySelector<HTMLAnchorElement>(".prose p a");
+        if (!link) throw new Error("no inline prose link");
+        const style = getComputedStyle(link);
+        const surfaces: string[] = [];
+        for (let p = link.parentElement; p; p = p.parentElement) {
+          const bg = getComputedStyle(p).backgroundColor;
+          if (bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+            surfaces.push(bg);
+          }
+        }
+        return {
+          line: style.textDecorationLine,
+          underline: style.textDecorationColor,
+          surfaces,
+        };
+      });
+    const underlineRatio = (s: Awaited<ReturnType<typeof sample>>) =>
+      contrast(s.underline, flattenSurface(s.surfaces));
+    for (const theme of THEMES) {
+      await openThemed(page, "/blog/tallyandtrace", theme);
+      const link = await sample();
+      expect(link.line, `${theme}: the link is underlined`).toContain(
+        "underline"
+      );
+      expect(
+        underlineRatio(link),
+        `${theme}: underline against the page`
+      ).toBeGreaterThanOrEqual(3);
+
+      // Control: the old rule-coloured underline is under 3:1.
+      await page.addStyleTag({
+        content: ".prose a { text-decoration-color: var(--line-strong) }",
+      });
+      expect(underlineRatio(await sample())).toBeLessThan(3);
     }
   });
 

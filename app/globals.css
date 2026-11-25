@@ -676,14 +676,11 @@ body {
   letter-spacing: -0.015em;
 }
 
+/* Links share the body colour, so the underline, in that colour, is the cue. */
 .prose a {
-  text-decoration-color: var(--line-strong);
+  text-decoration-color: currentColor;
   text-underline-offset: 0.2em;
   font-weight: 400;
-}
-
-.prose a:hover {
-  text-decoration-color: var(--ink);
 }
 
 .prose code {
