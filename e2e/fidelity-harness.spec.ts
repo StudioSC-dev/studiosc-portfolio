@@ -1017,6 +1017,15 @@ test.describe("fidelity harness", () => {
           actual: `it stays ${list(ref(c, row).shows.photos)}`,
         });
 
+      const plateControl =
+        (control: string, state: string): Expect =>
+        (c) => ({
+          section: "fx/range",
+          state,
+          property: "control plate",
+          expected: `${control} shows another plate (board: ${list(ref(c, "fx/range").shows.slides)} to ${list(ref(c, "fx/range", state).shows.slides)})`,
+          actual: `it stays ${list(ref(c, "fx/range").shows.slides)}`,
+        });
       const altFont = `alt-font.woff2 with sha256 ${sha256(
         readFileSync(path.join(CANVAS, "../site/alt-font.woff2"))
       )}`;
@@ -1232,6 +1241,16 @@ test.describe("fidelity harness", () => {
           }),
         ],
         [
+          "plate-next-dead",
+          rowsIn(["fx/range"], ["default", "plate-next"]),
+          plateControl('"Next plate"', "plate-next"),
+        ],
+        [
+          "plate-prev-dead",
+          rowsIn(["fx/range"], ["default", "plate-prev"]),
+          plateControl('"Previous plate"', "plate-prev"),
+        ],
+        [
           "gallery-dead",
           rowsIn(["fx/gallery"], ["default", "gallery-2"]),
           photoControl('"Next photo"', "gallery-2"),
@@ -1269,6 +1288,17 @@ test.describe("fidelity harness", () => {
           (c) => ({
             section: "fx/contact",
             state: "contact-sent",
+            property: "control copy",
+            expected: '"Send message" changes the text',
+            actual: `the text stays ${quoted(ref(c, "fx/contact").copy)}`,
+          }),
+        ],
+        [
+          "contact-error-dead",
+          rowsIn(["fx/contact"], ["default", "contact-error"]),
+          (c) => ({
+            section: "fx/contact",
+            state: "contact-error",
             property: "control copy",
             expected: '"Send message" changes the text',
             actual: `the text stays ${quoted(ref(c, "fx/contact").copy)}`,

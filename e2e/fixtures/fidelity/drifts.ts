@@ -140,6 +140,8 @@ export const DRIFTS: Record<string, Drift> = {
   "thumb-dead": dead("[data-thumb]"),
   "chips-back-dead": dead("[data-chips-back]"),
   "holly-dead": dead("[data-holly-next]"),
+  "plate-next-dead": dead("[data-next-plate]"),
+  "plate-prev-dead": dead("[data-prev-plate]"),
   "treat-dead": dead("[data-treat]"),
   // Next updates the counter and the pressed thumbnail, not the picture.
   "gallery-counter-only": {
@@ -150,6 +152,15 @@ export const DRIFTS: Record<string, Drift> = {
   const n = (Number(shown.textContent.split(" ")[0]) % 3) + 1;
   shown.textContent = n + " of 3";
   document.querySelectorAll("[data-thumb]").forEach((t, j) => t.setAttribute("aria-pressed", String(j === n - 1)));
+}, true);`,
+  },
+  // A failed send says nothing; a sent one still thanks.
+  "contact-error-dead": {
+    js: `document.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const r = await fetch("/api/contact", { method: "POST", body: new FormData(e.target) });
+  if (r.ok) document.querySelector("[data-status]").textContent = "Thanks, it is sent.";
 }, true);`,
   },
   "contact-dead": {
