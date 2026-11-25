@@ -1810,6 +1810,73 @@ test.describe("Range design system", () => {
           absolute: result.links,
         };
       };
+      // The navigation a visitor uses: each header link (the open menu on a
+      // phone) clicked on the rendered page, and where the click lands. A
+      // link that cannot be clicked, or lands elsewhere, differs from the base.
+      const activate = async (
+        origin: string,
+        route: string,
+        phone: boolean,
+        opts: { css?: string; limit?: number } = {}
+      ) => {
+        const context = await browser.newContext({
+          baseURL: origin,
+          ...(phone ? { viewport: { width: 390, height: 844 } } : {}),
+        });
+        const page = await context.newPage();
+        const selector = phone ? "#mobile-menu a[href]" : "header a[href]";
+        const open = async () => {
+          await page.goto(route);
+          await page.waitForLoadState("networkidle");
+          if (opts.css) await page.addStyleTag({ content: opts.css });
+          if (phone) {
+            await page.getByRole("button", { name: "Toggle menu" }).click();
+            await page.waitForFunction(() => {
+              const menu = document.getElementById("mobile-menu");
+              return !!menu && getComputedStyle(menu).opacity === "1";
+            });
+          }
+        };
+        const landed: string[] = [];
+        await open();
+        const count = Math.min(
+          await page.locator(selector).count(),
+          opts.limit ?? Infinity
+        );
+        for (let i = 0; i < count; i++) {
+          if (i > 0) await open();
+          const link = page.locator(selector).nth(i);
+          const href = await link.evaluate(
+            (a) => (a as HTMLAnchorElement).href
+          );
+          if (!(await link.isVisible())) {
+            landed.push(`hidden ${dest(href)}`);
+          } else if (new URL(href).origin !== new URL(origin).origin) {
+            landed.push(dest(href));
+          } else {
+            try {
+              await link.click({ timeout: 3000 });
+              await page
+                .waitForURL(href, { timeout: 5000 })
+                .catch(() => undefined);
+              await page.waitForLoadState("networkidle");
+              landed.push(`${dest(href)} lands on ${dest(page.url())}`);
+            } catch {
+              landed.push(`${dest(href)} cannot be clicked`);
+            }
+          }
+        }
+        await context.close();
+        return landed;
+      };
+      // Control: navigation a stylesheet makes unclickable is caught, though
+      // its text and href are unchanged.
+      const [blocked] = await activate(headURL, "/", false, {
+        css: "header nav { pointer-events: none }",
+        limit: 1,
+      });
+      expect(blocked).toMatch(/cannot be clicked$/);
+
       // Whether the page at `url` has the element its fragment names.
       const targetOf = async (url: string) => {
         const id = decodeURIComponent(new URL(url).hash.slice(1));
@@ -1858,6 +1925,15 @@ test.describe("Range design system", () => {
         expect(after.status, `${label} still renders`).toBe(before.status);
         expect(after.text, `${label} visible text`).toBe(before.text);
         expect(after.links, `${label} link destinations`).toEqual(before.links);
+        const navBefore = await activate(baseURL, route, phone);
+        expect(
+          navBefore.some((l) => l.includes(" lands on ")),
+          `${label}: the base has navigation to click`
+        ).toBe(true);
+        expect(
+          await activate(headURL, route, phone),
+          `${label} navigation, clicked`
+        ).toEqual(navBefore);
 
         // Each link on either test server, followed to its final URL.
         const local = (list: string[]) =>
