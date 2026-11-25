@@ -127,11 +127,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="label">{formattedDate}</span>
-            <StatusBadge
-              qaVerified={project.qaVerified}
-              qaInProgress={project.qaInProgress}
-              underDevelopment={project.underDevelopment}
-            />
+            <StatusBadge status={project.status} />
           </div>
 
           {project.tags && project.tags.length > 0 && (

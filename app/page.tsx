@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Hero from "@/components/home/Hero";
 import ProjectCard from "@/components/home/ProjectCard";
 import LatestBlogPosts from "@/components/home/LatestBlogPosts";
-import { getBlogPosts, getProjects } from "@/lib/mdx";
+import { getBlogPosts, getProjects, validateShippedRange } from "@/lib/mdx";
+import { STATUS_ORDER } from "@/lib/statuses";
 
 export const metadata: Metadata = {
   title: "StudioSC",
@@ -14,6 +15,8 @@ export default async function Home() {
   const allPosts = await getBlogPosts();
   const latestPosts = allPosts.slice(0, 3);
   const allProjects = await getProjects();
+  // Fails the build if the project files or the Range are invalid
+  await validateShippedRange();
 
   // Get featured projects
   const featuredProjects = allProjects.filter(
@@ -23,16 +26,10 @@ export default async function Home() {
       p.slug === "tallyandtrace"
   );
 
-  // Sort by completion status: QA Verified > QA In Progress > Under Development
-  const sortedFeaturedProjects = featuredProjects.sort((a, b) => {
-    const getStatusPriority = (project: typeof a) => {
-      if (project.qaVerified) return 1;
-      if (project.qaInProgress) return 2;
-      if (project.underDevelopment) return 3;
-      return 4;
-    };
-    return getStatusPriority(a) - getStatusPriority(b);
-  });
+  // Sort by completion status, in the order of the fixed status set
+  const sortedFeaturedProjects = featuredProjects.sort(
+    (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
+  );
 
   return (
     <>
@@ -51,9 +48,7 @@ export default async function Home() {
                 description={project.description}
                 tags={project.tags}
                 thumbnail={project.thumbnail}
-                qaVerified={project.qaVerified}
-                qaInProgress={project.qaInProgress}
-                underDevelopment={project.underDevelopment}
+                status={project.status}
                 githubUrl={project.githubUrl}
                 liveUrl={project.liveUrl}
               />

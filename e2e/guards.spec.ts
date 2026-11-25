@@ -52,6 +52,7 @@ import {
   isImageCandidate,
 } from "../scripts/image-metadata";
 import { addedLineNumbers, findPrivate } from "../scripts/privacy-scan";
+import playwrightConfig from "../playwright.config";
 import { throwawayRepo } from "./support/throwaway";
 import { collectErrors, nextHop, stubVercelInsights } from "./support/page";
 import marathonCard from "./fixtures/marathon-card.json";
@@ -385,6 +386,24 @@ test.describe("guards", () => {
     } finally {
       rmSync(merges, { recursive: true, force: true });
     }
+  });
+
+  test("repo stays a full clone in PR runs", () => {
+    nodeOnly();
+    // Throws on a pull request run missing either SHA; null on a push build.
+    const range = prRange();
+    test.skip(range === null, "push build: no pull request range");
+    // Playwright's PR diff capture fetches the base with --depth=1, which
+    // cuts its history, so a base newer than the fork point has no merge base.
+    expect(git(["rev-parse", "--is-shallow-repository"]).trim()).toBe("false");
+    expect(
+      gitOk(["merge-base", range!.base, range!.head]),
+      `merge-base ${range!.base} ${range!.head}`
+    ).toBe(true);
+    expect(playwrightConfig.captureGitInfo).toStrictEqual({
+      commit: true,
+      diff: false,
+    });
   });
 
   test("denylist fixtures", () => {
