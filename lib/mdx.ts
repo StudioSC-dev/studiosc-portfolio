@@ -175,6 +175,8 @@ export async function validateShippedRange(): Promise<void> {
   const projects = await getProjects();
   validateRange(
     RANGE_CATEGORIES,
-    projects.map((project) => project.slug)
+    Object.fromEntries(
+      projects.map((project) => [project.slug, project.status])
+    )
   );
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STATUSES, type ProjectStatus } from "../lib/statuses";
 
 /**
  * The fragments the range plates draw, one per tab. PRV-5 to PRV-7 supply the
@@ -77,7 +78,7 @@ export const RANGE_CATEGORIES: RangeCategory[] = [];
  */
 export function validateRange(
   categories: unknown,
-  slugs: readonly string[],
+  projects: readonly string[] | Readonly<Record<string, ProjectStatus>>,
   fragmentIds: readonly string[] = FRAGMENT_IDS
 ): asserts categories is RangeCategory[] {
   if (!Array.isArray(categories)) {
@@ -85,6 +86,13 @@ export function validateRange(
       "Invalid range in content/range.ts: categories must be an array"
     );
   }
+
+  // With statuses known, a real plate's Status fact must be its project's
+  // plate label; with slugs only, just the slugs are checked.
+  const slugs = Array.isArray(projects) ? projects : Object.keys(projects);
+  const statusBySlug = Array.isArray(projects)
+    ? undefined
+    : (projects as Readonly<Record<string, ProjectStatus>>);
 
   const problems: string[] = [];
   const seen = new Set<string>();
@@ -128,6 +136,19 @@ export function validateRange(
       problems.push(
         `${name}: project slug "${category.plate.slug}" does not exist`
       );
+    }
+    if (category.plate.kind === "real" && statusBySlug) {
+      const status = statusBySlug[category.plate.slug];
+      if (status) {
+        const expected = STATUSES[status].plateLabel;
+        for (const fact of category.plate.facts) {
+          if (fact.label === "Status" && fact.value !== expected) {
+            problems.push(
+              `${name}: Status fact "${fact.value}" is not "${expected}", the plate label of project "${category.plate.slug}"`
+            );
+          }
+        }
+      }
     }
   }
 
