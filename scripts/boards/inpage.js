@@ -423,10 +423,7 @@
       .join(" ");
     if (aria) data.aria = aria;
     if (k.cat === "image" || k.cat === "frame") {
-      if (k.cat === "image")
-        data.src = (k.el.currentSrc || k.el.getAttribute("src") || "")
-          .split("/")
-          .pop();
+      if (k.cat === "image") data.src = photoOf(k.el);
       data.ratio = round(r.width / r.height, 4);
     } else {
       data.type = {
@@ -521,6 +518,29 @@
     return out;
   };
 
+  /**
+   * The photo a picture shows: its file name, read from the original source
+   * when an image optimiser serves it (`/_next/image?url=/img/one.webp&w=…`).
+   */
+  const photoOf = (img) => {
+    const src = img.currentSrc || img.getAttribute("src") || "";
+    let url;
+    try {
+      url = new URL(src, location.href);
+    } catch {
+      return src.split("?")[0].split("/").pop();
+    }
+    const original = url.searchParams.get("url");
+    if (original) {
+      try {
+        url = new URL(original, location.href);
+      } catch {
+        return original.split("?")[0].split("/").pop();
+      }
+    }
+    return decodeURIComponent(url.pathname.split("/").pop());
+  };
+
   const labelOf = (el) =>
     (el.getAttribute("aria-label") || el.textContent || "")
       .replace(/\s+/g, " ")
@@ -551,12 +571,7 @@
         if (o === "auto" || o === "scroll") scrolling.push(el);
       }
     return {
-      photos: inRow("img", true).map((i) =>
-        (i.currentSrc || i.getAttribute("src") || "")
-          .split("?")[0]
-          .split("/")
-          .pop()
-      ),
+      photos: inRow("img", true).map(photoOf),
       // A row's slides count even when they are rows of their own.
       slides: inRow('[aria-roledescription="slide"]', false).map(labelOf),
       scroll: scrolling.map((el) => Math.round(el.scrollLeft)),

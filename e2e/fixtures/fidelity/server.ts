@@ -73,8 +73,17 @@ export function startFixtureServer(
     if (url.pathname === "/") file = path.join(FIXTURE, "site", "index.html");
     else if (url.pathname === "/blog/work")
       file = path.join(FIXTURE, "site", "blog-work.html");
-    else if (url.pathname.startsWith("/img/")) {
-      const name = path.basename(url.pathname);
+    else if (
+      url.pathname.startsWith("/img/") ||
+      url.pathname === "/_next/image"
+    ) {
+      // The gallery's photos come through an image optimiser, as Next.js
+      // serves them: the original path is in the `url` parameter.
+      const name = path.basename(
+        url.pathname === "/_next/image"
+          ? (url.searchParams.get("url") ?? "")
+          : url.pathname
+      );
       const swap = drift?.images?.[name];
       file = swap
         ? path.join(FIXTURE, "site", swap)
