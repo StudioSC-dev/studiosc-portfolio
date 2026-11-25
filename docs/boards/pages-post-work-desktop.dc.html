@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — work post</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --error: {{t.error}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery);">
+
+  <header style="position: relative; z-index: 2;">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; height: 5.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+      <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; text-decoration: none;">StudioSC</a>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <nav aria-label="Main">
+          <ul style="display: flex; align-items: center; gap: 2rem; list-style: none; margin: 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 500;">
+            <li><a href="/work" style="text-decoration: none;">Work</a></li>
+            <li><a href="/seth" style="text-decoration: none;">Seth</a></li>
+            <li><a href="/christine" style="text-decoration: none;">Christine</a></li>
+            <li><a href="/blog" aria-current="page" style="text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.45em;">Writing</a></li>
+            <li><a href="/contact" style="display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.125rem; border-radius: 6px; background: var(--ink); color: var(--gallery); text-decoration: none; font-weight: 600;">Start a project</a></li>
+          </ul>
+        </nav>
+        <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- A work post: the full text, with a contents rail on desktop -->
+    <header aria-labelledby="post-title" style="position: relative;">
+      <svg aria-hidden="true" width="220" height="620" viewBox="0 0 220 620" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M112.5 4.5h0M148.5 4.5h0M166.5 4.5h0M184.5 4.5h0M193.5 4.5h0M202.5 4.5h0M211.5 4.5h0M157.5 13.5h0M175.5 13.5h0M193.5 13.5h0M211.5 13.5h0M130.5 22.5h0M148.5 22.5h0M166.5 22.5h0M184.5 22.5h0M202.5 22.5h0M211.5 22.5h0M175.5 31.5h0M193.5 31.5h0M211.5 31.5h0M112.5 40.5h0M130.5 40.5h0M148.5 40.5h0M166.5 40.5h0M184.5 40.5h0M193.5 40.5h0M202.5 40.5h0M211.5 40.5h0M157.5 49.5h0M175.5 49.5h0M193.5 49.5h0M211.5 49.5h0M130.5 58.5h0M148.5 58.5h0M166.5 58.5h0M184.5 58.5h0M202.5 58.5h0M211.5 58.5h0M175.5 67.5h0M193.5 67.5h0M211.5 67.5h0M112.5 76.5h0M148.5 76.5h0M166.5 76.5h0M184.5 76.5h0M193.5 76.5h0M202.5 76.5h0M211.5 76.5h0M157.5 85.5h0M175.5 85.5h0M193.5 85.5h0M211.5 85.5h0M130.5 94.5h0M148.5 94.5h0M166.5 94.5h0M184.5 94.5h0M202.5 94.5h0M211.5 94.5h0M175.5 103.5h0M193.5 103.5h0M211.5 103.5h0M112.5 112.5h0M148.5 112.5h0M166.5 112.5h0M184.5 112.5h0M193.5 112.5h0M202.5 112.5h0M211.5 112.5h0M175.5 121.5h0M193.5 121.5h0M211.5 121.5h0M130.5 130.5h0M166.5 130.5h0M184.5 130.5h0M202.5 130.5h0M211.5 130.5h0M175.5 139.5h0M193.5 139.5h0M211.5 139.5h0M112.5 148.5h0M148.5 148.5h0M166.5 148.5h0M184.5 148.5h0M193.5 148.5h0M202.5 148.5h0M211.5 148.5h0M157.5 157.5h0M175.5 157.5h0M193.5 157.5h0M211.5 157.5h0M130.5 166.5h0M148.5 166.5h0M166.5 166.5h0M184.5 166.5h0M202.5 166.5h0M211.5 166.5h0M175.5 175.5h0M193.5 175.5h0M211.5 175.5h0M112.5 184.5h0M148.5 184.5h0M166.5 184.5h0M184.5 184.5h0M193.5 184.5h0M202.5 184.5h0M211.5 184.5h0M193.5 193.5h0M211.5 193.5h0M130.5 202.5h0M166.5 202.5h0M184.5 202.5h0M202.5 202.5h0M211.5 202.5h0M175.5 211.5h0M193.5 211.5h0M211.5 211.5h0M112.5 220.5h0M148.5 220.5h0M166.5 220.5h0M184.5 220.5h0M202.5 220.5h0M157.5 229.5h0M193.5 229.5h0M211.5 229.5h0M130.5 238.5h0M148.5 238.5h0M166.5 238.5h0M184.5 238.5h0M202.5 238.5h0M211.5 238.5h0M175.5 247.5h0M193.5 247.5h0M211.5 247.5h0M112.5 256.5h0M148.5 256.5h0M166.5 256.5h0M184.5 256.5h0M202.5 256.5h0M193.5 265.5h0M211.5 265.5h0M130.5 274.5h0M166.5 274.5h0M184.5 274.5h0M202.5 274.5h0M211.5 274.5h0M193.5 283.5h0M211.5 283.5h0M112.5 292.5h0M148.5 292.5h0M166.5 292.5h0M184.5 292.5h0M202.5 292.5h0M193.5 301.5h0M211.5 301.5h0M130.5 310.5h0M166.5 310.5h0M184.5 310.5h0M202.5 310.5h0M175.5 319.5h0M211.5 319.5h0M112.5 328.5h0M148.5 328.5h0M166.5 328.5h0M184.5 328.5h0M202.5 328.5h0M193.5 337.5h0M211.5 337.5h0M130.5 346.5h0M166.5 346.5h0M184.5 346.5h0M202.5 346.5h0M211.5 355.5h0M148.5 364.5h0M166.5 364.5h0M184.5 364.5h0M202.5 364.5h0M193.5 373.5h0M211.5 373.5h0M166.5 382.5h0M184.5 382.5h0M202.5 382.5h0M211.5 391.5h0M112.5 400.5h0M148.5 400.5h0M166.5 400.5h0M184.5 400.5h0M202.5 400.5h0M193.5 409.5h0M211.5 409.5h0M166.5 418.5h0M184.5 418.5h0M202.5 418.5h0M211.5 427.5h0M148.5 436.5h0M166.5 436.5h0M184.5 436.5h0M202.5 436.5h0M193.5 445.5h0M166.5 454.5h0M184.5 454.5h0M202.5 454.5h0M211.5 463.5h0M112.5 472.5h0M148.5 472.5h0M184.5 472.5h0M202.5 472.5h0M166.5 490.5h0M184.5 490.5h0M202.5 490.5h0M148.5 508.5h0M166.5 508.5h0M184.5 508.5h0M202.5 508.5h0M166.5 526.5h0M202.5 526.5h0M148.5 544.5h0M184.5 544.5h0M202.5 544.5h0M202.5 562.5h0M148.5 580.5h0M184.5 580.5h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative; box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; padding-top: 1.5rem;">
+        <a href="/blog/work" style="display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.75rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; text-decoration: none;"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M16 10H4M9 5L4 10L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>How we build</a>
+        <p style="margin: 1.5rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);"><span style="font-variant-numeric: tabular-nums;">19 July 2026</span> · <a href="/work/tallyandtrace" style="font-weight: 600;">Tally & Trace</a></p>
+        <h1 id="post-title" style="margin: 0.75rem 0 0; max-width: 56rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 3.5rem; line-height: 4rem; letter-spacing: -0.03em;">Which Account Comes Up Short: Per-Account Solvency in Tally &amp; Trace</h1>
+        <p style="margin: 1.25rem 0 0; max-width: 46rem; font-size: 1.25rem; line-height: 1.875rem; color: var(--muted);">The cash-flow timeline used to pool every account into one balance. Now it routes each bill primary→overflow and tells you exactly which account can&#x27;t cover what — plus credit-card statement modelling, hardened auth, and what&#x27;s coming next.</p>
+      </div>
+    </header>
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; padding-top: 1.5rem; display: grid; grid-template-columns: minmax(0, 46rem) minmax(0, 1fr); gap: 5rem; align-items: start;">
+      <article aria-labelledby="post-title">
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">A <a href="/blog/tallyandtrace-update">previous post</a> rebuilt <a href="/work/tallyandtrace">Tally &amp; Trace</a>&#x27;s forecaster into a day-ordered running-balance engine — one that could finally see the mid-month trough where the bills come due before payday. It shipped with an honest limitation: it pooled every account into a single balance. That&#x27;s the right first answer to &quot;am I solvent this month,&quot; and the wrong answer to the question that actually clears a payment: <strong style="font-weight: 600;">can <em>this</em> account cover <em>this</em> bill, on the day it&#x27;s due?</strong></p>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">This update closes that gap, and brings a few other pieces of the spreadsheet across with it.</p>
+        <h2 id="shipped" style="margin: 3rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.875rem; line-height: 2.375rem; letter-spacing: -0.015em;">Shipped</h2>
+        <h3 style="margin: 2rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem;">Per-account solvency, with payment routing</h3>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">The forecaster now projects a <strong style="font-weight: 600;">running balance per account</strong>, not one merged number. Each payable is routed the way we actually pay it: from a <strong style="font-weight: 600;">primary</strong> account first, and only the overflow from a designated second account. When the primary can&#x27;t cover a bill, the engine draws the remainder from overflow — and if that still isn&#x27;t enough <em>before the due date</em>, it flags the shortfall with the specific account, the amount short, and the date. &quot;You&#x27;re fine on paper but Card A is ₱X short on the 24th&quot; is a sentence the old pooled view structurally couldn&#x27;t say.</p>
+        <figure style="margin: 2rem 0 0; padding: 1.5rem; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek);">
+          <div role="img" aria-label="Flowchart: a bill is paid from the primary account if it can cover it; otherwise the remainder comes from the overflow account; if that still falls short before the due date, the shortfall is flagged with the account, amount and date." style="display: grid; grid-template-columns: minmax(0, 1fr); max-width: 40rem;">
+            <div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--ink); border-radius: 6px; background: var(--plate); font-size: 0.9375rem; line-height: 1.375rem;">Bill due (with due date)</div><p style="margin: 0; padding: 0.375rem 0 0.375rem 1rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 0.375rem;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M2.5 8.5L7 13L11.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></p><div style="display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem minmax(0, 1fr); align-items: center;"><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--ink); border-radius: 6px; background: var(--plate); font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600;">Primary account covers it?</div><p style="margin: 0; text-align: center; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">Yes<svg aria-hidden="true" width="40" height="10" viewBox="0 0 40 10" fill="none" style="display: block; margin: 0.125rem auto 0;"><path d="M1 5H38M33 1L38 5L33 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></p><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--peek); font-size: 0.9375rem; line-height: 1.375rem;">Paid from primary</div></div><p style="margin: 0; padding: 0.375rem 0 0.375rem 1rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 0.375rem;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M2.5 8.5L7 13L11.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>No</p><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--ink); border-radius: 6px; background: var(--plate); font-size: 0.9375rem; line-height: 1.375rem;">Cover the remainder from overflow account</div><p style="margin: 0; padding: 0.375rem 0 0.375rem 1rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 0.375rem;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M2.5 8.5L7 13L11.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></p><div style="display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem minmax(0, 1fr); align-items: center;"><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--ink); border-radius: 6px; background: var(--plate); font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600;">Overflow covers the rest before the due date?</div><p style="margin: 0; text-align: center; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">Yes<svg aria-hidden="true" width="40" height="10" viewBox="0 0 40 10" fill="none" style="display: block; margin: 0.125rem auto 0;"><path d="M1 5H38M33 1L38 5L33 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></p><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--peek); font-size: 0.9375rem; line-height: 1.375rem;">Paid — split across accounts</div></div><p style="margin: 0; padding: 0.375rem 0 0.375rem 1rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 0.375rem;"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M2.5 8.5L7 13L11.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>No</p><div style="box-sizing: border-box; padding: 0.75rem 1rem; border: 1px solid var(--ink); border-radius: 6px; background: var(--plate); font-size: 0.9375rem; line-height: 1.375rem; border-color: var(--error); color: var(--error); font-weight: 600;">Flag shortfall: which account, how much short, on what date</div>
+          </div>
+          <figcaption style="margin-top: 1rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">How a bill is routed, primary first, then overflow.</figcaption>
+        </figure>
+        <h3 style="margin: 2rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem;">Credit-card statement modelling</h3>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">Credit cards no longer show up as a single lump. The engine derives <strong style="font-weight: 600;">one dated payable per billing cycle</strong> straight from the card&#x27;s own transactions — walking each card&#x27;s close day to its due date — and routes that statement payment to its funding account like any other bill. This also fixed a modelling bug: an unposted card charge used to leave cash on its <em>purchase</em> date, as if you paid at the register. A credit purchase doesn&#x27;t touch cash until the statement is due, so the forecast now defers the cash impact to the payment date, where it belongs.</p>
+        <h3 style="margin: 2rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem;">Also shipped</h3>
+        <ul style="margin: 1.25rem 0 0; padding-left: 1.25rem; font-size: 1.125rem; line-height: 1.875rem;"><li style="margin-top: 0.75rem;"><strong style="font-weight: 600;">Installment &quot;n of m&quot; tracking</strong> — recurring installments now carry their position in the plan (&quot;Payment 3 of 12&quot;, &quot;9 left&quot;), so a financed purchase reads as progress toward payoff instead of an anonymous recurring line.</li><li style="margin-top: 0.75rem;"><strong style="font-weight: 600;">Auth &amp; config hardening</strong> — refresh tokens are now <strong style="font-weight: 600;">rotating and revocable</strong>, moved out of XSS-readable <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; padding: 0.0625rem 0.3125rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--peek);">localStorage</code> into <strong style="font-weight: 600;">httpOnly cookies</strong>. A production config guard refuses to boot with a placeholder <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; padding: 0.0625rem 0.3125rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--peek);">SECRET_KEY</code> or <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; padding: 0.0625rem 0.3125rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--peek);">DATABASE_URL</code>, and datetimes are timezone-aware end to end.</li><li style="margin-top: 0.75rem;"><strong style="font-weight: 600;">Multi-entity, for real</strong> — co-members of a business entity now see each other&#x27;s records, while personal data stays owner-only. The isolation model finally works both ways: shared where it should be shared, private where it must stay private.</li><li style="margin-top: 0.75rem;"><strong style="font-weight: 600;">A correctness baseline</strong> — a growing pytest suite pins the money math: balances, transfers with fees, allocations, and FX round-tripping, all at full <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; padding: 0.0625rem 0.3125rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--peek);">Decimal</code> precision. The properties are blunt on purpose, because a finance tool that&#x27;s <em>almost</em> right isn&#x27;t right.</li></ul>
+        <h2 id="what-s-next" style="margin: 3rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.875rem; line-height: 2.375rem; letter-spacing: -0.015em;">What&#x27;s next</h2>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">The forecaster can now tell you which account comes up short before payday. The next step is letting you <strong style="font-weight: 600;">ask it</strong> — and act on what it says — without opening the app.</p>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">We&#x27;re designing an <strong style="font-weight: 600;">MCP connector</strong> that lets you read your finances, and make guarded changes, by talking to Claude: <em>&quot;what bills are due before payday?&quot;</em>, <em>&quot;mark the electric bill paid.&quot;</em> The plan is deliberately staged — <strong style="font-weight: 600;">read-only tools first</strong>, guarded writes second — everything <strong style="font-weight: 600;">entity-scoped</strong> and gated behind <strong style="font-weight: 600;">revocable personal-access tokens</strong>, so access is narrow, auditable, and easy to cut off. This is in design, not shipped; we&#x27;d rather get the guardrails right than rush the writes.</p>
+        <h2 id="why-this-matters" style="margin: 3rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.875rem; line-height: 2.375rem; letter-spacing: -0.015em;">Why this matters</h2>
+        <p style="margin: 1.25rem 0 0; font-size: 1.125rem; line-height: 1.875rem;">The throughline hasn&#x27;t changed since day one: <strong style="font-weight: 600;">exact money math, and solvency <em>before</em> the bill hits.</strong> Every figure stays in <code style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.875em; padding: 0.0625rem 0.3125rem; border: 1px solid var(--rule); border-radius: 4px; background: var(--peek);">Decimal</code> from the database to the forecast — no floating-point drift in numbers that decide whether rent clears. What this update adds is precision about <em>where</em> the money is: not just &quot;will the month net out,&quot; but &quot;will this specific account cover this specific bill on the day it&#x27;s due.&quot; That&#x27;s the question a household actually asks at the end of the month — and now it&#x27;s the one the app answers first.</p>
+      </article>
+      <aside aria-label="On this page" style="position: sticky; top: 1.5rem; margin-top: 1.5rem;">
+        <p style="margin: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">On this page</p>
+        <ul style="list-style: none; margin: 0.5rem 0 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);"><li style="padding: 0.5rem 0; border-top: 1px solid var(--rule);"><a href="#shipped" style="text-decoration: none;">Shipped</a></li><li style="padding: 0.5rem 0; border-top: 1px solid var(--rule);"><a href="#what-s-next" style="text-decoration: none;">What&#x27;s next</a></li><li style="padding: 0.5rem 0; border-top: 1px solid var(--rule);"><a href="#why-this-matters" style="text-decoration: none;">Why this matters</a></li></ul>
+        <p style="margin: 1.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">From the project</p>
+        <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;"><a href="/work/tallyandtrace" style="font-weight: 600;">Tally &amp; Trace case study</a></p>
+        <p style="margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">Built by <a href="/seth">Seth</a> · Tested by <a href="/christine">Christine</a></p>
+      </aside>
+    </div>
+
+    <nav aria-label="More posts" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 5rem 2.5rem 0;">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3rem; padding-top: 1.25rem; border-top: 2px solid var(--ink);">
+        <a href="/blog/tallyandtrace-update" style="display: block; text-decoration: none; text-align: left;"><span style="display: flex; align-items: center; justify-content: flex-start; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M16 10H4M9 5L4 10L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Older post</span><span style="display: block; margin-top: 0.25rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.01em;">The Month-End Total Lied: Modeling Cash-Flow Timing in Tally &amp; Trace</span></a>
+        <a href="/blog/tallyandtrace-sentry" style="display: block; text-decoration: none; text-align: right;"><span style="display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Newer post<svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M4 10H16M11 5L16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span style="display: block; margin-top: 0.25rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.01em;">Wiring Sentry Into a Finance App Without Leaking the Money</span></a>
+      </div>
+      <p style="margin: 2rem 0 0;"><a href="/blog/work" style="display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.75rem; font-weight: 600;"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M16 10H4M9 5L4 10L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>All of How we build</a></p>
+    </nav>
+  </main>
+
+  <footer style="border-top: 1px solid var(--rule);">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 2.5rem 2.5rem 2.5rem; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 9fr); gap: 1.5rem 2rem;">
+      <div>
+        <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem;">StudioSC</p>
+        <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+      </div>
+      <nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; align-content: start; font-size: 0.9375rem; line-height: 1.5rem;">
+        <a href="/work" style="text-decoration: none;">Work</a>
+        <a href="/blog" style="text-decoration: none;">Writing</a>
+        <a href="/about" style="text-decoration: none;">About</a>
+        <a href="/contact" style="text-decoration: none;">Contact</a>
+        <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="text-decoration: none;">Seth on LinkedIn</a>
+        <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="text-decoration: none;">Christine on LinkedIn</a>
+        <a href="https://github.com/StudioSC-dev" style="text-decoration: none;">StudioSC-dev on GitHub</a>
+      </nav>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3450}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

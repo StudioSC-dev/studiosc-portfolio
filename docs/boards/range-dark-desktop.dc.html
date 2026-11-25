@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Range, dark — home</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes stage-in{from{opacity:0;transform:translateY(2rem)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes word-in{from{opacity:0;transform:translateY(0.3em)}to{opacity:1;transform:none}}
+@keyframes plate-from-right{from{opacity:0;transform:translateX(1.5rem)}to{opacity:1;transform:none}}
+@keyframes plate-from-left{from{opacity:0;transform:translateX(-1.5rem)}to{opacity:1;transform:none}}
+@keyframes plate-fade{from{opacity:0}to{opacity:1}}
+@keyframes tick-in{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:none}}
+@keyframes stream-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes wiggle-b{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes tuck-a{0%{transform:none;z-index:7}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:7}55%{z-index:0}100%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}}
+@keyframes tuck-b{0%{transform:none;z-index:7}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:7}55%{z-index:0}100%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}}
+@keyframes untuck-a{0%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:0}55%{z-index:7}100%{transform:none;z-index:7}}
+@keyframes untuck-b{0%{transform:translate(-0.75rem,0.375rem) rotate(-3deg);z-index:0}45%{transform:translate(-62%,-4%) rotate(-10deg);z-index:0}55%{z-index:7}100%{transform:none;z-index:7}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes ears-b{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes turn{from{transform:rotateX(-24deg) rotateY(36deg)}to{transform:rotateX(-24deg) rotateY(396deg)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery);">
+
+  <header style="position: relative; z-index: 2;">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; height: 5.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+      <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; text-decoration: none;">StudioSC</a>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <nav aria-label="Main">
+          <ul style="display: flex; align-items: center; gap: 2rem; list-style: none; margin: 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 500;">
+            <li><a href="/work" style="text-decoration: none;">Work</a></li>
+            <li><a href="/seth" style="text-decoration: none;">Seth</a></li>
+            <li><a href="/christine" style="text-decoration: none;">Christine</a></li>
+            <li><a href="/blog" style="text-decoration: none;">Writing</a></li>
+            <li><a href="/contact" style="display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.125rem; border-radius: 6px; background: var(--ink); color: var(--gallery); text-decoration: none; font-weight: 600;">Start a project</a></li>
+          </ul>
+        </nav>
+        <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Opener: the headline's accent word follows the category tabs. Dither at the page edge, accent only. -->
+    <section aria-labelledby="range-title" style="position: relative;">
+      <svg aria-hidden="true" width="220" height="620" viewBox="0 0 220 620" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M112.5 4.5h0M148.5 4.5h0M166.5 4.5h0M184.5 4.5h0M193.5 4.5h0M202.5 4.5h0M211.5 4.5h0M157.5 13.5h0M175.5 13.5h0M193.5 13.5h0M211.5 13.5h0M130.5 22.5h0M148.5 22.5h0M166.5 22.5h0M184.5 22.5h0M202.5 22.5h0M211.5 22.5h0M175.5 31.5h0M193.5 31.5h0M211.5 31.5h0M112.5 40.5h0M130.5 40.5h0M148.5 40.5h0M166.5 40.5h0M184.5 40.5h0M193.5 40.5h0M202.5 40.5h0M211.5 40.5h0M157.5 49.5h0M175.5 49.5h0M193.5 49.5h0M211.5 49.5h0M130.5 58.5h0M148.5 58.5h0M166.5 58.5h0M184.5 58.5h0M202.5 58.5h0M211.5 58.5h0M175.5 67.5h0M193.5 67.5h0M211.5 67.5h0M112.5 76.5h0M148.5 76.5h0M166.5 76.5h0M184.5 76.5h0M193.5 76.5h0M202.5 76.5h0M211.5 76.5h0M157.5 85.5h0M175.5 85.5h0M193.5 85.5h0M211.5 85.5h0M130.5 94.5h0M148.5 94.5h0M166.5 94.5h0M184.5 94.5h0M202.5 94.5h0M211.5 94.5h0M175.5 103.5h0M193.5 103.5h0M211.5 103.5h0M112.5 112.5h0M148.5 112.5h0M166.5 112.5h0M184.5 112.5h0M193.5 112.5h0M202.5 112.5h0M211.5 112.5h0M175.5 121.5h0M193.5 121.5h0M211.5 121.5h0M130.5 130.5h0M166.5 130.5h0M184.5 130.5h0M202.5 130.5h0M211.5 130.5h0M175.5 139.5h0M193.5 139.5h0M211.5 139.5h0M112.5 148.5h0M148.5 148.5h0M166.5 148.5h0M184.5 148.5h0M193.5 148.5h0M202.5 148.5h0M211.5 148.5h0M157.5 157.5h0M175.5 157.5h0M193.5 157.5h0M211.5 157.5h0M130.5 166.5h0M148.5 166.5h0M166.5 166.5h0M184.5 166.5h0M202.5 166.5h0M211.5 166.5h0M175.5 175.5h0M193.5 175.5h0M211.5 175.5h0M112.5 184.5h0M148.5 184.5h0M166.5 184.5h0M184.5 184.5h0M193.5 184.5h0M202.5 184.5h0M211.5 184.5h0M193.5 193.5h0M211.5 193.5h0M130.5 202.5h0M166.5 202.5h0M184.5 202.5h0M202.5 202.5h0M211.5 202.5h0M175.5 211.5h0M193.5 211.5h0M211.5 211.5h0M112.5 220.5h0M148.5 220.5h0M166.5 220.5h0M184.5 220.5h0M202.5 220.5h0M157.5 229.5h0M193.5 229.5h0M211.5 229.5h0M130.5 238.5h0M148.5 238.5h0M166.5 238.5h0M184.5 238.5h0M202.5 238.5h0M211.5 238.5h0M175.5 247.5h0M193.5 247.5h0M211.5 247.5h0M112.5 256.5h0M148.5 256.5h0M166.5 256.5h0M184.5 256.5h0M202.5 256.5h0M193.5 265.5h0M211.5 265.5h0M130.5 274.5h0M166.5 274.5h0M184.5 274.5h0M202.5 274.5h0M211.5 274.5h0M193.5 283.5h0M211.5 283.5h0M112.5 292.5h0M148.5 292.5h0M166.5 292.5h0M184.5 292.5h0M202.5 292.5h0M193.5 301.5h0M211.5 301.5h0M130.5 310.5h0M166.5 310.5h0M184.5 310.5h0M202.5 310.5h0M175.5 319.5h0M211.5 319.5h0M112.5 328.5h0M148.5 328.5h0M166.5 328.5h0M184.5 328.5h0M202.5 328.5h0M193.5 337.5h0M211.5 337.5h0M130.5 346.5h0M166.5 346.5h0M184.5 346.5h0M202.5 346.5h0M211.5 355.5h0M148.5 364.5h0M166.5 364.5h0M184.5 364.5h0M202.5 364.5h0M193.5 373.5h0M211.5 373.5h0M166.5 382.5h0M184.5 382.5h0M202.5 382.5h0M211.5 391.5h0M112.5 400.5h0M148.5 400.5h0M166.5 400.5h0M184.5 400.5h0M202.5 400.5h0M193.5 409.5h0M211.5 409.5h0M166.5 418.5h0M184.5 418.5h0M202.5 418.5h0M211.5 427.5h0M148.5 436.5h0M166.5 436.5h0M184.5 436.5h0M202.5 436.5h0M193.5 445.5h0M166.5 454.5h0M184.5 454.5h0M202.5 454.5h0M211.5 463.5h0M112.5 472.5h0M148.5 472.5h0M184.5 472.5h0M202.5 472.5h0M166.5 490.5h0M184.5 490.5h0M202.5 490.5h0M148.5 508.5h0M166.5 508.5h0M184.5 508.5h0M202.5 508.5h0M166.5 526.5h0M202.5 526.5h0M148.5 544.5h0M184.5 544.5h0M202.5 544.5h0M202.5 562.5h0M148.5 580.5h0M184.5 580.5h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative; box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 3rem 2.5rem 0;">
+        <h1 id="range-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 5.75rem; line-height: 5.75rem; letter-spacing: -0.04em;"><span data-motion="" style="display: block; animation: {{load.line1}} 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;">We build <sc-if value="{{word.dash}}" hint-placeholder-val="{{ true }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">dashboards</span></sc-if><sc-if value="{{word.money}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">finance apps</span></sc-if><sc-if value="{{word.mobile}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">mobile apps</span></sc-if><sc-if value="{{word.ai}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">AI features</span></sc-if><sc-if value="{{word.motion}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">3D scenes</span></sc-if><sc-if value="{{word.sites}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">websites</span></sc-if><sc-if value="{{word.testing}}" hint-placeholder-val="{{ false }}"><span data-motion="" style="display: inline-block; color: var(--accent); animation: {{wordAnim}} 280ms ease-out both;">test suites</span></sc-if>.</span><span data-motion="" style="display: block; animation: {{load.line2}} 560ms cubic-bezier(0.2, 0.7, 0.2, 1) 90ms both;">We break them first.</span></h1>
+        <div style="margin-top: 2rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.5rem 3rem;">
+          <p style="margin: 0; max-width: 40rem; font-size: 1.125rem; line-height: 1.75rem;">Husband and wife, developer and tester. We've had plenty of practice disagreeing, and your software is better for it.</p>
+          <div style="display: flex; gap: 0.75rem;">
+            <a href="/contact" style="display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0 1.375rem; border-radius: 6px; background: var(--ink); color: var(--gallery); text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Start a project</a>
+            <a href="#work" style="display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0 1.375rem; border-radius: 6px; border: 1px solid var(--ink); box-sizing: border-box; color: var(--ink); text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Every project</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The range: category tabs sit on the peek carousel -->
+    <section id="cabinet" aria-roledescription="carousel" aria-label="What we build, by category" style="position: relative; padding: 3.5rem 0 0; overflow: hidden;">
+      <svg aria-hidden="true" width="200" height="460" viewBox="0 0 200 460" fill="none" data-motion="" style="position: absolute; top: 2rem; left: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 200ms both; pointer-events: none;"><path d="M4.5 4.5h0M22.5 4.5h0M40.5 4.5h0M76.5 4.5h0M4.5 22.5h0M22.5 22.5h0M58.5 22.5h0M4.5 40.5h0M22.5 40.5h0M40.5 40.5h0M58.5 40.5h0M76.5 40.5h0M112.5 40.5h0M4.5 58.5h0M22.5 58.5h0M40.5 58.5h0M58.5 58.5h0M4.5 76.5h0M22.5 76.5h0M40.5 76.5h0M58.5 76.5h0M76.5 76.5h0M112.5 76.5h0M148.5 76.5h0M13.5 85.5h0M4.5 94.5h0M22.5 94.5h0M40.5 94.5h0M58.5 94.5h0M94.5 94.5h0M31.5 103.5h0M4.5 112.5h0M22.5 112.5h0M40.5 112.5h0M58.5 112.5h0M76.5 112.5h0M112.5 112.5h0M13.5 121.5h0M49.5 121.5h0M4.5 130.5h0M22.5 130.5h0M40.5 130.5h0M58.5 130.5h0M94.5 130.5h0M13.5 139.5h0M31.5 139.5h0M4.5 148.5h0M13.5 148.5h0M22.5 148.5h0M40.5 148.5h0M58.5 148.5h0M76.5 148.5h0M94.5 148.5h0M112.5 148.5h0M148.5 148.5h0M13.5 157.5h0M31.5 157.5h0M49.5 157.5h0M4.5 166.5h0M22.5 166.5h0M40.5 166.5h0M58.5 166.5h0M76.5 166.5h0M94.5 166.5h0M13.5 175.5h0M31.5 175.5h0M4.5 184.5h0M13.5 184.5h0M22.5 184.5h0M40.5 184.5h0M58.5 184.5h0M76.5 184.5h0M94.5 184.5h0M112.5 184.5h0M13.5 193.5h0M31.5 193.5h0M49.5 193.5h0M4.5 202.5h0M22.5 202.5h0M40.5 202.5h0M58.5 202.5h0M76.5 202.5h0M94.5 202.5h0M13.5 211.5h0M31.5 211.5h0M49.5 211.5h0M67.5 211.5h0M4.5 220.5h0M13.5 220.5h0M22.5 220.5h0M40.5 220.5h0M58.5 220.5h0M76.5 220.5h0M94.5 220.5h0M112.5 220.5h0M148.5 220.5h0M4.5 229.5h0M13.5 229.5h0M31.5 229.5h0M49.5 229.5h0M85.5 229.5h0M4.5 238.5h0M13.5 238.5h0M22.5 238.5h0M31.5 238.5h0M40.5 238.5h0M58.5 238.5h0M76.5 238.5h0M94.5 238.5h0M13.5 247.5h0M31.5 247.5h0M49.5 247.5h0M67.5 247.5h0M4.5 256.5h0M13.5 256.5h0M22.5 256.5h0M40.5 256.5h0M58.5 256.5h0M76.5 256.5h0M94.5 256.5h0M112.5 256.5h0M13.5 265.5h0M31.5 265.5h0M49.5 265.5h0M4.5 274.5h0M22.5 274.5h0M40.5 274.5h0M58.5 274.5h0M76.5 274.5h0M94.5 274.5h0M13.5 283.5h0M31.5 283.5h0M4.5 292.5h0M13.5 292.5h0M22.5 292.5h0M40.5 292.5h0M58.5 292.5h0M76.5 292.5h0M94.5 292.5h0M112.5 292.5h0M148.5 292.5h0M13.5 301.5h0M31.5 301.5h0M49.5 301.5h0M4.5 310.5h0M22.5 310.5h0M40.5 310.5h0M58.5 310.5h0M76.5 310.5h0M94.5 310.5h0M13.5 319.5h0M31.5 319.5h0M4.5 328.5h0M22.5 328.5h0M40.5 328.5h0M58.5 328.5h0M76.5 328.5h0M112.5 328.5h0M13.5 337.5h0M49.5 337.5h0M4.5 346.5h0M22.5 346.5h0M40.5 346.5h0M58.5 346.5h0M94.5 346.5h0M4.5 364.5h0M22.5 364.5h0M40.5 364.5h0M58.5 364.5h0M76.5 364.5h0M112.5 364.5h0M148.5 364.5h0M13.5 373.5h0M4.5 382.5h0M22.5 382.5h0M40.5 382.5h0M58.5 382.5h0M94.5 382.5h0M4.5 400.5h0M22.5 400.5h0M40.5 400.5h0M58.5 400.5h0M76.5 400.5h0M112.5 400.5h0M4.5 418.5h0M22.5 418.5h0M58.5 418.5h0M4.5 436.5h0M22.5 436.5h0M40.5 436.5h0M76.5 436.5h0M112.5 436.5h0M148.5 436.5h0M22.5 454.5h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div data-motion="" style="position: relative; z-index: 2; display: flex; justify-content: center; margin-bottom: -1.5rem; padding: 0 1rem; animation: {{load.tabs}} 420ms ease-out 360ms both;">
+        <div role="group" aria-label="Choose a category" style="display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem; padding: 0.3125rem; border: 1px solid var(--rule); border-radius: 999px; background: var(--plate); box-shadow: 0 8px 20px -12px rgba(0,0,0,0.35);">
+          <sc-for list="{{tabs}}" as="tab" hint-placeholder-count="7">
+            <button type="button" aria-pressed="{{tab.pressed}}" onClick="{{tab.pick}}" style="appearance: none; min-height: 2.5rem; padding: 0 1.125rem; border: 0; border-radius: 999px; background: {{tab.bg}}; color: {{tab.fg}}; font: inherit; font-family: 'Red Hat Display', sans-serif; font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600;">{{tab.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div data-motion="" style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 66rem) minmax(0, 1fr); column-gap: 1.5rem; animation: {{load.stage}} 640ms cubic-bezier(0.2, 0.7, 0.2, 1) 220ms both;">
+        <!-- Previous plate, dimmed at the edge: a drawing only, never focusable -->
+        <div aria-hidden="true" style="position: relative; min-width: 0;">
+          <div style="position: absolute; top: 9%; bottom: 9%; right: 0; padding: 2.5rem 1.5rem 2.5rem 4.5rem; width: calc(100% + 3rem); box-sizing: border-box; background: var(--peek); border: 1px solid var(--rule); border-radius: 12px;">
+            <sc-if value="{{prevPeek.cc}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Dashboards</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Central Command</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">In QA</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#EEF1F6" stroke="#D9DFEA"></rect><rect x="10" y="8" width="28" height="6" rx="1" fill="#1A2233"></rect><rect x="112" y="9" width="38" height="4" rx="1" fill="#4F5A70"></rect><rect x="8" y="20" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="26" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="23" width="3" height="10" rx="1" fill="#DB4C75"></rect><rect x="43" y="26" width="92" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="39" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="45" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="42" width="3" height="10" rx="1" fill="#3A9ABB"></rect><rect x="43" y="45" width="100" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="58" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="64" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="61" width="3" height="10" rx="1" fill="#9B4ED6"></rect><rect x="43" y="64" width="76" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="77" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="83" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="80" width="3" height="10" rx="1" fill="#2E9E5B"></rect><rect x="43" y="83" width="88" height="4" rx="1" fill="#9AA3B5"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.tt}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Finance</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Tally &amp; Trace</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">In QA</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#DCE3DE"></rect><path d="M4.5 0.5H155.5A4 4 0 0 1 159.5 4.5V17H0.5V4.5A4 4 0 0 1 4.5 0.5Z" fill="#1F4D3A"></path><rect x="10" y="7" width="52" height="4" rx="1" fill="#FFFFFF"></rect><rect x="118" y="7" width="32" height="4" rx="1" fill="#FFFFFF"></rect><rect x="10" y="24" width="34" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="24" width="22" height="4" rx="1" fill="#B3261E"></rect><rect x="130" y="24" width="20" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 33.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="39" width="46" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="39" width="16" height="4" rx="1" fill="#58615B"></rect><rect x="126" y="39" width="24" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 48.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="54" width="40" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="54" width="16" height="4" rx="1" fill="#58615B"></rect><rect x="126" y="54" width="24" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 63.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="69" width="58" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="69" width="18" height="4" rx="1" fill="#58615B"></rect><rect x="120" y="69" width="30" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 78.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="84" width="38" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="84" width="18" height="4" rx="1" fill="#58615B"></rect><rect x="124" y="84" width="26" height="4" rx="1" fill="#1C2420"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.mob}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Mobile</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Pocket habit tracker</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#EEF3F1" stroke="#D5E2DD"></rect><rect x="60" y="6" width="40" height="88" rx="8" fill="#111315"></rect><rect x="63" y="10" width="34" height="80" rx="6" fill="#FFFFFF"></rect><rect x="68" y="18" width="16" height="4" rx="1" fill="#17201C"></rect><circle cx="70" cy="34" r="3" fill="#0E7C66"></circle><rect x="76" y="32.5" width="16" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="46" r="3" fill="#0E7C66"></circle><rect x="76" y="44.5" width="18" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="58" r="3" stroke="#6B7A74"></circle><rect x="76" y="56.5" width="13" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="70" r="3" stroke="#6B7A74"></circle><rect x="76" y="68.5" width="17" height="3" rx="1" fill="#17201C"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.ai}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">AI features</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Form helper</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#F7F6F3" stroke="#E2DFD8"></rect><rect x="10" y="9" width="40" height="3" rx="1" fill="#5C574F"></rect><rect x="10" y="16" width="140" height="18" rx="3" fill="#FFFFFF" stroke="#E2DFD8"></rect><rect x="16" y="23" width="96" height="4" rx="1" fill="#1F1D1A"></rect><rect x="122" y="39" width="28" height="8" rx="2" fill="#1F1D1A"></rect><rect x="10" y="52" width="140" height="40" rx="3" fill="#FFFFFF" stroke="#C9C4BA"></rect><rect x="16" y="59" width="124" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="67" width="118" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="75" width="128" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="83" width="60" height="3.5" rx="1" fill="#1F1D1A"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.cube}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">3D &amp; motion</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Turntable scene</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#0F1113"></rect><path d="M0 78H160M0 90H160" stroke="#2A2E33"></path><path d="M80 20L104 34L80 48L56 34Z" fill="rgba(127,162,255,0.18)" stroke="#7FA2FF" stroke-width="1.2"></path><path d="M56 34V62L80 76V48M104 34V62L80 76" stroke="#7FA2FF" stroke-width="1.2"></path></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.site}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Sites</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">StudioSC Portfolio</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Live</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#D0D3D8"></rect><path d="M4.5 0.5H155.5A4 4 0 0 1 159.5 4.5V13H0.5V4.5A4 4 0 0 1 4.5 0.5Z" fill="#F1F2F4"></path><circle cx="8" cy="7" r="2" fill="#C4C8CE"></circle><circle cx="14" cy="7" r="2" fill="#C4C8CE"></circle><circle cx="20" cy="7" r="2" fill="#C4C8CE"></circle><rect x="30" y="4" width="50" height="6" rx="3" fill="#FFFFFF" stroke="#D0D3D8" stroke-width="0.6"></rect><rect x="0.5" y="13" width="159" height="86.5" fill="#E9EAEC"></rect><rect x="10" y="20" width="62" height="7" rx="1.5" fill="#1D1F23"></rect><rect x="10" y="30" width="48" height="7" rx="1.5" fill="#1D1F23"></rect><rect x="10" y="44" width="140" height="48" rx="3" fill="#FFFFFF"></rect><rect x="60" y="50" width="84" height="6" rx="1" fill="#1F4D3A"></rect><rect x="64" y="61" width="30" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="68" width="40" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="75" width="26" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="82" width="36" height="2.5" rx="1" fill="#1C2420"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{prevPeek.test}}" hint-placeholder-val="{{ true }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Testing</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">StudioSC Portfolio</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Live, tested</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#D0D3D8"></rect><rect x="10" y="9" width="24" height="4" rx="1" fill="#5E636B"></rect><rect x="104" y="9" width="18" height="4" rx="1" fill="#5E636B"></rect><rect x="132" y="9" width="18" height="4" rx="1" fill="#5E636B"></rect><path d="M0.5 18.5H159.5" stroke="#1D1F23"></path><rect x="10" y="25" width="6" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="27" r="4.5" fill="#1D1F23"></circle><path d="M110.8 27.1L112.4 28.6L115.3 25.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="27" r="4.5" fill="#1D1F23"></circle><path d="M138.8 27.1L140.4 28.6L143.3 25.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 34H159.5" stroke="#D0D3D8"></path><rect x="10" y="39" width="22" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="41" r="4.5" fill="#1D1F23"></circle><path d="M110.8 41.1L112.4 42.6L115.3 39.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="41" r="4.5" fill="#1D1F23"></circle><path d="M138.8 41.1L140.4 42.6L143.3 39.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 48H159.5" stroke="#D0D3D8"></path><rect x="10" y="53" width="56" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="55" r="4.5" fill="#1D1F23"></circle><path d="M110.8 55.1L112.4 56.6L115.3 53.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="55" r="4.5" fill="#1D1F23"></circle><path d="M138.8 55.1L140.4 56.6L143.3 53.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 62H159.5" stroke="#D0D3D8"></path><rect x="10" y="67" width="26" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="69" r="4.5" fill="#1D1F23"></circle><path d="M110.8 69.1L112.4 70.6L115.3 67.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="69" r="4.5" fill="#1D1F23"></circle><path d="M138.8 69.1L140.4 70.6L143.3 67.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 76H159.5" stroke="#D0D3D8"></path><rect x="10" y="81" width="34" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="83" r="4.5" fill="#1D1F23"></circle><path d="M110.8 83.1L112.4 84.6L115.3 81.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="83" r="4.5" fill="#1D1F23"></circle><path d="M138.8 83.1L140.4 84.6L143.3 81.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="min-width: 0;">
+          <sc-if value="{{show.cc}}" hint-placeholder-val="{{ true }}">
+            <div role="group" aria-roledescription="slide" aria-label="1 of 7: Dashboards, Central Command" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Central Command</h2>
+                <p style="margin: 0.75rem 0 0;">A dashboard for one person's day, running on Cloudflare's free tier.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Status</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); font-weight: 600;">In QA with Christine</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule);">Cloudflare Workers, Hono and React</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Started</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">June 2026</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;">Built by <a href="#seth">Seth</a> · Tested by <a href="#christine">Christine</a></p>
+                <p style="margin: 1.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+                  <a href="/work/central-command">Read the case study</a>
+                  <a href="https://centralcommand.studiosc.dev">Open the demo</a>
+                </p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="border: 1px solid var(--cc-line); border-radius: 6px; overflow: hidden; background: var(--cc-bg); font-family: Manrope, sans-serif; color: var(--cc-ink); padding: 1.25rem;">
+                  <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: 0 0.25rem 1rem;">
+                    <span style="font-weight: 700; font-size: 1.25rem; line-height: 1.75rem;">Today</span>
+                    <span style="font-size: 0.875rem; line-height: 1.25rem; color: var(--cc-muted);">Thursday 3 December</span>
+                  </div>
+                  <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem;">
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">06:40</span>
+                      <span style="border-radius: 2px; background: #DB4C75;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">Sleep</strong> 7 h 10 min, in bed by 23:20</span>
+                    </li>
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">07:00</span>
+                      <span style="border-radius: 2px; background: #3A9ABB;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">Weather</strong> 31° and humid, rain likely after 15:00</span>
+                    </li>
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">09:30</span>
+                      <span style="border-radius: 2px; background: #9B4ED6;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">Calendar</strong> Sprint review, 45 minutes</span>
+                    </li>
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">12:10</span>
+                      <span style="border-radius: 2px; background: #2E9E5B;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">Fitness</strong> 6,400 steps so far, a 30-minute run planned</span>
+                    </li>
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">14:00</span>
+                      <span style="border-radius: 2px; background: #D94640;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">Tickets</strong> 2 urgent tickets are waiting for a reply</span>
+                    </li>
+                    <li style="display: grid; grid-template-columns: 3.5rem 0.25rem minmax(0, 1fr); gap: 1rem; align-items: stretch; background: var(--cc-panel); border-radius: 8px; padding: 0.75rem 1rem;">
+                      <span style="font-size: 0.875rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">18:00</span>
+                      <span style="border-radius: 2px; background: #5B72A8;"></span>
+                      <span style="font-size: 0.9375rem; line-height: 1.5rem;"><strong style="font-weight: 700;">News</strong> 3 saved stories to read tonight</span>
+                    </li>
+                  </ol>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">A day feed with made-up entries, in Central Command's own colours: one colour per kind of source.</figcaption>
+              </figure>
+              <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.875rem; line-height: 1.375rem;">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M5.75 9.25L7.9 11.25L12.25 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <p style="margin: 0;"><strong style="font-weight: 600;">Checked by Christine.</strong> The day feed stays in time order, and each entry keeps its source's colour.</p>
+                <span style="margin-left: auto; flex: 0 0 auto; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Illustrative wording</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.tt}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="2 of 7: Finance, Tally &amp; Trace" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Tally &amp; Trace</h2>
+                <p style="margin: 0.75rem 0 0;">A money app for a household and a small business. It forecasts cash flow day by day and says which account comes up short before a bill is due.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Status</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); font-weight: 600;">In QA with Christine</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule);">React, FastAPI and PostgreSQL</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Started</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">February 2026</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;">Built by <a href="#seth">Seth</a> · Tested by <a href="#christine">Christine</a></p>
+                <p style="margin: 1.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+                  <a href="/work/tallyandtrace">Read the case study</a>
+                  <a href="https://tallyandtrace.studiosc.dev">Open the app</a>
+                </p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="border: 1px solid var(--tt-rule); border-radius: 6px; overflow: hidden; background: var(--tt-pad); font-family: 'IBM Plex Sans', sans-serif; color: var(--tt-ink); font-variant-numeric: tabular-nums;">
+                  <div style="background: var(--tt-band); color: #FFFFFF; padding: 0.875rem 1.25rem; display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;">
+                    <span style="font-weight: 600; font-size: 1rem; line-height: 1.5rem;">Bills due, December</span>
+                    <span style="font-size: 0.875rem; line-height: 1.25rem;">Available to spend <strong style="font-weight: 600; font-size: 1rem;">₱47,650.00</strong></span>
+                  </div>
+                  <div role="table" aria-label="Bills due in December, made-up figures" style="background: #FFFFFF; font-size: 0.9375rem; line-height: 1.375rem;">
+                    <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 7rem 7.5rem; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-bottom: 1px solid var(--tt-ink); font-size: 0.8125rem; line-height: 1.25rem; color: var(--tt-muted);">
+                      <span role="columnheader" aria-sort="{{sort.name.aria}}"><button type="button" onClick="{{sort.name.toggle}}" style="appearance: none; background: none; border: 0; padding: 0.25rem 0; font: inherit; font-weight: {{sort.name.weight}}; color: {{sort.name.color}}; display: inline-flex; align-items: center; gap: 0.25rem;">Bill<sc-if value="{{sort.name.asc}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if><sc-if value="{{sort.name.desc}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if></button></span>
+                      <span role="columnheader">Paid from</span>
+                      <span role="columnheader" aria-sort="{{sort.due.aria}}"><button type="button" onClick="{{sort.due.toggle}}" style="appearance: none; background: none; border: 0; padding: 0.25rem 0; font: inherit; font-weight: {{sort.due.weight}}; color: {{sort.due.color}}; display: inline-flex; align-items: center; gap: 0.25rem;">Due<sc-if value="{{sort.due.asc}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if><sc-if value="{{sort.due.desc}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if></button></span>
+                      <span role="columnheader" aria-sort="{{sort.amount.aria}}" style="text-align: right;"><button type="button" onClick="{{sort.amount.toggle}}" style="appearance: none; background: none; border: 0; padding: 0.25rem 0; font: inherit; font-weight: {{sort.amount.weight}}; color: {{sort.amount.color}}; display: inline-flex; align-items: center; gap: 0.25rem;">Amount<sc-if value="{{sort.amount.asc}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if><sc-if value="{{sort.amount.desc}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if></button></span>
+                    </div>
+                    <sc-for list="{{rows}}" as="row" hint-placeholder-count="6">
+                      <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) 7rem 7.5rem; align-items: center; min-height: 3.5rem; padding: 0 1.25rem; border-bottom: 1px solid var(--tt-rule);">
+                        <span role="cell" style="font-weight: 500;">{{row.name}}</span>
+                        <span role="cell" style="color: var(--tt-muted);">{{row.from}}</span>
+                        <span role="cell" style="color: {{row.dueColor}}; font-weight: {{row.dueWeight}};">{{row.dueLabel}}</span>
+                        <span role="cell" style="text-align: right;">{{row.amountLabel}}</span>
+                      </div>
+                    </sc-for>
+                    <div role="row" style="display: grid; grid-template-columns: minmax(0, 1fr) 7.5rem; align-items: center; min-height: 3.5rem; padding: 0 1.25rem; font-weight: 600;">
+                      <span role="cell">Due this month</span>
+                      <span role="cell" style="text-align: right;">₱32,816.67</span>
+                    </div>
+                  </div>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">A working fragment with made-up figures. Sort by bill, due date or amount. Red means overdue, and nothing else.</figcaption>
+              </figure>
+              <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.875rem; line-height: 1.375rem;">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M5.75 9.25L7.9 11.25L12.25 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <p style="margin: 0;"><strong style="font-weight: 600;">Checked by Christine.</strong> Amounts keep one right edge on desktop and phone.</p>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.mob}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="3 of 7: Mobile, Pocket habit tracker [Lab demo]" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Pocket habit tracker <span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></h2>
+                <p style="margin: 0.75rem 0 0;">A small phone-frame app with native-feel lists. Tick a habit and watch the count follow.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">[PLACEHOLDER]</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--muted);">Nobody's hired us for one of these yet. We built this so you don't have to take our word for it.</p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="display: flex; justify-content: center; padding: 1.75rem 0; background: #EEF3F1; border: 1px solid #D5E2DD; border-radius: 6px;">
+                  <div style="width: 17rem; border-radius: 2.25rem; background: #111315; padding: 0.625rem; box-shadow: 0 18px 36px -18px rgba(17,19,21,0.55);">
+                    <div style="border-radius: 1.75rem; background: #FFFFFF; overflow: hidden; font-family: Manrope, sans-serif; color: #17201C;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 1.375rem 0; font-size: 0.75rem; line-height: 1rem; font-weight: 700;"><span>9:41</span><svg aria-hidden="true" width="22" height="10" viewBox="0 0 22 10" fill="none"><rect x="0.5" y="0.5" width="18" height="9" rx="2" stroke="#17201C"></rect><rect x="2" y="2" width="12" height="6" rx="1" fill="#17201C"></rect><rect x="19.5" y="3" width="1.5" height="4" rx="0.5" fill="#17201C"></rect></svg></div>
+                      <div style="padding: 1rem 1.25rem 1.5rem;">
+                        <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: #4F5E58;">Thursday</p>
+                        <p style="margin: 0.125rem 0 0; font-weight: 800; font-size: 1.5rem; line-height: 1.875rem;">Today</p>
+                        <p aria-live="polite" style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: #4F5E58;">{{habits.done}}</p>
+                        <ul style="list-style: none; margin: 0.875rem 0 0; padding: 0;">
+                          <sc-for list="{{habits.items}}" as="h" hint-placeholder-count="4">
+                            <li style="border-bottom: 1px solid #E3EAE7;">
+                              <button type="button" aria-pressed="{{h.pressed}}" onClick="{{h.toggle}}" style="width: 100%; appearance: none; border: 0; background: transparent; padding: 0; min-height: 3rem; display: flex; align-items: center; gap: 0.75rem; text-align: left; font: inherit; color: #17201C;">
+                                <span style="flex: 0 0 auto; width: 1.375rem; height: 1.375rem; box-sizing: border-box; border-radius: 999px; border: 2px solid {{h.ring}}; background: {{h.fill}}; display: inline-flex; align-items: center; justify-content: center;"><sc-if value="{{h.on}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" data-motion="" width="12" height="12" viewBox="0 0 12 12" fill="none" style="animation: tick-in 200ms ease-out both;"><path d="M2.5 6.2L5 8.5L9.5 3.5" stroke="#FFFFFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if></span>
+                                <span style="font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; color: {{h.color}}; text-decoration: {{h.strike}};">{{h.name}}</span>
+                              </button>
+                            </li>
+                          </sc-for>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">A lab demo in a phone frame. Tick a habit; the count and the list answer straight away.</figcaption>
+              </figure>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.ai}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="4 of 7: AI features, Form helper [Lab demo]" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Form helper <span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></h2>
+                <p style="margin: 0.75rem 0 0;">Drafts a reply and streams it in as it writes. Nothing is sent until you say so.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">[PLACEHOLDER]</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--muted);">Nobody's hired us for one of these yet. We built this so you don't have to take our word for it.</p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="background: #F7F6F3; border: 1px solid #E2DFD8; border-radius: 6px; padding: 1.25rem; color: #1F1D1A; font-family: 'IBM Plex Sans', sans-serif;">
+                  <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600; color: #5C574F;">Customer message</p>
+                  <p style="margin: 0.375rem 0 0; background: #FFFFFF; border: 1px solid #E2DFD8; border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">Our invoices keep going out late, and two clients have asked why.</p>
+                  <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+                    <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600; color: #5C574F;">Reply draft</p>
+                    <button type="button" onClick="{{ai.draft}}" style="appearance: none; min-height: 2.5rem; padding: 0 0.875rem; border: 1px solid #1F1D1A; border-radius: 6px; background: #1F1D1A; color: #FFFFFF; font: inherit; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">{{ai.button}}</button>
+                  </div>
+                  <div aria-live="polite" style="margin-top: 0.5rem; min-height: 7.5rem; box-sizing: border-box; background: #FFFFFF; border: 1px solid #C9C4BA; border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+                    <sc-if value="{{ai.none}}" hint-placeholder-val="{{ true }}"><p style="margin: 0; color: #5C574F;">The draft appears here as it is written.</p></sc-if>
+                    <sc-if value="{{ai.a}}" hint-placeholder-val="{{ false }}"><p style="margin: 0;"><span data-motion="" style="animation: stream-in 140ms ease-out 0ms both;">Thanks</span> <span data-motion="" style="animation: stream-in 140ms ease-out 45ms both;">for</span> <span data-motion="" style="animation: stream-in 140ms ease-out 90ms both;">raising</span> <span data-motion="" style="animation: stream-in 140ms ease-out 135ms both;">this,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 180ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 225ms both;">sorry</span> <span data-motion="" style="animation: stream-in 140ms ease-out 270ms both;">for</span> <span data-motion="" style="animation: stream-in 140ms ease-out 315ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 360ms both;">wait.</span> <span data-motion="" style="animation: stream-in 140ms ease-out 405ms both;">Invoices</span> <span data-motion="" style="animation: stream-in 140ms ease-out 450ms both;">now</span> <span data-motion="" style="animation: stream-in 140ms ease-out 495ms both;">go</span> <span data-motion="" style="animation: stream-in 140ms ease-out 540ms both;">out</span> <span data-motion="" style="animation: stream-in 140ms ease-out 585ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 630ms both;">same</span> <span data-motion="" style="animation: stream-in 140ms ease-out 675ms both;">day</span> <span data-motion="" style="animation: stream-in 140ms ease-out 720ms both;">they</span> <span data-motion="" style="animation: stream-in 140ms ease-out 765ms both;">are</span> <span data-motion="" style="animation: stream-in 140ms ease-out 810ms both;">approved,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 855ms both;">because</span> <span data-motion="" style="animation: stream-in 140ms ease-out 900ms both;">approval</span> <span data-motion="" style="animation: stream-in 140ms ease-out 945ms both;">has</span> <span data-motion="" style="animation: stream-in 140ms ease-out 990ms both;">moved</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1035ms both;">out</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1080ms both;">of</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1125ms both;">email</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1170ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1215ms both;">into</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1260ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1305ms both;">billing</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1350ms both;">screen.</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1395ms both;">If</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1440ms both;">either</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1485ms both;">client</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1530ms both;">wants</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1575ms both;">a</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1620ms both;">copy</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1665ms both;">resent,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1710ms both;">reply</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1755ms both;">here</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1800ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1845ms both;">I</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1890ms both;">will</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1935ms both;">send</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1980ms both;">it</span> <span data-motion="" style="animation: stream-in 140ms ease-out 2025ms both;">today.</span></p></sc-if>
+                    <sc-if value="{{ai.b}}" hint-placeholder-val="{{ false }}"><p style="margin: 0;"><span data-motion="" style="animation: stream-in 140ms ease-out 0ms both;">Thanks</span> <span data-motion="" style="animation: stream-in 140ms ease-out 45ms both;">for</span> <span data-motion="" style="animation: stream-in 140ms ease-out 90ms both;">raising</span> <span data-motion="" style="animation: stream-in 140ms ease-out 135ms both;">this,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 180ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 225ms both;">sorry</span> <span data-motion="" style="animation: stream-in 140ms ease-out 270ms both;">for</span> <span data-motion="" style="animation: stream-in 140ms ease-out 315ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 360ms both;">wait.</span> <span data-motion="" style="animation: stream-in 140ms ease-out 405ms both;">Invoices</span> <span data-motion="" style="animation: stream-in 140ms ease-out 450ms both;">now</span> <span data-motion="" style="animation: stream-in 140ms ease-out 495ms both;">go</span> <span data-motion="" style="animation: stream-in 140ms ease-out 540ms both;">out</span> <span data-motion="" style="animation: stream-in 140ms ease-out 585ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 630ms both;">same</span> <span data-motion="" style="animation: stream-in 140ms ease-out 675ms both;">day</span> <span data-motion="" style="animation: stream-in 140ms ease-out 720ms both;">they</span> <span data-motion="" style="animation: stream-in 140ms ease-out 765ms both;">are</span> <span data-motion="" style="animation: stream-in 140ms ease-out 810ms both;">approved,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 855ms both;">because</span> <span data-motion="" style="animation: stream-in 140ms ease-out 900ms both;">approval</span> <span data-motion="" style="animation: stream-in 140ms ease-out 945ms both;">has</span> <span data-motion="" style="animation: stream-in 140ms ease-out 990ms both;">moved</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1035ms both;">out</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1080ms both;">of</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1125ms both;">email</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1170ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1215ms both;">into</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1260ms both;">the</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1305ms both;">billing</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1350ms both;">screen.</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1395ms both;">If</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1440ms both;">either</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1485ms both;">client</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1530ms both;">wants</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1575ms both;">a</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1620ms both;">copy</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1665ms both;">resent,</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1710ms both;">reply</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1755ms both;">here</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1800ms both;">and</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1845ms both;">I</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1890ms both;">will</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1935ms both;">send</span> <span data-motion="" style="animation: stream-in 140ms ease-out 1980ms both;">it</span> <span data-motion="" style="animation: stream-in 140ms ease-out 2025ms both;">today.</span></p></sc-if>
+                  </div>
+                  <p style="margin: 0.625rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: #5C574F;">Nothing is sent until you say so.</p>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">A lab demo with a scripted draft that streams in word by word. The real one would call a language model.</figcaption>
+              </figure>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.cube}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="5 of 7: 3D &amp; motion, Turntable scene [Lab demo]" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Turntable scene <span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></h2>
+                <p style="margin: 0.75rem 0 0;">A small 3D scene you can turn and pause.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">[PLACEHOLDER]</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--muted);">Nobody's hired us for one of these yet. We built this so you don't have to take our word for it.</p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="position: relative; height: 21rem; background: #0F1113; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 900px;">
+                  <svg aria-hidden="true" viewBox="0 0 600 200" preserveAspectRatio="none" fill="none" style="position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 40%;"><path d="M0 40H600M0 90H600M0 150H600M300 0V200M200 0L60 200M400 0L540 200M100 0L-180 200M500 0L780 200" stroke="#2A2E33"></path></svg>
+                  <div aria-hidden="true" data-motion="" style="position: relative; width: 9rem; height: 9rem; transform-style: preserve-3d; transform: rotateX(-24deg) rotateY(36deg); animation: turn 14s linear infinite; animation-play-state: {{cube.state}};"><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateY(0deg) translateZ(4.5rem);"></span><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateY(90deg) translateZ(4.5rem);"></span><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateY(180deg) translateZ(4.5rem);"></span><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateY(-90deg) translateZ(4.5rem);"></span><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateX(90deg) translateZ(4.5rem);"></span><span style="position: absolute; inset: 0; box-sizing: border-box; border: 1.5px solid #7FA2FF; background: rgba(127,162,255,0.10); transform: rotateX(-90deg) translateZ(4.5rem);"></span></div>
+                  <button type="button" onClick="{{cube.toggle}}" style="position: absolute; right: 0.75rem; bottom: 0.75rem; appearance: none; min-height: 2.5rem; padding: 0 0.875rem; border: 1px solid #5A616B; border-radius: 6px; background: #0F1113; color: #E6E8EB; font: inherit; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">{{cube.label}}</button>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Drawn here as a CSS cube that turns. The real demo would be a small three.js scene you can turn and light. Pause stops it.</figcaption>
+              </figure>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.site}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="6 of 7: Sites, StudioSC Portfolio" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">StudioSC Portfolio</h2>
+                <p style="margin: 0.75rem 0 0;">This site. Case studies and posts written in MDX, with a Playwright suite that Christine keeps green.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Status</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); font-weight: 600;">Live</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Built with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule);">Next.js, Tailwind and Playwright</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Started</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">February 2026</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;">Built by <a href="#seth">Seth</a> · Tested by <a href="#christine">Christine</a></p>
+                <p style="margin: 1.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+                  <a href="/work/portfolio-site">Read the case study</a>
+                  <a href="https://github.com/StudioSC-dev/studiosc-portfolio">Source on GitHub</a>
+                </p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div style="border: 1px solid #D0D3D8; border-radius: 8px; overflow: hidden; background: #FFFFFF;">
+                  <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.875rem; background: #F1F2F4; border-bottom: 1px solid #D0D3D8;">
+                    <svg aria-hidden="true" width="40" height="10" viewBox="0 0 40 10" fill="none"><circle cx="5" cy="5" r="4" fill="#C4C8CE"></circle><circle cx="19" cy="5" r="4" fill="#C4C8CE"></circle><circle cx="33" cy="5" r="4" fill="#C4C8CE"></circle></svg>
+                    <span style="flex: 1 1 auto; max-width: 18rem; padding: 0.125rem 0.75rem; border-radius: 999px; background: #FFFFFF; border: 1px solid #D0D3D8; font-size: 0.8125rem; line-height: 1.25rem; color: #5E636B;">studiosc.dev</span>
+                  </div>
+                  <svg aria-hidden="true" viewBox="0 0 600 300" fill="none" style="display: block; width: 100%; height: auto;"><rect width="600" height="300" fill="#E9EAEC"></rect><rect x="28" y="22" width="70" height="10" rx="2" fill="#1D1F23"></rect><rect x="420" y="24" width="34" height="6" rx="2" fill="#5E636B"></rect><rect x="466" y="24" width="40" height="6" rx="2" fill="#5E636B"></rect><rect x="518" y="24" width="52" height="6" rx="2" fill="#5E636B"></rect><rect x="28" y="60" width="250" height="22" rx="3" fill="#1D1F23"></rect><rect x="28" y="90" width="200" height="22" rx="3" fill="#1D1F23"></rect><rect x="360" y="64" width="210" height="6" rx="2" fill="#5E636B"></rect><rect x="360" y="78" width="190" height="6" rx="2" fill="#5E636B"></rect><rect x="360" y="98" width="70" height="18" rx="3" fill="#1D1F23"></rect><rect x="28" y="136" width="544" height="150" rx="8" fill="#FFFFFF"></rect><rect x="50" y="156" width="110" height="10" rx="2" fill="#1D1F23"></rect><rect x="50" y="176" width="130" height="5" rx="2" fill="#9AA0A8"></rect><rect x="50" y="188" width="118" height="5" rx="2" fill="#9AA0A8"></rect><rect x="220" y="156" width="330" height="22" rx="3" fill="#1F4D3A"></rect><rect x="232" y="192" width="70" height="5" rx="2" fill="#1C2420"></rect><rect x="498" y="192" width="40" height="5" rx="2" fill="#1C2420"></rect><rect x="232" y="210" width="96" height="5" rx="2" fill="#1C2420"></rect><rect x="492" y="210" width="46" height="5" rx="2" fill="#1C2420"></rect><rect x="232" y="228" width="80" height="5" rx="2" fill="#1C2420"></rect><rect x="498" y="228" width="40" height="5" rx="2" fill="#1C2420"></rect><rect x="232" y="246" width="120" height="5" rx="2" fill="#1C2420"></rect><rect x="484" y="246" width="54" height="5" rx="2" fill="#1C2420"></rect><rect x="232" y="264" width="64" height="5" rx="2" fill="#1C2420"></rect><rect x="494" y="264" width="44" height="5" rx="2" fill="#1C2420"></rect></svg>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">This site, drawn small. The working fragment for this one is the page you are on.</figcaption>
+              </figure>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.test}}" hint-placeholder-val="{{ false }}">
+            <div role="group" aria-roledescription="slide" aria-label="7 of 7: Testing, StudioSC Portfolio" data-motion="" style="animation: {{plateAnim}} 240ms ease-out both; background: var(--plate); border-radius: 14px; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 28px 56px -28px rgba(0,0,0,0.35); padding: 3.25rem 2.5rem 2.5rem; display: grid; grid-template-columns: 19rem minmax(0, 1fr); gap: 2rem 3rem;">
+              <div style="display: flex; flex-direction: column;">
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">StudioSC Portfolio</h2>
+                <p style="margin: 0.75rem 0 0;">The testing half of this site: a Playwright suite that Christine keeps green, run at both widths the site is built for.</p>
+                <dl style="margin: 1.5rem 0 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); font-size: 0.9375rem; line-height: 1.5rem;">
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); color: var(--muted);">Status</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); font-weight: 600;">Live</dd>
+                  <dt style="padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--muted);">Tested with</dt><dd style="margin: 0; padding: 0.5rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">Playwright</dd>
+                </dl>
+                <p style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;">Built by <a href="#seth">Seth</a> · Tested by <a href="#christine">Christine</a></p>
+                <p style="margin: 1.25rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+                  <a href="/work/portfolio-site">Read the case study</a>
+                  <a href="https://github.com/StudioSC-dev/studiosc-portfolio">Source on GitHub</a>
+                </p>
+              </div>
+              <figure style="margin: 0; min-width: 0;">
+                <div role="table" aria-label="Route checks from a made-up run" style="border: 1px solid #D0D3D8; border-radius: 6px; overflow: hidden; background: #FFFFFF; color: #1D1F23; font-size: 0.9375rem; line-height: 1.375rem;">
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-bottom: 1px solid #1D1F23; font-size: 0.8125rem; line-height: 1.25rem; color: #5E636B;">
+                    <span role="columnheader">Route</span><span role="columnheader">Page</span><span role="columnheader">Desktop, 1440</span><span role="columnheader">Phone, 390</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem; border-bottom: 1px solid #D0D3D8;">
+                    <span role="cell" style="font-weight: 600;">/</span><span role="cell" style="color: #5E636B;">Home</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 150ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 220ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem; border-bottom: 1px solid #D0D3D8;">
+                    <span role="cell" style="font-weight: 600;">/work</span><span role="cell" style="color: #5E636B;">Work</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 290ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 360ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem; border-bottom: 1px solid #D0D3D8;">
+                    <span role="cell" style="font-weight: 600;">/work/tallyandtrace</span><span role="cell" style="color: #5E636B;">Case study</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 430ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 500ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem; border-bottom: 1px solid #D0D3D8;">
+                    <span role="cell" style="font-weight: 600;">/blog</span><span role="cell" style="color: #5E636B;">Writing</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 570ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 640ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem; border-bottom: 1px solid #D0D3D8;">
+                    <span role="cell" style="font-weight: 600;">/about</span><span role="cell" style="color: #5E636B;">About</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 710ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 780ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                  <div role="row" style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 7.5rem 7.5rem; align-items: center; min-height: 3.25rem; padding: 0 1.25rem;">
+                    <span role="cell" style="font-weight: 600;">/contact</span><span role="cell" style="color: #5E636B;">Contact</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 850ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                    <span role="cell" style="display: inline-flex; align-items: center; gap: 0.5rem;"><svg aria-hidden="true" data-motion="" style="animation: tick-in 220ms ease-out 920ms both;" width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1D1F23"></circle><path d="M5.5 9.2L7.9 11.5L12.5 6.6" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>Pass</span>
+                  </div>
+                </div>
+                <figcaption style="margin-top: 0.75rem; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Route checks from a made-up run of this site's Playwright suite, at both widths. The ticks land as the run reports in.</figcaption>
+              </figure>
+              <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--rule); font-size: 0.875rem; line-height: 1.375rem;">
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><circle cx="9" cy="9" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M5.75 9.25L7.9 11.25L12.25 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <p style="margin: 0;"><strong style="font-weight: 600;">Checked by Christine.</strong> Every route renders without a console error at both widths it is tested at.</p>
+                <span style="margin-left: auto; flex: 0 0 auto; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Illustrative wording</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Next plate, dimmed at the edge: a drawing only, never focusable -->
+        <div aria-hidden="true" style="position: relative; min-width: 0;">
+          <div style="position: absolute; top: 9%; bottom: 9%; left: 0; padding: 2.5rem 4.5rem 2.5rem 1.5rem; width: calc(100% + 3rem); box-sizing: border-box; background: var(--peek); border: 1px solid var(--rule); border-radius: 12px;">
+            <sc-if value="{{nextPeek.cc}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Dashboards</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Central Command</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">In QA</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#EEF1F6" stroke="#D9DFEA"></rect><rect x="10" y="8" width="28" height="6" rx="1" fill="#1A2233"></rect><rect x="112" y="9" width="38" height="4" rx="1" fill="#4F5A70"></rect><rect x="8" y="20" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="26" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="23" width="3" height="10" rx="1" fill="#DB4C75"></rect><rect x="43" y="26" width="92" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="39" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="45" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="42" width="3" height="10" rx="1" fill="#3A9ABB"></rect><rect x="43" y="45" width="100" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="58" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="64" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="61" width="3" height="10" rx="1" fill="#9B4ED6"></rect><rect x="43" y="64" width="76" height="4" rx="1" fill="#9AA3B5"></rect><rect x="8" y="77" width="144" height="16" rx="3" fill="#FFFFFF"></rect><rect x="14" y="83" width="14" height="4" rx="1" fill="#1A2233"></rect><rect x="34" y="80" width="3" height="10" rx="1" fill="#2E9E5B"></rect><rect x="43" y="83" width="88" height="4" rx="1" fill="#9AA3B5"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.tt}}" hint-placeholder-val="{{ true }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Finance</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Tally &amp; Trace</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">In QA</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#DCE3DE"></rect><path d="M4.5 0.5H155.5A4 4 0 0 1 159.5 4.5V17H0.5V4.5A4 4 0 0 1 4.5 0.5Z" fill="#1F4D3A"></path><rect x="10" y="7" width="52" height="4" rx="1" fill="#FFFFFF"></rect><rect x="118" y="7" width="32" height="4" rx="1" fill="#FFFFFF"></rect><rect x="10" y="24" width="34" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="24" width="22" height="4" rx="1" fill="#B3261E"></rect><rect x="130" y="24" width="20" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 33.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="39" width="46" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="39" width="16" height="4" rx="1" fill="#58615B"></rect><rect x="126" y="39" width="24" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 48.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="54" width="40" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="54" width="16" height="4" rx="1" fill="#58615B"></rect><rect x="126" y="54" width="24" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 63.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="69" width="58" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="69" width="18" height="4" rx="1" fill="#58615B"></rect><rect x="120" y="69" width="30" height="4" rx="1" fill="#1C2420"></rect><path d="M0.5 78.5H159.5" stroke="#DCE3DE"></path><rect x="10" y="84" width="38" height="4" rx="1" fill="#1C2420"></rect><rect x="84" y="84" width="18" height="4" rx="1" fill="#58615B"></rect><rect x="124" y="84" width="26" height="4" rx="1" fill="#1C2420"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.mob}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Mobile</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Pocket habit tracker</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#EEF3F1" stroke="#D5E2DD"></rect><rect x="60" y="6" width="40" height="88" rx="8" fill="#111315"></rect><rect x="63" y="10" width="34" height="80" rx="6" fill="#FFFFFF"></rect><rect x="68" y="18" width="16" height="4" rx="1" fill="#17201C"></rect><circle cx="70" cy="34" r="3" fill="#0E7C66"></circle><rect x="76" y="32.5" width="16" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="46" r="3" fill="#0E7C66"></circle><rect x="76" y="44.5" width="18" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="58" r="3" stroke="#6B7A74"></circle><rect x="76" y="56.5" width="13" height="3" rx="1" fill="#17201C"></rect><circle cx="70" cy="70" r="3" stroke="#6B7A74"></circle><rect x="76" y="68.5" width="17" height="3" rx="1" fill="#17201C"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.ai}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">AI features</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Form helper</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#F7F6F3" stroke="#E2DFD8"></rect><rect x="10" y="9" width="40" height="3" rx="1" fill="#5C574F"></rect><rect x="10" y="16" width="140" height="18" rx="3" fill="#FFFFFF" stroke="#E2DFD8"></rect><rect x="16" y="23" width="96" height="4" rx="1" fill="#1F1D1A"></rect><rect x="122" y="39" width="28" height="8" rx="2" fill="#1F1D1A"></rect><rect x="10" y="52" width="140" height="40" rx="3" fill="#FFFFFF" stroke="#C9C4BA"></rect><rect x="16" y="59" width="124" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="67" width="118" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="75" width="128" height="3.5" rx="1" fill="#1F1D1A"></rect><rect x="16" y="83" width="60" height="3.5" rx="1" fill="#1F1D1A"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.cube}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">3D &amp; motion</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">Turntable scene</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Lab demo</span></p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#0F1113"></rect><path d="M0 78H160M0 90H160" stroke="#2A2E33"></path><path d="M80 20L104 34L80 48L56 34Z" fill="rgba(127,162,255,0.18)" stroke="#7FA2FF" stroke-width="1.2"></path><path d="M56 34V62L80 76V48M104 34V62L80 76" stroke="#7FA2FF" stroke-width="1.2"></path></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.site}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Sites</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">StudioSC Portfolio</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Live</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#D0D3D8"></rect><path d="M4.5 0.5H155.5A4 4 0 0 1 159.5 4.5V13H0.5V4.5A4 4 0 0 1 4.5 0.5Z" fill="#F1F2F4"></path><circle cx="8" cy="7" r="2" fill="#C4C8CE"></circle><circle cx="14" cy="7" r="2" fill="#C4C8CE"></circle><circle cx="20" cy="7" r="2" fill="#C4C8CE"></circle><rect x="30" y="4" width="50" height="6" rx="3" fill="#FFFFFF" stroke="#D0D3D8" stroke-width="0.6"></rect><rect x="0.5" y="13" width="159" height="86.5" fill="#E9EAEC"></rect><rect x="10" y="20" width="62" height="7" rx="1.5" fill="#1D1F23"></rect><rect x="10" y="30" width="48" height="7" rx="1.5" fill="#1D1F23"></rect><rect x="10" y="44" width="140" height="48" rx="3" fill="#FFFFFF"></rect><rect x="60" y="50" width="84" height="6" rx="1" fill="#1F4D3A"></rect><rect x="64" y="61" width="30" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="68" width="40" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="75" width="26" height="2.5" rx="1" fill="#1C2420"></rect><rect x="64" y="82" width="36" height="2.5" rx="1" fill="#1C2420"></rect></svg></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{nextPeek.test}}" hint-placeholder-val="{{ false }}">
+              <div data-motion="" style="animation: {{peekAnim}} 240ms ease-out both;">
+                <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Testing</p>
+                <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem; color: var(--muted);">StudioSC Portfolio</p>
+                <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">Live, tested</p>
+                <div style="margin-top: 1.25rem; opacity: 0.75;"><svg aria-hidden="true" viewBox="0 0 160 100" fill="none" style="display: block; width: 100%; height: auto;"><rect x="0.5" y="0.5" width="159" height="99" rx="4" fill="#FFFFFF" stroke="#D0D3D8"></rect><rect x="10" y="9" width="24" height="4" rx="1" fill="#5E636B"></rect><rect x="104" y="9" width="18" height="4" rx="1" fill="#5E636B"></rect><rect x="132" y="9" width="18" height="4" rx="1" fill="#5E636B"></rect><path d="M0.5 18.5H159.5" stroke="#1D1F23"></path><rect x="10" y="25" width="6" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="27" r="4.5" fill="#1D1F23"></circle><path d="M110.8 27.1L112.4 28.6L115.3 25.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="27" r="4.5" fill="#1D1F23"></circle><path d="M138.8 27.1L140.4 28.6L143.3 25.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 34H159.5" stroke="#D0D3D8"></path><rect x="10" y="39" width="22" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="41" r="4.5" fill="#1D1F23"></circle><path d="M110.8 41.1L112.4 42.6L115.3 39.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="41" r="4.5" fill="#1D1F23"></circle><path d="M138.8 41.1L140.4 42.6L143.3 39.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 48H159.5" stroke="#D0D3D8"></path><rect x="10" y="53" width="56" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="55" r="4.5" fill="#1D1F23"></circle><path d="M110.8 55.1L112.4 56.6L115.3 53.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="55" r="4.5" fill="#1D1F23"></circle><path d="M138.8 55.1L140.4 56.6L143.3 53.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 62H159.5" stroke="#D0D3D8"></path><rect x="10" y="67" width="26" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="69" r="4.5" fill="#1D1F23"></circle><path d="M110.8 69.1L112.4 70.6L115.3 67.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="69" r="4.5" fill="#1D1F23"></circle><path d="M138.8 69.1L140.4 70.6L143.3 67.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><path d="M0.5 76H159.5" stroke="#D0D3D8"></path><rect x="10" y="81" width="34" height="4" rx="1" fill="#1D1F23"></rect><circle cx="113" cy="83" r="4.5" fill="#1D1F23"></circle><path d="M110.8 83.1L112.4 84.6L115.3 81.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="141" cy="83" r="4.5" fill="#1D1F23"></circle><path d="M138.8 83.1L140.4 84.6L143.3 81.4" stroke="#FFFFFF" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 66rem) minmax(0, 1fr); column-gap: 1.5rem; margin-top: 1.25rem;">
+        <div style="grid-column: 2; display: flex; align-items: center; gap: 0.75rem;">
+          <button type="button" aria-label="Previous plate" onClick="{{prev}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12 4.5L6.5 10L12 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          <p aria-live="polite" style="margin: 0; min-width: 3.75rem; text-align: center; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">{{counter}}</p>
+          <button type="button" aria-label="Next plate" onClick="{{next}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M8 4.5L13.5 10L8 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- The two of us: a deliberate pair in one frame, split by an ink rule -->
+    <section id="people" aria-labelledby="people-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 5rem 2.5rem 0;">
+      <h2 id="people-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">The two of us</h2>
+      <div style="margin-top: 1.25rem; display: grid; grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr); background: var(--plate); border: 1px solid var(--ink); border-radius: 14px;">
+        <article id="seth" aria-labelledby="seth-name" style="min-width: 0; padding: 2.5rem;">
+          <div style="display: flex; align-items: flex-end; gap: 1.25rem;">
+            <img src="img/seth.jpg" alt="Seth Palileo" width="600" height="600" style="display: block; flex: 0 0 auto; width: 7rem; height: 7rem; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 35%; border-radius: 4px;">
+            <div>
+              <h3 id="seth-name" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.25rem; line-height: 2.75rem; letter-spacing: -0.02em;">Seth Palileo</h3>
+              <p style="margin: 0.25rem 0 0; font-size: 1rem; line-height: 1.5rem; font-weight: 600;">Lead Software Engineer</p>
+              <p style="margin: 0.125rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">10+ years shipping production systems</p>
+            </div>
+          </div>
+          <p style="margin: 1.25rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">I build the apps on this page, from the database to the screen you tap. Then I hand them to Christine, which is where they get good.</p>
+          <p style="margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;"><span style="color: var(--muted);">Open to</span> <strong style="font-weight: 600;">Full-time · Contract · Remote or relocation</strong></p>
+          <h4 style="margin: 1.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--muted);">What I did here</h4>
+          <ul style="list-style: none; margin: 0.5rem 0 0; padding: 0; text-align: left; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/tallyandtrace" style="font-weight: 600;">Tally &amp; Trace</a> <span style="color: var(--muted);">Built it with React, FastAPI and PostgreSQL.</span></li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/central-command" style="font-weight: 600;">Central Command</a> <span style="color: var(--muted);">Built it with Cloudflare Workers, Hono and React.</span></li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/portfolio-site" style="font-weight: 600;">This site</a> <span style="color: var(--muted);">Built it with Next.js and Tailwind.</span></li>
+          </ul>
+          <div style="margin-top: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+            <a href="/cv/seth.pdf" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery);"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><path d="M9 2.75V11.25M5.25 7.75L9 11.5L12.75 7.75M3.25 14.75H14.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Download CV (PDF)</a>
+            <a href="mailto:seth@studiosc.dev" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 1px solid var(--ink); color: var(--ink);">Email Seth</a>
+          </div>
+          <p style="margin: 1rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+            <a href="https://www.linkedin.com/in/sethcharlespalileo/">LinkedIn</a>
+            <a href="https://github.com/smpalileo">GitHub</a>
+          </p>
+        </article>
+        <div aria-hidden="true" style="background: var(--ink); margin: 2.5rem 0;"></div>
+        <article id="christine" aria-labelledby="christine-name" style="min-width: 0; padding: 2.5rem;">
+          <div style="display: flex; align-items: flex-end; gap: 1.25rem;">
+            <img src="img/christine.jpg" alt="Christine Nacar-Palileo" width="600" height="600" style="display: block; flex: 0 0 auto; width: 7rem; height: 7rem; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 35%; border-radius: 4px;">
+            <div>
+              <h3 id="christine-name" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.25rem; line-height: 2.75rem; letter-spacing: -0.02em;">Christine Nacar-Palileo</h3>
+              <p style="margin: 0.25rem 0 0; font-size: 1rem; line-height: 1.5rem; font-weight: 600;">Senior QA Engineer</p>
+              <p style="margin: 0.125rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">11+ years building test automation</p>
+            </div>
+          </div>
+          <p style="margin: 1.25rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">I test what Seth builds, and I write the checks that keep it working. If something on your site can break, I would rather find it than your users.</p>
+          <p style="margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;"><span style="color: var(--muted);">Open to</span> <strong style="font-weight: 600;">Full-time · Contract · Remote or relocation</strong></p>
+          <h4 style="margin: 1.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--muted);">What I did here</h4>
+          <ul style="list-style: none; margin: 0.5rem 0 0; padding: 0; text-align: left; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/tallyandtrace" style="font-weight: 600;">Tally &amp; Trace</a> <span style="color: var(--muted);">Testing it now, including the check that amounts keep one right edge on desktop and phone.</span></li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/central-command" style="font-weight: 600;">Central Command</a> <span style="color: var(--muted);">Testing it now, before it goes live.</span></li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);"><a href="/work/portfolio-site" style="font-weight: 600;">This site</a> <span style="color: var(--muted);">Keeps its Playwright suite green.</span></li>
+          </ul>
+          <div style="margin-top: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+            <a href="/cv/christine.pdf" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery);"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><path d="M9 2.75V11.25M5.25 7.75L9 11.5L12.75 7.75M3.25 14.75H14.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Download CV (PDF)</a>
+            <a href="mailto:christine@studiosc.dev" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 1px solid var(--ink); color: var(--ink);">Email Christine</a>
+          </div>
+          <p style="margin: 1rem 0 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+            <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/">LinkedIn</a>
+            <a href="https://github.com/cdtncr">GitHub</a>
+          </p>
+        </article>
+      </div>
+      <p style="margin: 1.5rem 0 0; text-align: center; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem;"><a href="/contact">Or hire us both for your project or idea</a></p>
+    </section>
+
+    <!-- Holly: the studio dog. Not staff, so a softer radius than the people blocks -->
+    <section aria-labelledby="holly-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 3.5rem 2.5rem 0;">
+      <p aria-hidden="true" style="margin: 0; padding-left: 16rem; font-family: 'Red Hat Display', sans-serif; letter-spacing: -0.02em; font-weight: 400; font-size: 2.75rem; line-height: 3rem;">And</p>
+      <div style="display: grid; grid-template-columns: 13rem minmax(0, 1fr) 15rem; gap: 3rem; align-items: start; margin-top: 0.25rem;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+          <div role="group" aria-label="Photos of Holly. The left and right arrow keys flip through them." tabindex="0" onKeyDown="{{holly.key}}" style="position: relative; width: 13rem; height: 13rem; border-radius: 2.5rem;">
+            <img src="img/holly-collar.jpg" alt="{{holly.alt0}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 50% 60%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z0}}; transform: {{holly.tf0}}; animation: {{holly.an0}}; transition: transform 220ms ease;">
+            <img src="img/holly-chair.jpg" alt="{{holly.alt1}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 45% 50%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z1}}; transform: {{holly.tf1}}; animation: {{holly.an1}}; transition: transform 220ms ease;">
+            <img src="img/holly-garden.jpg" alt="{{holly.alt2}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 50% 40%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z2}}; transform: {{holly.tf2}}; animation: {{holly.an2}}; transition: transform 220ms ease;">
+            <img src="img/holly-nose.jpg" alt="{{holly.alt3}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 50% 65%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z3}}; transform: {{holly.tf3}}; animation: {{holly.an3}}; transition: transform 220ms ease;">
+            <img src="img/holly-side-eye.jpg" alt="{{holly.alt4}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 50% 25%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z4}}; transform: {{holly.tf4}}; animation: {{holly.an4}}; transition: transform 220ms ease;">
+            <img src="img/holly-upside-down.jpg" alt="{{holly.alt5}}" width="600" height="600" data-fade="" data-motion="" style="position: absolute; top: 0.75rem; left: 0.75rem; display: block; width: calc(100% - 1.5rem); height: calc(100% - 1.5rem); box-sizing: border-box; object-fit: cover; object-position: 50% 60%; border: 1px solid var(--rule); border-radius: 2.5rem; background: var(--plate); z-index: {{holly.z5}}; transform: {{holly.tf5}}; animation: {{holly.an5}}; transition: transform 220ms ease;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <button type="button" aria-label="Previous photo of Holly" onClick="{{holly.prev}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12 4.5L6.5 10L12 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <p aria-live="polite" style="margin: 0; min-width: 3.25rem; text-align: center; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">{{holly.counter}}</p>
+            <button type="button" aria-label="Next photo of Holly" onClick="{{holly.next}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M8 4.5L13.5 10L8 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+        </div>
+        <div>
+          <h2 id="holly-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; letter-spacing: -0.02em; font-weight: 600; font-size: 2.75rem; line-height: 3rem;">Holly</h2>
+          <p style="margin: 0.25rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem; color: var(--accent);">Chief Morale Officer</p>
+          <p style="margin: 0.75rem 0 0; max-width: 34rem; font-size: 1.0625rem; line-height: 1.625rem;">She hasn't shipped a single feature, but she's basically the first test user of every app. Reviews every release from under the desk. Doesn't mind if her walks are a little off schedule to meet deadlines.</p>
+          <dl style="margin: 1rem 0 0; display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); gap: 0.25rem 1rem; text-align: left; font-size: 0.9375rem; line-height: 1.5rem;">
+            <dt style="color: var(--muted);">Breed</dt><dd style="margin: 0;">Pembroke Welsh Corgi</dd>
+            <dt style="color: var(--muted);">Age</dt><dd title="Born 31 July 2023" style="margin: 0; font-variant-numeric: tabular-nums;">{{holly.age}}</dd>
+          </dl>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+          <svg aria-hidden="true" viewBox="10 0 130 84" fill="none" style="display: block; width: 11rem; height: auto; color: var(--ink); overflow: visible;"><g data-motion="" style="transform-box: view-box; transform-origin: 86px 77px; animation: {{holly.wiggle}};"><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M44 68V77H50M74 71V77H79"></path><path d="M96 34C80 35 50 35 34 36C22 36 15 45 17 55C18 61 22 65 27 66L28 77H37L37 67C52 69 68 71 80 71L81 77H90L92 68C99 65 104 57 104 48C104 45 105 43 106 42C110 39 114 37 118 35L127 33C131 33 133 30 132 28L120 24C117 20 113 18 108 19C102 20 97 26 96 34Z"></path><path d="M21 49C23 51 24 54 23 58M100 54C98.5 56 98.5 59 100 61"></path><g data-motion="" style="transform-box: view-box; transform-origin: 108px 21px; animation: {{holly.ears}};"><path d="M101 23L98 5L108.5 19.5M108.5 19.5L114 3.5L118.5 22"></path><path d="M103 18L100.5 10.5M113.3 18L113.7 9.5"></path></g></g><circle cx="114" cy="25.5" r="1.3" fill="currentColor"></circle><circle cx="132" cy="28.5" r="1.7" fill="currentColor"></circle></g></svg>
+          <p style="margin: 0.25rem 0 0; max-width: 15rem; text-align: center; font-size: 0.9375rem; line-height: 1.5rem;">Very flexible rates: anything beef or duck will do.</p>
+          <button type="button" onClick="{{holly.give}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0 1.125rem; border: 1px solid var(--ink); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Give Holly a treat</button>
+          <p aria-live="polite" style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem; font-variant-numeric: tabular-nums;">{{holly.count}}</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- The three of us: a pause between Holly and the writing -->
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 5rem 2.5rem 0;">
+      <figure style="margin: 0;">
+        <img src="img/us-three.jpg" alt="Seth and Christine on a sofa, mock-shouting at Holly, who sits between them looking away" width="1200" height="800" style="display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 10%; border-radius: 14px;">
+        <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Sprint planning. Holly abstained.</figcaption>
+      </figure>
+    </div>
+
+    <!-- Writing: two doors into the blog, the work and everything else -->
+    <section aria-labelledby="writing-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 5rem 2.5rem 0;">
+      <h2 id="writing-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Writing</h2>
+      <div style="margin-top: 1.25rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem;">
+        <a href="/blog/work" style="display: block; padding-top: 1.25rem; border-top: 2px solid var(--ink); text-decoration: none; color: var(--ink);">
+          <span style="display: flex; align-items: center; gap: 0.75rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.25rem; line-height: 2.75rem; letter-spacing: -0.02em;">How we build<svg aria-hidden="true" width="28" height="28" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M4 10H16M11 5L16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span style="display: block; margin-top: 0.375rem; font-size: 1.0625rem; line-height: 1.625rem; color: var(--muted);">Notes from the projects on this page</span>
+        </a>
+        <a href="/blog/life" style="display: block; padding-top: 1.25rem; border-top: 2px solid var(--ink); text-decoration: none; color: var(--ink);">
+          <span style="display: flex; align-items: center; gap: 0.75rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.25rem; line-height: 2.75rem; letter-spacing: -0.02em;">Off the clock<svg aria-hidden="true" width="28" height="28" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M4 10H16M11 5L16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span style="display: block; margin-top: 0.375rem; font-size: 1.0625rem; line-height: 1.625rem; color: var(--muted);">Trips, food, Holly, and whatever we got up to lately</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Every project, compact -->
+    <section id="work" aria-labelledby="work-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 5rem 2.5rem 0;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 2rem;">
+        <h2 id="work-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Every project</h2>
+        <a href="/work" style="font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">All case studies</a>
+      </div>
+      <ul style="list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 3rem; border-bottom: 1px solid var(--rule);">
+        <sc-for list="{{list}}" as="p" hint-placeholder-count="10">
+          <li style="padding: 0.875rem 0; border-top: 1px solid var(--rule);">
+            <p style="margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;"><span style="display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.625rem;"><a href="{{p.href}}" aria-label="{{p.aria}}" style="text-decoration: none; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.5rem;">{{p.name}}</a><sc-if value="{{p.sample}}" hint-placeholder-val="{{ false }}"><span aria-hidden="true"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Sample</span></span></sc-if></span><span style="flex: 0 0 auto; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">{{p.status}}</span></p>
+            <p style="margin: 0.125rem 0 0; font-size: 0.875rem; line-height: 1.375rem; color: var(--muted);">{{p.desc}}</p>
+          </li>
+        </sc-for>
+      </ul>
+    </section>
+
+    <!-- Contact call -->
+    <section aria-labelledby="contact-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 6rem 2.5rem 6rem;">
+      <div style="display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 4rem; align-items: end;">
+        <h2 id="contact-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 3rem; line-height: 3.25rem; letter-spacing: -0.025em;">Got something you want built? Or broken?</h2>
+        <div>
+          <p style="margin: 0;">Tell us about the idea, even if it's half of one. If you're hiring for a role, email <a href="#seth">Seth</a> or <a href="#christine">Christine</a> directly.</p>
+          <a href="/contact" style="display: inline-flex; align-items: center; margin-top: 1.25rem; min-height: 3rem; padding: 0 1.375rem; border-radius: 6px; background: var(--ink); color: var(--gallery); text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Start a project</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top: 1px solid var(--rule);">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 2.5rem 2.5rem 2.5rem; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 9fr); gap: 1.5rem 2rem;">
+      <div>
+        <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem;">StudioSC</p>
+        <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+      </div>
+      <nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; align-content: start; font-size: 0.9375rem; line-height: 1.5rem;">
+        <a href="/work" style="text-decoration: none;">Work</a>
+        <a href="/blog" style="text-decoration: none;">Writing</a>
+        <a href="/about" style="text-decoration: none;">About</a>
+        <a href="/contact" style="text-decoration: none;">Contact</a>
+        <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="text-decoration: none;">Seth on LinkedIn</a>
+        <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="text-decoration: none;">Christine on LinkedIn</a>
+        <a href="https://github.com/StudioSC-dev" style="text-decoration: none;">StudioSC-dev on GitHub</a>
+      </nav>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":4470}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : true;
+    const idx = typeof st.idx === 'number' ? st.idx : 0;
+    const moved = st.moved || '';
+    // The dark board is drawn as a settled state, so its load moment is skipped.
+    const seen = !!st.seen || true;
+    const sortKey = st.sortKey || 'due';
+    const dir = st.dir || 1;
+    // Four real projects, six invented samples (sample: true). feat is the hand-picked featured order, -1 if not featured.
+    const projects = [
+      {"id": "tt", "name": "Tally & Trace", "short": "Tally & Trace", "sample": false, "status": "In QA", "key": "qa", "href": "/work/tallyandtrace", "desc": "Money app for a household and a small business", "feat": 0},
+      {"id": "cc", "name": "Central Command", "short": "Central Command", "sample": false, "status": "In QA", "key": "qa", "href": "/work/central-command", "desc": "A dashboard for one person's day, on Cloudflare's free tier", "feat": 1},
+      {"id": "pf", "name": "StudioSC Portfolio", "short": "Portfolio", "sample": false, "status": "Live", "key": "live", "href": "/work/portfolio-site", "desc": "This site", "feat": 2},
+      {"id": "cb", "name": "Clinic Booking", "short": "Clinic Booking", "sample": true, "status": "Live", "key": "live", "href": "/work/clinic-booking", "desc": "Online booking and reminders for a small clinic", "feat": 3},
+      {"id": "qa", "name": "Web App QA Retainer", "short": "QA Retainer", "sample": true, "status": "Tested by us", "key": "tested", "href": "/work/web-app-qa-retainer", "desc": "Test automation and release checks for a client's web app", "feat": 4},
+      {"id": "fr", "name": "Fitness Rival", "short": "Fitness Rival", "sample": false, "status": "In development", "key": "dev", "href": "/work/fitness-rival", "desc": "A workout app where friends compete for points and badges", "feat": -1},
+      {"id": "si", "name": "Shop Inventory", "short": "Shop Inventory", "sample": true, "status": "In development", "key": "dev", "href": "/work/shop-inventory", "desc": "Stock counts and reorder alerts for a small shop", "feat": -1},
+      {"id": "fc", "name": "Field Companion", "short": "Field Companion", "sample": true, "status": "In QA", "key": "qa", "href": "/work/field-companion", "desc": "A mobile companion app for a client's web service", "feat": -1},
+      {"id": "or", "name": "Ops Reporting", "short": "Ops Reporting", "sample": true, "status": "Live", "key": "live", "href": "/work/ops-reporting", "desc": "An internal reporting dashboard for an operations team", "feat": -1},
+      {"id": "ls", "name": "Launch Site", "short": "Launch Site", "sample": true, "status": "Live", "key": "live", "href": "/work/launch-site", "desc": "A landing site with a CMS the client edits", "feat": -1}
+    ];
+    const label = (p) => p.name + (p.sample ? ' [Sample]' : '');
+    const featured = projects.filter((p) => p.feat >= 0).sort((a, b) => a.feat - b.feat);
+
+    // Made-up fixture: no real financial data.
+    const bills = [
+      { name: 'Water', from: 'GCash', due: 28, dueLabel: '28 Nov, overdue', dueDate: '28 Nov', overdue: true, amount: 650 },
+      { name: 'Electricity', from: 'BPI Savings', due: 35, dueLabel: '5 Dec', dueDate: '5 Dec', amount: 3200 },
+      { name: 'Fibre internet', from: 'BPI Savings', due: 38, dueLabel: '8 Dec', dueDate: '8 Dec', amount: 1700 },
+      { name: 'Metrobank card statement', from: 'BPI Savings', due: 42, dueLabel: '12 Dec', dueDate: '12 Dec', amount: 18600 },
+      { name: 'Condo dues', from: 'BPI Savings', due: 45, dueLabel: '15 Dec', dueDate: '15 Dec', amount: 4500 },
+      { name: 'Laptop, instalment 7 of 12', from: 'Metrobank card', due: 50, dueLabel: '20 Dec', dueDate: '20 Dec', amount: 4166.67 }
+    ];
+    const fmt = (v) => v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const rows = bills
+      .slice()
+      .sort((a, b) => {
+        if (sortKey === 'name') return a.name.localeCompare(b.name) * dir;
+        return (a[sortKey] - b[sortKey]) * dir;
+      })
+      .map((b) => ({
+        name: b.name,
+        from: b.from,
+        dueLabel: b.dueLabel,
+        dueDate: b.dueDate,
+        overdue: !!b.overdue,
+        dueColor: b.overdue ? '#B3261E' : '#1C2420',
+        dueWeight: b.overdue ? 600 : 400,
+        amountLabel: fmt(b.amount)
+      }));
+    const col = (key) => ({
+      asc: sortKey === key && dir === 1,
+      desc: sortKey === key && dir === -1,
+      aria: sortKey === key ? (dir === 1 ? 'ascending' : 'descending') : 'none',
+      weight: sortKey === key ? 600 : 400,
+      color: sortKey === key ? '#1C2420' : '#58615B',
+      toggle: () => this.setState({ seen: true, sortKey: key, dir: sortKey === key ? -dir : 1 })
+    });
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    // Every change marks the page as seen, so the load moment plays once.
+    const set = (patch) => this.setState(Object.assign({ seen: true }, patch));
+
+    // Theme switch: a circular reveal from the toggle where View Transitions exist, an instant swap otherwise.
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+
+    // Categories: each tab has one plate. No autoplay: the word and the plate change only when the visitor picks.
+    const cats = [
+      { id: 'dash', label: 'Dashboards', plate: 'cc' },
+      { id: 'money', label: 'Finance', plate: 'tt' },
+      { id: 'mobile', label: 'Mobile', plate: 'mob' },
+      { id: 'ai', label: 'AI features', plate: 'ai' },
+      { id: 'motion', label: '3D & motion', plate: 'cube' },
+      { id: 'sites', label: 'Sites', plate: 'site' },
+      { id: 'testing', label: 'Testing', plate: 'test' }
+    ];
+    const n = cats.length;
+    const prevIdx = (idx + n - 1) % n;
+    const nextIdx = (idx + 1) % n;
+    const go = (target, way) => () => {
+      if (target === idx) return;
+      set({ idx: target, moved: way || (target > idx ? 'next' : 'prev') });
+    };
+    const plates = (i) => { const o = {}; cats.forEach((c, j) => { o[c.plate] = j === i; }); return o; };
+    const word = {};
+    cats.forEach((c, j) => { word[c.id] = j === idx; });
+    const tabs = cats.map((c, i) => ({
+      label: c.label,
+      pressed: i === idx ? 'true' : 'false',
+      bg: i === idx ? 'var(--ink)' : 'transparent',
+      fg: i === idx ? 'var(--gallery)' : 'var(--ink)',
+      pick: go(i)
+    }));
+    const load = seen
+      ? { line1: 'none', line2: 'none', dots: 'none', stage: 'none', tabs: 'none' }
+      : { line1: 'rise', line2: 'rise', dots: 'fade-in', stage: 'stage-in', tabs: 'fade-in' };
+
+    // Lab demo: habit tracker
+    const habitNames = ['Drink water', 'Walk 20 minutes', 'Read 10 pages', 'Sleep by 23:00'];
+    const habitsOn = st.habits || [true, true, false, false];
+    const doneCount = habitsOn.filter(Boolean).length;
+    const habits = {
+      done: doneCount + ' of ' + habitNames.length + ' done',
+      items: habitNames.map((name, i) => ({
+        name,
+        on: habitsOn[i],
+        pressed: habitsOn[i] ? 'true' : 'false',
+        ring: habitsOn[i] ? '#0E7C66' : '#6B7A74',
+        fill: habitsOn[i] ? '#0E7C66' : 'transparent',
+        color: habitsOn[i] ? '#4F5E58' : '#17201C',
+        strike: habitsOn[i] ? 'line-through' : 'none',
+        toggle: () => { const next = habitsOn.slice(); next[i] = !next[i]; set({ habits: next }); }
+      }))
+    };
+    // Lab demo: form helper (scripted draft)
+    const drafts = st.drafts || 0;
+    const ai = { none: drafts === 0, a: drafts % 2 === 1, b: drafts > 0 && drafts % 2 === 0, button: drafts ? 'Draft again' : 'Draft a reply', draft: () => set({ drafts: drafts + 1 }) };
+    // Lab demo: turntable (pausable, still under reduced motion)
+    const paused = !!st.paused;
+    const cube = { state: paused ? 'paused' : 'running', label: paused ? 'Play' : 'Pause', pressed: paused ? 'true' : 'false', toggle: () => set({ paused: !paused }) };
+
+    const list = projects.map((p) => ({ name: p.name, aria: label(p), href: p.href, status: p.status, desc: p.desc, sample: p.sample }));
+
+    // Holly: treats are counted on this page only; the rear wiggles, the ears twitch and the top print tucks to the back once per treat; prev/next and the arrow keys flip the pile without a treat (off under reduced motion via data-motion)
+    const treats = st.treats || 0;
+    // Holly's age, worked out at render from her birthday (31 July 2023); no timer
+    const hollyYears = (Date.now() - new Date(2023, 6, 31).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+    const hollyShots = [
+      ['holly-collar', 'Holly on the sofa in a red gingham flower collar', '50% 60%'],
+      ['holly-chair', 'Holly on an outdoor cafe chair with her tongue out', '45% 50%'],
+      ['holly-garden', 'Holly at a table with a garden behind her', '50% 40%'],
+      ['holly-nose', 'A wide-angle close-up of Holly\'s nose', '50% 65%'],
+      ['holly-side-eye', 'Holly on the sofa giving a side-eye', '50% 25%'],
+      ['holly-upside-down', 'Holly lying upside down with her teeth showing', '50% 60%']
+    ];
+    const hN = hollyShots.length;
+    const hTop = typeof st.hollyPos === 'number' ? st.hollyPos : 0;
+    const hStep = st.hollyStep || 0;
+    const hDir = st.hollyDir || '';
+    const hTurn = (d, extra) => set(Object.assign({ hollyPos: (hTop + d + hN) % hN, hollyDir: d > 0 ? 'next' : 'prev', hollyStep: hStep + 1 }, extra || {}));
+    const hLay = ['none', 'translate(0.75rem, -0.25rem) rotate(4deg)', 'translate(-0.75rem, 0.375rem) rotate(-3deg)'];
+    const hDepth = (i) => (i - hTop + hN) % hN;
+    const hMoved = (i) => hStep === 0 ? 'none' : (hDir === 'next' && hDepth(i) === hN - 1) ? (hStep % 2 ? 'tuck-a' : 'tuck-b') + ' 300ms ease-in-out' : (hDir === 'prev' && hDepth(i) === 0) ? (hStep % 2 ? 'untuck-a' : 'untuck-b') + ' 300ms ease-in-out' : 'none';
+    const holly = {
+      ...Object.fromEntries(hollyShots.flatMap((p, i) => [['alt' + i, hDepth(i) === 0 ? p[1] : ''], ['z' + i, hN - hDepth(i)], ['tf' + i, hLay[Math.min(hDepth(i), 2)]], ['an' + i, hMoved(i)]])),
+      counter: (hTop + 1) + ' / ' + hN,
+      prev: () => hTurn(-1),
+      next: () => hTurn(1),
+      key: (ev) => { if (ev.key === 'ArrowRight') { ev.preventDefault(); hTurn(1); } else if (ev.key === 'ArrowLeft') { ev.preventDefault(); hTurn(-1); } },
+      age: hollyYears.toFixed(2) + ' years old',
+      count: 'Treats today: ' + treats,
+      wiggle: treats === 0 ? 'none' : (treats % 2 ? 'wiggle-a' : 'wiggle-b') + ' 360ms ease-in-out',
+      ears: treats === 0 ? 'none' : (treats % 2 ? 'ears-a' : 'ears-b') + ' 300ms ease-out',
+      give: () => hTurn(1, { treats: treats + 1 })
+    };
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      tabs,
+      word,
+      show: plates(idx),
+      prevPeek: plates(prevIdx),
+      nextPeek: plates(nextIdx),
+      plateAnim: moved === 'next' ? 'plate-from-right' : (moved === 'prev' ? 'plate-from-left' : 'none'),
+      peekAnim: moved ? 'plate-fade' : 'none',
+      wordAnim: moved ? 'word-in' : 'none',
+      load,
+      counter: (idx + 1) + ' of ' + n,
+      prev: go(prevIdx, 'prev'),
+      next: go(nextIdx, 'next'),
+      rows,
+      sort: { name: col('name'), due: col('due'), amount: col('amount') },
+      habits,
+      ai,
+      cube,
+      holly,
+      list
+    };
+  }
+}
+</script>
+</body>
+</html>

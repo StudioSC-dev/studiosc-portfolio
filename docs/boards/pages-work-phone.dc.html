@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — Every project, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery); width: 390px; box-sizing: border-box; padding-bottom: 3rem; position: relative; overflow: hidden;">
+
+  <header style="position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 4rem; padding: 0 1rem;">
+    <div style="justify-self: start;">
+  <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+    </div>
+    <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem; text-decoration: none;">StudioSC</a>
+    <div style="justify-self: end;">
+  <button type="button" aria-expanded="false" aria-controls="phone-menu" style="min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Menu</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Every project: the full index, filtered by status -->
+    <section aria-labelledby="work-title" style="position: relative; padding: 1.5rem 1rem 0;">
+      <svg aria-hidden="true" width="120" height="200" viewBox="0 0 120 200" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M36 4h0M68 4h0M84 4h0M100 4h0M108 4h0M116 4h0M76 12h0M92 12h0M108 12h0M52 20h0M68 20h0M84 20h0M100 20h0M116 20h0M92 28h0M108 28h0M36 36h0M68 36h0M84 36h0M100 36h0M108 36h0M116 36h0M92 44h0M108 44h0M52 52h0M84 52h0M100 52h0M116 52h0M92 60h0M108 60h0M68 68h0M84 68h0M100 68h0M116 68h0M108 76h0M84 84h0M100 84h0M116 84h0M68 100h0M84 100h0M100 100h0M116 100h0M108 108h0M84 116h0M100 116h0M116 116h0M68 132h0M84 132h0M100 132h0M116 132h0M84 148h0M116 148h0M100 164h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative;">
+        <h1 id="work-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.625rem; line-height: 2.875rem; letter-spacing: -0.035em;">Every project</h1>
+        <p style="margin: 0.75rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">Everything Seth has built and Christine has tested, live or still in the works.</p>
+      </div>
+      <div style="margin-top: 1.5rem;">
+        <div role="group" aria-label="Filter by status" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+            <button type="button" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="appearance: none; font: inherit; cursor: pointer; min-height: 2.75rem; padding: 0 1rem; border: 1px solid var(--ink); border-radius: 999px; background: {{f.bg}}; color: {{f.fg}}; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">{{f.label}}</button>
+          </sc-for>
+        </div>
+        <p aria-live="polite" style="margin: 0.75rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">{{count}}</p>
+      </div>
+        <ul style="list-style: none; margin: 1.25rem 0 0; padding: 0; border-bottom: 1px solid var(--rule);">
+          <sc-for list="{{list}}" as="p" hint-placeholder-count="10">
+            <li style="padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+              <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                <div aria-hidden="true" style="flex: 0 0 auto; width: 5.5rem; aspect-ratio: 1 / 1; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid var(--rule); border-radius: 8px; background: var(--peek); overflow: hidden;"><div style="display: flex; gap: 0.1875rem; padding: 0.25rem 0.375rem; border-bottom: 1px solid var(--rule);"><span style="width: 0.3125rem; height: 0.3125rem; border-radius: 999px; background: var(--rule);"></span><span style="width: 0.3125rem; height: 0.3125rem; border-radius: 999px; background: var(--rule);"></span><span style="width: 0.3125rem; height: 0.3125rem; border-radius: 999px; background: var(--rule);"></span></div><div style="flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.25rem; padding: 0.375rem;"><span style="display: block; height: 0.875rem; border-radius: 3px; {{p.band}}"></span><span style="display: block; width: 70%; height: 0.25rem; border-radius: 2px; background: var(--rule);"></span><span style="display: block; width: 45%; height: 0.25rem; border-radius: 2px; background: var(--rule);"></span><span style="margin-top: auto; font-size: 0.625rem; line-height: 0.75rem; font-weight: 600; color: var(--muted);">Preview to come</span></div></div>
+                <span aria-hidden="true" style="flex: 0 0 auto; width: 0.75rem; height: 0.75rem; margin-top: 0.4375rem; box-sizing: border-box; border-radius: 2px; {{p.swatch}}"></span>
+                <div style="min-width: 0; flex: 1 1 auto;">
+                  <p style="margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem;"><span style="display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem;"><a href="{{p.href}}" aria-label="{{p.aria}}" style="text-decoration: none; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.625rem;">{{p.name}}</a><sc-if value="{{p.sample}}" hint-placeholder-val="{{ false }}"><span aria-hidden="true"><span style="display: inline-block; padding: 0 0.375rem; border: 1px dashed var(--muted); border-radius: 4px; font-family: 'Red Hat Text', sans-serif; font-size: 0.75rem; line-height: 1.125rem; font-weight: 500; letter-spacing: 0; color: var(--muted); vertical-align: middle;">Sample</span></span></sc-if></span><span style="flex: 0 0 auto; font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600;">{{p.status}}</span></p>
+                  <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.375rem;">{{p.desc}}</p>
+                  <sc-if value="{{p.hasStack}}" hint-placeholder-val="{{ true }}"><p style="margin: 0.25rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">{{p.stack}}</p></sc-if>
+                  <p style="margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;"><sc-if value="{{p.both}}" hint-placeholder-val="{{ true }}">Built by <a href="/seth">Seth</a> · Tested by <a href="/christine">Christine</a></sc-if><sc-if value="{{p.test}}" hint-placeholder-val="{{ false }}">Tested by <a href="/christine">Christine</a></sc-if><sc-if value="{{p.next}}" hint-placeholder-val="{{ false }}">Being built by <a href="/seth">Seth</a> · <a href="/christine">Christine</a> tests it next</sc-if></p>
+                </div>
+              </div>
+            </li>
+          </sc-for>
+        </ul>
+    </section>
+  </main>
+
+  <footer style="margin-top: 3.5rem; border-top: 1px solid var(--rule); padding: 2rem 1rem 0;">
+    <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem;">StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+    <nav aria-label="Footer" style="margin-top: 1rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+      <a href="/work" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Work</a>
+      <a href="/blog" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Writing</a>
+      <a href="/about" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">About</a>
+      <a href="/contact" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Contact</a>
+      <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Seth on LinkedIn</a>
+      <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Christine on LinkedIn</a>
+      <a href="https://github.com/StudioSC-dev" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">StudioSC-dev on GitHub</a>
+    </nav>
+    <p style="margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+    const chips = (defs, cur, key) => defs.map(([k, label]) => ({
+      label,
+      pressed: k === cur ? 'true' : 'false',
+      bg: k === cur ? 'var(--ink)' : 'transparent',
+      fg: k === cur ? 'var(--gallery)' : 'var(--ink)',
+      pick: () => set({ [key]: k })
+    }));
+    // Status filter. "Tested by us" (the QA-only engagement) shows under All only.
+    const filter = st.filter || 'all';
+    const projects = [{"name": "Tally & Trace", "href": "/work/tallyandtrace", "status": "In QA", "key": "qa", "sample": false, "swatch": "#1F4D3A", "desc": "Money app for a household and a small business", "stack": "React, FastAPI and PostgreSQL", "credit": "both"}, {"name": "Central Command", "href": "/work/central-command", "status": "In QA", "key": "qa", "sample": false, "swatch": "#2F6FED", "desc": "A dashboard for one person's day, on Cloudflare's free tier", "stack": "Cloudflare Workers, Hono and React", "credit": "both"}, {"name": "StudioSC Portfolio", "href": "/work/portfolio-site", "status": "Live", "key": "live", "sample": false, "swatch": "#1D1F23", "desc": "This site", "stack": "Next.js and Tailwind", "credit": "both"}, {"name": "Clinic Booking", "href": "/work/clinic-booking", "status": "Live", "key": "live", "sample": true, "desc": "Online booking and reminders for a small clinic", "credit": "both"}, {"name": "Web App QA Retainer", "href": "/work/web-app-qa-retainer", "status": "Tested by us", "key": "tested", "sample": true, "desc": "Test automation and release checks for a client's web app", "credit": "test"}, {"name": "Fitness Rival", "href": "/work/fitness-rival", "status": "In development", "key": "dev", "sample": false, "swatch": "#5E636B", "desc": "A workout app where friends compete for points and badges", "stack": "React, TypeScript and Node.js", "credit": "next"}, {"name": "Shop Inventory", "href": "/work/shop-inventory", "status": "In development", "key": "dev", "sample": true, "desc": "Stock counts and reorder alerts for a small shop", "credit": "next"}, {"name": "Field Companion", "href": "/work/field-companion", "status": "In QA", "key": "qa", "sample": true, "desc": "A mobile companion app for a client's web service", "credit": "both"}, {"name": "Ops Reporting", "href": "/work/ops-reporting", "status": "Live", "key": "live", "sample": true, "desc": "An internal reporting dashboard for an operations team", "credit": "both"}, {"name": "Launch Site", "href": "/work/launch-site", "status": "Live", "key": "live", "sample": true, "desc": "A landing site with a CMS the client edits", "credit": "both"}];
+    const filters = chips([['all', 'All'], ['live', 'Live'], ['qa', 'In QA'], ['dev', 'In development']], filter, 'filter');
+    const shown = projects.filter((p) => filter === 'all' || p.key === filter);
+    const list = shown.map((p) => ({
+      name: p.name,
+      href: p.href,
+      aria: p.name + (p.sample ? ' [Sample]' : ''),
+      status: p.status,
+      desc: p.desc,
+      sample: p.sample,
+      hasStack: !!p.stack,
+      stack: p.stack || '',
+      swatch: p.swatch ? 'background: ' + p.swatch + ';' : 'border: 1.5px solid var(--ink);',
+        band: 'background: ' + (p.swatch || 'var(--muted)') + ';',
+      both: p.credit === 'both',
+      test: p.credit === 'test',
+      next: p.credit === 'next'
+    }));
+    const count = filter === 'all' ? projects.length + ' projects' : shown.length + ' of ' + projects.length + ' projects';
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' },
+      filters,
+      list,
+      count
+    };
+  }
+}
+</script>
+</body>
+</html>

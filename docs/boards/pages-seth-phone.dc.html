@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — Seth, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery); width: 390px; box-sizing: border-box; padding-bottom: 3rem; position: relative; overflow: hidden;">
+
+  <header style="position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 4rem; padding: 0 1rem;">
+    <div style="justify-self: start;">
+  <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+    </div>
+    <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem; text-decoration: none;">StudioSC</a>
+    <div style="justify-self: end;">
+  <button type="button" aria-expanded="false" aria-controls="phone-menu" style="min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Menu</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seth's page: who, how to reach, then the work and the record -->
+    <section aria-labelledby="person-name" style="position: relative;">
+      <svg aria-hidden="true" width="120" height="200" viewBox="0 0 120 200" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M36 4h0M68 4h0M84 4h0M100 4h0M108 4h0M116 4h0M76 12h0M92 12h0M108 12h0M52 20h0M68 20h0M84 20h0M100 20h0M116 20h0M92 28h0M108 28h0M36 36h0M68 36h0M84 36h0M100 36h0M108 36h0M116 36h0M92 44h0M108 44h0M52 52h0M84 52h0M100 52h0M116 52h0M92 60h0M108 60h0M68 68h0M84 68h0M100 68h0M116 68h0M108 76h0M84 84h0M100 84h0M116 84h0M68 100h0M84 100h0M100 100h0M116 100h0M108 108h0M84 116h0M100 116h0M116 116h0M68 132h0M84 132h0M100 132h0M116 132h0M84 148h0M116 148h0M100 164h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative; box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 1.5rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; align-items: start;">
+        <div>
+          <h1 id="person-name" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.625rem; line-height: 2.875rem; letter-spacing: -0.035em;">Seth Palileo</h1>
+          <p style="margin: 0.75rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem; color: var(--accent);">Lead Software Engineer</p>
+          <p style="margin: 0.25rem 0 0; font-size: 1rem; line-height: 1.5rem; font-weight: 500;">AI Automation Lead (LLM Integration, Workflow Automation, TechOps)</p>
+          <p style="margin: 0.25rem 0 0; font-size: 1.0625rem; line-height: 1.625rem; color: var(--muted);">10+ years shipping production systems</p>
+          <p style="margin: 1.25rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">I build the apps on this page, from the database to the screen you tap. Then I hand them to Christine, which is where they get good.</p>
+          <p style="margin: 1rem 0 0; font-size: 1rem; line-height: 1.625rem;"><span style="color: var(--muted);">Open to</span> <strong style="font-weight: 600;">Full-time · Contract · Remote or relocation</strong></p>
+          <div style="margin-top: 1.75rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">
+            <a href="/cv/seth.pdf" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery);"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex: 0 0 auto;"><path d="M9 2.75V11.25M5.25 7.75L9 11.5L12.75 7.75M3.25 14.75H14.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Download CV (PDF)</a>
+            <a href="mailto:seth@studiosc.dev" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 1px solid var(--ink); color: var(--ink);">Email Seth</a>
+            <a href="https://www.linkedin.com/in/sethcharlespalileo/">LinkedIn</a>
+            <a href="https://github.com/smpalileo">GitHub</a>
+          </div>
+        </div>
+        <img src="img/seth.jpg" alt="Seth Palileo" width="600" height="600" style="display: block; width: 9rem; height: 9rem; order: -1; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 35%; border-radius: 4px;">
+      </div>
+    </section>
+
+    <section aria-labelledby="work-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem;">
+      <h2 id="work-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Selected work</h2>
+      <ol style="list-style: none; margin: 1.25rem 0 0; padding: 0; border-bottom: 1px solid var(--rule);">
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; border-radius: 2px; background: #1F4D3A; box-shadow: 0 0 0 1px var(--rule);"></span>
+        <div>
+          <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;"><a href="/work/tallyandtrace" style="text-decoration: none;">Tally &amp; Trace</a></h3>
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">In QA with Christine</p>
+        </div>
+      </div>
+      <div>
+        <p style="margin: 0;">Built it: a money app for a household and a small business that forecasts cash flow day by day.</p>
+        <p style="margin: 0.5rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;"><a href="/blog/tallyandtrace-statement-reconciliation">Latest: statement reconciliation, 18 November 2026</a></p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">React, FastAPI and PostgreSQL</dd>
+        <dt style="color: var(--muted);">Started</dt><dd style="margin: 0;">February 2026</dd>
+      </dl>
+    </li>
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; border-radius: 2px; background: #2F6FED; box-shadow: 0 0 0 1px var(--rule);"></span>
+        <div>
+          <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;"><a href="/work/central-command" style="text-decoration: none;">Central Command</a></h3>
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">In QA with Christine</p>
+        </div>
+      </div>
+      <div>
+        <p style="margin: 0;">Built it: a dashboard for one person's day, running on Cloudflare's free tier.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">Cloudflare Workers, Hono and React</dd>
+        <dt style="color: var(--muted);">Started</dt><dd style="margin: 0;">June 2026</dd>
+      </dl>
+    </li>
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; border-radius: 2px; background: #1D1F23; box-shadow: 0 0 0 1px var(--rule);"></span>
+        <div>
+          <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;"><a href="/work/portfolio-site" style="text-decoration: none;">StudioSC Portfolio</a></h3>
+          <p style="margin: 0.25rem 0 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">Live</p>
+        </div>
+      </div>
+      <div>
+        <p style="margin: 0;">Built it: this site, with case studies and posts written in MDX. Christine's Playwright suite tests it.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">Next.js and Tailwind</dd>
+        <dt style="color: var(--muted);">Started</dt><dd style="margin: 0;">February 2026</dd>
+      </dl>
+    </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="clients-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem;">
+      <h2 id="clients-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Client work</h2>
+      <ol style="list-style: none; margin: 1.25rem 0 0; padding: 0; border-bottom: 1px solid var(--rule);">
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; box-sizing: border-box; border-radius: 2px; border: 1.5px solid var(--ink);"></span>
+        <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;">Space Reserve</h3>
+      </div>
+      <div>
+        <p style="margin: 0;">Multi-tenant facility booking and payments for the Japanese market. Six-role access control, a booking flow that can't double-book under concurrent requests, and retry-safe delivery to a partner service.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Role</dt><dd style="margin: 0;">Lead engineer and solutions architect</dd>
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">NestJS, PostgreSQL, Next.js, React Native, Google Cloud</dd>
+      </dl>
+    </li>
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; box-sizing: border-box; border-radius: 2px; border: 1.5px solid var(--ink);"></span>
+        <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;">PSJ</h3>
+      </div>
+      <div>
+        <p style="margin: 0;">Multi-shop room reservations and payments. Fixed reservations stuck mid-cancellation and a timezone double-conversion bug, and kept each shop's data separate.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Role</dt><dd style="margin: 0;">Lead engineer and solutions architect</dd>
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">Next.js, Prisma, MySQL, Stripe</dd>
+      </dl>
+    </li>
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; box-sizing: border-box; border-radius: 2px; border: 1.5px solid var(--ink);"></span>
+        <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;">Entame Choice</h3>
+      </div>
+      <div>
+        <p style="margin: 0;">A two-sided artist booking marketplace. Owned billing and finance, including refunds, withholding tax and the Veritrans payment gateway.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Role</dt><dd style="margin: 0;">Lead engineer and solutions architect</dd>
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">NestJS, TypeORM, MySQL, Docker</dd>
+      </dl>
+    </li>
+    <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+      <div style="display: flex; align-items: flex-start; gap: 0.875rem;">
+        <span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-top: 0.5rem; box-sizing: border-box; border-radius: 2px; border: 1.5px solid var(--ink);"></span>
+        <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.015em;">BIS</h3>
+      </div>
+      <div>
+        <p style="margin: 0;">A white-label membership, points and coupon platform for karaoke chains. Led a transactional legacy-member migration and built the metrics and usage-history APIs.</p>
+      </div>
+      <dl style="margin: 0; display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+        <dt style="color: var(--muted);">Role</dt><dd style="margin: 0;">Lead engineer and solutions architect</dd>
+        <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">Next.js, Prisma, MySQL, Upstash Redis</dd>
+      </dl>
+    </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="hl-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem;">
+      <h2 id="hl-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Highlights</h2>
+      <ol style="list-style: none; margin: 1.25rem 0 0; padding: 0; border-bottom: 1px solid var(--rule);">
+        <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.375rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+          <div>
+            <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem;">Tech Lead, First Mate Technologies</h3>
+            <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">Oct 2025 – present</p>
+          </div>
+          <p style="margin: 0; font-size: 1.0625rem; line-height: 1.75rem;">Leads AI customer-service tools now serving 1K+ daily users, and rebuilt a pet social app that now serves 10K+ pet owners in the US.</p>
+        </li>
+        <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.375rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+          <div>
+            <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem;">Software Engineer 3, Asurion</h3>
+            <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">Dec 2022 – Oct 2025</p>
+          </div>
+          <p style="margin: 0; font-size: 1.0625rem; line-height: 1.75rem;">Designed and led generative-AI features across 10M+ accounts at a 99.9% SLA, and built the routing layer for an LLM call-triage pipeline.</p>
+        </li>
+        <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.375rem; padding: 1.25rem 0; border-top: 1px solid var(--rule);">
+          <div>
+            <h3 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.25rem; line-height: 1.75rem;">Senior Software Engineer, SiteMinder</h3>
+            <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">Sep 2021 – Aug 2022</p>
+          </div>
+          <p style="margin: 0; font-size: 1.0625rem; line-height: 1.75rem;">Built the large-scale rate scrapers behind hotel clients' competitor dashboards.</p>
+        </li>
+      </ol>
+      <p style="margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Before that: iRipple, Stratpoint (payments for Globe Telecom), Acquire BPO and Migo, from 2016. <a href="/cv/seth.pdf">The full history is in the CV.</a></p>
+      <p style="margin: 0.5rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;"><span style="color: var(--muted);">Education</span> <strong style="font-weight: 600;">BS Computer Science, University of the Philippines Los Baños</strong></p>
+    </section>
+
+    <section aria-labelledby="photos-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem;">
+      <h2 id="photos-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Photos</h2>
+        <figure aria-label="Photos" style="margin: 1.25rem 0 0; ">
+          <div style="position: relative; aspect-ratio: 4 / 3; box-sizing: border-box; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek); overflow: hidden;">
+            <img src="img/seth.jpg" alt="{{gallery.alt0}}" width="922" height="1153" data-fade="" style="position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: {{gallery.o0}}; transition: opacity 200ms ease;">
+            <img src="img/seth-holly.jpg" alt="{{gallery.alt1}}" width="800" height="1200" data-fade="" style="position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: {{gallery.o1}}; transition: opacity 200ms ease;">
+            <img src="img/holly-collar.jpg" alt="{{gallery.alt2}}" width="800" height="1200" data-fade="" style="position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: {{gallery.o2}}; transition: opacity 200ms ease;">
+            <img src="img/holly-chair.jpg" alt="{{gallery.alt3}}" width="1200" height="800" data-fade="" style="position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; opacity: {{gallery.o3}}; transition: opacity 200ms ease;">
+          </div>
+          <figcaption aria-live="polite" style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">{{gallery.caption}}</figcaption>
+          <div style="margin-top: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <button type="button" aria-label="Previous photo" onClick="{{gallery.prev}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12 4.5L6.5 10L12 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+              <p style="margin: 0; min-width: 3rem; text-align: center; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums;">{{gallery.counter}}</p>
+              <button type="button" aria-label="Next photo" onClick="{{gallery.next}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink);"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M8 4.5L13.5 10L8 15.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            </div>
+            
+          </div>
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.375rem;">
+            <button type="button" aria-label="Photo 1 of 4" aria-pressed="{{gallery.p0}}" onClick="{{gallery.pick0}}" style="appearance: none; font: inherit; cursor: pointer; flex: 0 0 auto; width: 3rem; height: 3rem; padding: 0; border: 2px solid {{gallery.b0}}; border-radius: 6px; background: var(--peek); overflow: hidden;"><img src="img/seth.jpg" alt="" width="922" height="1153" style="display: block; width: 100%; height: 100%; object-fit: cover;"></button>
+            <button type="button" aria-label="Photo 2 of 4" aria-pressed="{{gallery.p1}}" onClick="{{gallery.pick1}}" style="appearance: none; font: inherit; cursor: pointer; flex: 0 0 auto; width: 3rem; height: 3rem; padding: 0; border: 2px solid {{gallery.b1}}; border-radius: 6px; background: var(--peek); overflow: hidden;"><img src="img/seth-holly.jpg" alt="" width="800" height="1200" style="display: block; width: 100%; height: 100%; object-fit: cover;"></button>
+            <button type="button" aria-label="Photo 3 of 4" aria-pressed="{{gallery.p2}}" onClick="{{gallery.pick2}}" style="appearance: none; font: inherit; cursor: pointer; flex: 0 0 auto; width: 3rem; height: 3rem; padding: 0; border: 2px solid {{gallery.b2}}; border-radius: 6px; background: var(--peek); overflow: hidden;"><img src="img/holly-collar.jpg" alt="" width="800" height="1200" style="display: block; width: 100%; height: 100%; object-fit: cover;"></button>
+            <button type="button" aria-label="Photo 4 of 4" aria-pressed="{{gallery.p3}}" onClick="{{gallery.pick3}}" style="appearance: none; font: inherit; cursor: pointer; flex: 0 0 auto; width: 3rem; height: 3rem; padding: 0; border: 2px solid {{gallery.b3}}; border-radius: 6px; background: var(--peek); overflow: hidden;"><img src="img/holly-chair.jpg" alt="" width="1200" height="800" style="display: block; width: 100%; height: 100%; object-fit: cover;"></button>
+          </div>
+        </figure>
+    </section>
+
+    <section aria-labelledby="skills-title" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem;">
+      <h2 id="skills-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Skills</h2>
+      <dl style="margin: 1.25rem 0 0; font-size: 1rem; line-height: 1.625rem; border-bottom: 1px solid var(--rule);">
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">AI &amp; LLMs</dt><dd style="margin: 0;">Generative AI (LLM) integration, Claude Code, multi-model orchestration and review (Claude, OpenAI, DeepSeek), a multi-model audit harness where Claude, Codex and DeepSeek independently review every plan and pull request, model routing by cost and risk, prompt engineering, AI-assisted customer service, chatbots, ML recommendation engines</dd></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Automation &amp; Workflows</dt><dd style="margin: 0;">Ticket-to-PR AI pipelines (Trello, Linear, GitHub), including Trailhead, a self-built pipeline that turns tickets into reviewed pull requests; human-in-the-loop approval gates, event-driven automation (AWS Lambda, SQS, SNS, Upstash QStash), scheduled jobs, CI/CD automation, Playwright UI verification judged by AI verifiers, artifact-driven development with a clickable mock-up before every feature</dd></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">TechOps &amp; Infrastructure</dt><dd style="margin: 0;">Docker, ephemeral containers, Linux (Debian), systemd, Tailscale, Kubernetes, Terraform, AWS (Lambda, ECS, S3, RDS, CDK), Google Cloud (Cloud Run, Cloud Build, Secret Manager), Cloudflare (Workers, D1, KV), Vercel, Render, Supabase, a self-hosted Docker Compose stack behind Traefik, monitoring (Sentry, CloudWatch)</dd></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Engineering</dt><dd style="margin: 0;">TypeScript, Node.js, NestJS, Express.js, Python (FastAPI), REST and GraphQL APIs, React, Next.js, Vue.js, React Native and Expo, Tailwind, PostgreSQL, MySQL, MongoDB, Redis, Prisma, Drizzle, Stripe, Turborepo and pnpm monorepos</dd></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Security &amp; Governance</dt><dd style="margin: 0;">Credential isolation, secrets management, IAM and least privilege, RBAC, OAuth, audit trails, human review before production changes, security headers and a content security policy, rate limiting, rotating refresh tokens in httpOnly cookies</dd></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Project Leadership</dt><dd style="margin: 0;">Requirements gathering, delivery planning, estimation, stakeholder communication, technical documentation, mentoring, Agile Scrum, Kanban, Lean IT (APMG certified)</dd></div>
+      </dl>
+    </section>
+
+    <section aria-label="Christine" style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; padding-top: 3rem; padding-bottom: 0;">
+      <figure style="margin: 0 auto 2rem; width: 14rem;">
+        <img src="img/seth-holly.jpg" alt="Seth on the sofa with Holly on his lap" width="800" height="1000" style="display: block; width: 14rem; height: 17.5rem; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 40%; border-radius: 4px;">
+        <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">With Holly, off the clock</figcaption>
+      </figure>
+      <p style="margin: 0; padding-top: 2rem; border-top: 2px solid var(--ink); font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">The other half of StudioSC is Christine, who tests all of it. <a href="/christine">Meet Christine</a></p>
+    </section>
+
+  </main>
+
+  <footer style="margin-top: 3.5rem; border-top: 1px solid var(--rule); padding: 2rem 1rem 0;">
+    <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem;">StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+    <nav aria-label="Footer" style="margin-top: 1rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+      <a href="/work" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Work</a>
+      <a href="/blog" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Writing</a>
+      <a href="/about" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">About</a>
+      <a href="/contact" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Contact</a>
+      <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Seth on LinkedIn</a>
+      <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Christine on LinkedIn</a>
+      <a href="https://github.com/StudioSC-dev" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">StudioSC-dev on GitHub</a>
+    </nav>
+    <p style="margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":6510}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+
+
+    // Gallery: one photo at a time with a 200ms crossfade; thumbnails, back and next all pick a photo. Stand-in photos and placeholder captions until the owner supplies them.
+    const shots = [["img/seth.jpg", "Seth smiling, his chin resting on his hand", "[PLACEHOLDER]"], ["img/seth-holly.jpg", "Seth on the sofa with Holly on his lap", "[PLACEHOLDER]"], ["img/holly-collar.jpg", "Holly on the sofa in a red gingham flower collar", "[PLACEHOLDER]"], ["img/holly-chair.jpg", "Holly on an outdoor cafe chair with her tongue out", "[PLACEHOLDER]"]];
+    const n = shots.length;
+    const g = typeof st.g === 'number' ? st.g : 0;
+    const go = (i) => () => set({ g: (i + n) % n });
+    const gallery = { counter: (g + 1) + ' / ' + n, caption: shots[g][2], prev: go(g - 1), next: go(g + 1) };
+    shots.forEach((s, i) => {
+      gallery['o' + i] = i === g ? '1' : '0';
+      gallery['alt' + i] = i === g ? s[1] : '';
+      gallery['p' + i] = i === g ? 'true' : 'false';
+      gallery['b' + i] = i === g ? 'var(--ink)' : 'var(--rule)';
+      gallery['pick' + i] = go(i);
+    });
+    return {
+      t: theme,
+      gallery,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

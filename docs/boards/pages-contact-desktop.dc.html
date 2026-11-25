@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — Start a project</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --error: {{t.error}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery);">
+
+  <header style="position: relative; z-index: 2;">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; height: 5.5rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+      <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem; letter-spacing: -0.01em; text-decoration: none;">StudioSC</a>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <nav aria-label="Main">
+          <ul style="display: flex; align-items: center; gap: 2rem; list-style: none; margin: 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 500;">
+            <li><a href="/work" style="text-decoration: none;">Work</a></li>
+            <li><a href="/seth" style="text-decoration: none;">Seth</a></li>
+            <li><a href="/christine" style="text-decoration: none;">Christine</a></li>
+            <li><a href="/blog" style="text-decoration: none;">Writing</a></li>
+            <li><a href="/contact" aria-current="page" style="display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.125rem; border-radius: 6px; background: var(--ink); color: var(--gallery); text-decoration: none; font-weight: 600;">Start a project</a></li>
+          </ul>
+        </nav>
+        <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Review only: switches the drawn state. Not part of the page. -->
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; padding-top: 0.5rem;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.5rem 0.75rem; border: 1px dashed var(--muted); border-radius: 6px;">
+        <p style="margin: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">Mock-up state, not part of the page</p>
+        <div role="group" aria-label="Mock-up state" style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <sc-for list="{{states}}" as="f" hint-placeholder-count="4">
+            <button type="button" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}" style="appearance: none; font: inherit; cursor: pointer; min-height: 2.75rem; padding: 0 1rem; border: 1px solid var(--ink); border-radius: 999px; background: {{f.bg}}; color: {{f.fg}}; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">{{f.label}}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <!-- Contact: projects only; job enquiries go to the person pages -->
+    <section aria-labelledby="contact-title" style="position: relative;">
+      <svg aria-hidden="true" width="220" height="620" viewBox="0 0 220 620" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M112.5 4.5h0M148.5 4.5h0M166.5 4.5h0M184.5 4.5h0M193.5 4.5h0M202.5 4.5h0M211.5 4.5h0M157.5 13.5h0M175.5 13.5h0M193.5 13.5h0M211.5 13.5h0M130.5 22.5h0M148.5 22.5h0M166.5 22.5h0M184.5 22.5h0M202.5 22.5h0M211.5 22.5h0M175.5 31.5h0M193.5 31.5h0M211.5 31.5h0M112.5 40.5h0M130.5 40.5h0M148.5 40.5h0M166.5 40.5h0M184.5 40.5h0M193.5 40.5h0M202.5 40.5h0M211.5 40.5h0M157.5 49.5h0M175.5 49.5h0M193.5 49.5h0M211.5 49.5h0M130.5 58.5h0M148.5 58.5h0M166.5 58.5h0M184.5 58.5h0M202.5 58.5h0M211.5 58.5h0M175.5 67.5h0M193.5 67.5h0M211.5 67.5h0M112.5 76.5h0M148.5 76.5h0M166.5 76.5h0M184.5 76.5h0M193.5 76.5h0M202.5 76.5h0M211.5 76.5h0M157.5 85.5h0M175.5 85.5h0M193.5 85.5h0M211.5 85.5h0M130.5 94.5h0M148.5 94.5h0M166.5 94.5h0M184.5 94.5h0M202.5 94.5h0M211.5 94.5h0M175.5 103.5h0M193.5 103.5h0M211.5 103.5h0M112.5 112.5h0M148.5 112.5h0M166.5 112.5h0M184.5 112.5h0M193.5 112.5h0M202.5 112.5h0M211.5 112.5h0M175.5 121.5h0M193.5 121.5h0M211.5 121.5h0M130.5 130.5h0M166.5 130.5h0M184.5 130.5h0M202.5 130.5h0M211.5 130.5h0M175.5 139.5h0M193.5 139.5h0M211.5 139.5h0M112.5 148.5h0M148.5 148.5h0M166.5 148.5h0M184.5 148.5h0M193.5 148.5h0M202.5 148.5h0M211.5 148.5h0M157.5 157.5h0M175.5 157.5h0M193.5 157.5h0M211.5 157.5h0M130.5 166.5h0M148.5 166.5h0M166.5 166.5h0M184.5 166.5h0M202.5 166.5h0M211.5 166.5h0M175.5 175.5h0M193.5 175.5h0M211.5 175.5h0M112.5 184.5h0M148.5 184.5h0M166.5 184.5h0M184.5 184.5h0M193.5 184.5h0M202.5 184.5h0M211.5 184.5h0M193.5 193.5h0M211.5 193.5h0M130.5 202.5h0M166.5 202.5h0M184.5 202.5h0M202.5 202.5h0M211.5 202.5h0M175.5 211.5h0M193.5 211.5h0M211.5 211.5h0M112.5 220.5h0M148.5 220.5h0M166.5 220.5h0M184.5 220.5h0M202.5 220.5h0M157.5 229.5h0M193.5 229.5h0M211.5 229.5h0M130.5 238.5h0M148.5 238.5h0M166.5 238.5h0M184.5 238.5h0M202.5 238.5h0M211.5 238.5h0M175.5 247.5h0M193.5 247.5h0M211.5 247.5h0M112.5 256.5h0M148.5 256.5h0M166.5 256.5h0M184.5 256.5h0M202.5 256.5h0M193.5 265.5h0M211.5 265.5h0M130.5 274.5h0M166.5 274.5h0M184.5 274.5h0M202.5 274.5h0M211.5 274.5h0M193.5 283.5h0M211.5 283.5h0M112.5 292.5h0M148.5 292.5h0M166.5 292.5h0M184.5 292.5h0M202.5 292.5h0M193.5 301.5h0M211.5 301.5h0M130.5 310.5h0M166.5 310.5h0M184.5 310.5h0M202.5 310.5h0M175.5 319.5h0M211.5 319.5h0M112.5 328.5h0M148.5 328.5h0M166.5 328.5h0M184.5 328.5h0M202.5 328.5h0M193.5 337.5h0M211.5 337.5h0M130.5 346.5h0M166.5 346.5h0M184.5 346.5h0M202.5 346.5h0M211.5 355.5h0M148.5 364.5h0M166.5 364.5h0M184.5 364.5h0M202.5 364.5h0M193.5 373.5h0M211.5 373.5h0M166.5 382.5h0M184.5 382.5h0M202.5 382.5h0M211.5 391.5h0M112.5 400.5h0M148.5 400.5h0M166.5 400.5h0M184.5 400.5h0M202.5 400.5h0M193.5 409.5h0M211.5 409.5h0M166.5 418.5h0M184.5 418.5h0M202.5 418.5h0M211.5 427.5h0M148.5 436.5h0M166.5 436.5h0M184.5 436.5h0M202.5 436.5h0M193.5 445.5h0M166.5 454.5h0M184.5 454.5h0M202.5 454.5h0M211.5 463.5h0M112.5 472.5h0M148.5 472.5h0M184.5 472.5h0M202.5 472.5h0M166.5 490.5h0M184.5 490.5h0M202.5 490.5h0M148.5 508.5h0M166.5 508.5h0M184.5 508.5h0M202.5 508.5h0M166.5 526.5h0M202.5 526.5h0M148.5 544.5h0M184.5 544.5h0M202.5 544.5h0M202.5 562.5h0M148.5 580.5h0M184.5 580.5h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative; box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 0 2.5rem; padding-top: 3rem; padding-bottom: 6rem; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 4rem; align-items: start;">
+        <div>
+          <h1 id="contact-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 5.75rem; line-height: 5.75rem; letter-spacing: -0.04em;">Start a project</h1>
+          <p style="margin: 1.25rem 0 0; font-size: 1.25rem; line-height: 1.875rem;">Tell us about the idea, even if it's half of one.</p>
+          <div style="margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);">
+          <h2 style="margin: 0; font-size: 1rem; line-height: 1.5rem; font-weight: 600;">Hiring for a role?</h2>
+          <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem;">This form is for projects. For jobs, go straight to <a href="/seth">Seth's page</a> or <a href="/christine">Christine's page</a>, where you'll find our CVs and email addresses.</p>
+        </div>
+        </div>
+        <div style="box-sizing: border-box; padding: 2.5rem; background: var(--plate); border: 1px solid var(--ink); border-radius: 14px;">
+          <sc-if value="{{form.open}}" hint-placeholder-val="{{ true }}">
+            <form aria-labelledby="form-title" novalidate="" style="margin: 0;">
+              <h2 id="form-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">Tell us about it</h2>
+              <sc-if value="{{form.err}}" hint-placeholder-val="{{ false }}">
+                <div role="alert" style="margin-top: 1rem; padding: 1rem 1.125rem; border: 2px solid var(--error); border-radius: 6px;">
+                  <p style="margin: 0; font-weight: 600; color: var(--error);">Three things need fixing before we can send this.</p>
+                  <ul style="margin: 0.375rem 0 0; padding-left: 1.25rem; font-size: 0.9375rem; line-height: 1.5rem;"><li><a href="#f-name">Enter your name</a></li><li><a href="#f-email">Enter an email address, like name@example.com</a></li><li><a href="#f-msg">Tell us a little about what you need</a></li></ul>
+                </div>
+              </sc-if>
+              <div style="margin-top: 1.25rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem;">
+                <div><label for="f-name" style="display: block; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Your name</label><input id="f-name" name="name" type="text" autocomplete="name" aria-invalid="{{form.invalid}}" aria-describedby="{{form.nameErr}}" style="display: block; width: 100%; margin-top: 0.375rem; box-sizing: border-box; min-height: 3rem; padding: 0.625rem 0.875rem; border: {{form.line}}; border-radius: 6px; background: var(--plate); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.5rem;"><sc-if value="{{form.err}}" hint-placeholder-val="{{ false }}"><p id="f-name-err" style="margin: 0.375rem 0 0; display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--error);"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6V10.5M10 13.5H10.01" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path></svg>Enter your name</p></sc-if></div>
+                <div><label for="f-email" style="display: block; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Email</label><input id="f-email" name="email" type="email" autocomplete="email" aria-invalid="{{form.invalid}}" aria-describedby="{{form.emailErr}}" style="display: block; width: 100%; margin-top: 0.375rem; box-sizing: border-box; min-height: 3rem; padding: 0.625rem 0.875rem; border: {{form.line}}; border-radius: 6px; background: var(--plate); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.5rem;"><sc-if value="{{form.err}}" hint-placeholder-val="{{ false }}"><p id="f-email-err" style="margin: 0.375rem 0 0; display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--error);"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6V10.5M10 13.5H10.01" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path></svg>Enter an email address, like name@example.com</p></sc-if></div>
+              </div>
+              <fieldset style="margin: 1.25rem 0 0; padding: 0; border: 0; min-width: 0;">
+                <legend style="padding: 0; display: block; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">What do you need? <span style="font-weight: 400; color: var(--muted);">Optional</span></legend>
+                <div style="margin-top: 0.25rem; display: flex; flex-wrap: wrap; gap: 0 1.5rem;"><label style="display: flex; align-items: center; gap: 0.625rem; min-height: 2.75rem; font-size: 1rem; line-height: 1.5rem;"><input type="radio" name="need" value="build" style="width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--accent);">Build something new</label><label style="display: flex; align-items: center; gap: 0.625rem; min-height: 2.75rem; font-size: 1rem; line-height: 1.5rem;"><input type="radio" name="need" value="test" style="width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--accent);">Test something you already have</label><label style="display: flex; align-items: center; gap: 0.625rem; min-height: 2.75rem; font-size: 1rem; line-height: 1.5rem;"><input type="radio" name="need" value="both" style="width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--accent);">Both</label></div>
+              </fieldset>
+              <div style="margin-top: 1.25rem;"><label for="f-msg" style="display: block; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">The project or idea</label><textarea id="f-msg" name="message" rows="6" aria-invalid="{{form.invalid}}" aria-describedby="f-msg-hint {{form.msgErr}}" style="display: block; width: 100%; margin-top: 0.375rem; box-sizing: border-box; min-height: 3rem; padding: 0.625rem 0.875rem; border: {{form.line}}; border-radius: 6px; background: var(--plate); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.5rem; resize: vertical;"></textarea><p id="f-msg-hint" style="margin: 0.375rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Half an idea is fine. A link to what you have helps.</p><sc-if value="{{form.err}}" hint-placeholder-val="{{ false }}"><p id="f-msg-err" style="margin: 0.375rem 0 0; display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; color: var(--error);"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 6V10.5M10 13.5H10.01" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"></path></svg>Tell us a little about what you need</p></sc-if></div>
+              <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;">
+                <button type="button" onClick="{{form.send}}" style="appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery); border: 0;">Send message<svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M4 10H16M11 5L16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                <p style="margin: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">We reply by email within 2 working days.</p>
+              </div>
+            </form>
+          </sc-if>
+          <sc-if value="{{form.sent}}" hint-placeholder-val="{{ false }}">
+            <div role="status">
+              <svg aria-hidden="true" width="40" height="40" viewBox="0 0 40 40" fill="none" style="display: block; color: var(--accent);"><circle cx="20" cy="20" r="18.25" stroke="currentColor" stroke-width="1.5"></circle><path d="M12.5 20.5L17.5 25.5L27.5 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <h2 style="margin: 1rem 0 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2rem; line-height: 2.5rem; letter-spacing: -0.015em;">Thanks. Your message is with us.</h2>
+              <p style="margin: 0.5rem 0 0;">Seth and Christine both read it, and one of us will reply by email.</p>
+              <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+                <a href="/work" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 1px solid var(--ink); color: var(--ink);">See what we've built</a>
+                <button type="button" onClick="{{form.again}}" style="appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 0; background: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 0.2em;">Send another message</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="border-top: 1px solid var(--rule);">
+    <div style="box-sizing: content-box; max-width: 75rem; margin: 0 auto; padding: 2.5rem 2.5rem 2.5rem; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 9fr); gap: 1.5rem 2rem;">
+      <div>
+        <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.375rem; line-height: 1.75rem;">StudioSC</p>
+        <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+      </div>
+      <nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; align-content: start; font-size: 0.9375rem; line-height: 1.5rem;">
+        <a href="/work" style="text-decoration: none;">Work</a>
+        <a href="/blog" style="text-decoration: none;">Writing</a>
+        <a href="/about" style="text-decoration: none;">About</a>
+        <a href="/contact" style="text-decoration: none;">Contact</a>
+        <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="text-decoration: none;">Seth on LinkedIn</a>
+        <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="text-decoration: none;">Christine on LinkedIn</a>
+        <a href="https://github.com/StudioSC-dev" style="text-decoration: none;">StudioSC-dev on GitHub</a>
+      </nav>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+      <p style="margin: 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1340}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+    const chips = (defs, cur, key) => defs.map(([k, label]) => ({
+      label,
+      pressed: k === cur ? 'true' : 'false',
+      bg: k === cur ? 'var(--ink)' : 'transparent',
+      fg: k === cur ? 'var(--gallery)' : 'var(--ink)',
+      pick: () => set({ [key]: k })
+    }));
+    // Mock-up states: empty, error (Send pressed with nothing filled in) and sent. Send moves empty -> error -> sent.
+    const view = st.view || 'empty';
+    const err = view === 'error';
+    const states = chips([['empty', 'Empty'], ['error', 'Error'], ['sent', 'Sent']], view, 'view');
+    const form = {
+      open: view !== 'sent',
+      sent: view === 'sent',
+      err,
+      invalid: err ? 'true' : 'false',
+      line: err ? '2px solid var(--error)' : '1px solid var(--muted)',
+      nameErr: err ? 'f-name-err' : '',
+      emailErr: err ? 'f-email-err' : '',
+      msgErr: err ? 'f-msg-err' : '',
+      send: () => set({ view: view === 'empty' ? 'error' : 'sent' }),
+      again: () => set({ view: 'empty' })
+    };
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' },
+      states,
+      form
+    };
+  }
+}
+</script>
+</body>
+</html>
