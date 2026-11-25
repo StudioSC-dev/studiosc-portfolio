@@ -1,0 +1,2604 @@
+{
+  "version": 1,
+  "clock": "2026-11-20T12:00:00+08:00",
+  "timezone": "Asia/Manila",
+  "viewports": {
+    "1440": {
+      "width": 1440,
+      "height": 900
+    },
+    "390": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "theme": {
+    "light": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Switch to the dark theme"
+        }
+      }
+    ],
+    "dark": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Switch to the light theme"
+        }
+      }
+    ]
+  },
+  "keys": {
+    "heading": "h1, h2, h3, h4",
+    "control": "a[href], button, input, select, textarea, [role=\"tab\"]",
+    "frame": "[aria-roledescription=\"slide\"], article, figure",
+    "image": "img",
+    "text": "p, dt, dd, figcaption, label"
+  },
+  "states": {
+    "chips-back": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories forward"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories back"
+          }
+        }
+      ],
+      "widths": [
+        "390"
+      ]
+    },
+    "chips-forward": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Scroll the categories forward"
+          }
+        }
+      ],
+      "widths": [
+        "390"
+      ]
+    },
+    "contact-error": {
+      "board": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Error"
+          }
+        }
+      ],
+      "site": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Send message"
+          }
+        }
+      ]
+    },
+    "contact-sent": {
+      "board": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Sent"
+          }
+        }
+      ],
+      "site": [
+        {
+          "mock": {
+            "url": "**/api/contact",
+            "status": 200,
+            "body": "{\"success\":true}"
+          }
+        },
+        {
+          "fill": {
+            "target": {
+              "role": "textbox",
+              "name": "Your name"
+            },
+            "value": "Ana Reyes"
+          }
+        },
+        {
+          "fill": {
+            "target": {
+              "role": "textbox",
+              "name": "Email"
+            },
+            "value": "ana@example.com"
+          }
+        },
+        {
+          "fill": {
+            "target": {
+              "role": "textbox",
+              "name": "The project or idea"
+            },
+            "value": "A booking page for a small clinic."
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Send message"
+          }
+        }
+      ]
+    },
+    "filter-cc": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Central Command"
+          }
+        }
+      ]
+    },
+    "filter-dev": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "In development"
+          }
+        }
+      ]
+    },
+    "filter-live": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Live"
+          }
+        }
+      ]
+    },
+    "filter-qa": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "In QA"
+          }
+        }
+      ]
+    },
+    "filter-site": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "This site"
+          }
+        }
+      ]
+    },
+    "filter-tt": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Tally & Trace"
+          }
+        }
+      ]
+    },
+    "filter-workflow": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Our workflow"
+          }
+        }
+      ]
+    },
+    "gallery-2": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-4": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-5": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-prev": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Previous photo"
+          }
+        }
+      ]
+    },
+    "holly-2": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-4": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-5": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-6": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-prev": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Previous photo of Holly"
+          }
+        }
+      ]
+    },
+    "holly-treat": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Give Holly a treat"
+          }
+        }
+      ]
+    },
+    "plate-next": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next plate"
+          }
+        }
+      ]
+    },
+    "plate-prev": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Previous plate"
+          }
+        }
+      ]
+    },
+    "tab-3d": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "3D & motion"
+          }
+        }
+      ]
+    },
+    "tab-ai": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "AI features"
+          }
+        }
+      ]
+    },
+    "tab-finance": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Finance"
+          }
+        }
+      ]
+    },
+    "tab-mobile": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Mobile"
+          }
+        }
+      ]
+    },
+    "tab-sites": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Sites"
+          }
+        }
+      ]
+    },
+    "tab-testing": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Testing"
+          }
+        }
+      ]
+    },
+    "theme-reveal": {
+      "toggleTheme": true,
+      "inFlight": true
+    }
+  },
+  "rows": [
+    {
+      "id": "chrome/header",
+      "section": "header",
+      "route": "/",
+      "ticket": "PRV-4",
+      "built": false,
+      "board": "header:not(main header)",
+      "site": "[data-board-section=\"chrome/header\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "theme-reveal"
+      ],
+      "pageMotion": true,
+      "later": [
+        {
+          "ticket": "PRV-10",
+          "hide": [
+            {
+              "selector": "a[href=\"/seth\"], a[href=\"/christine\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chrome/footer",
+      "section": "footer",
+      "route": "/",
+      "ticket": "PRV-4",
+      "built": false,
+      "board": "footer:not(main footer)",
+      "site": "[data-board-section=\"chrome/footer\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "home/opener",
+      "section": "opener",
+      "route": "/preview/home",
+      "ticket": "PRV-5",
+      "built": false,
+      "board": "[aria-labelledby=\"range-title\"]",
+      "site": "[data-board-section=\"home/opener\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "home/range",
+      "section": "range",
+      "route": "/preview/home",
+      "ticket": "PRV-5",
+      "built": false,
+      "board": "#cabinet",
+      "site": "[data-board-section=\"home/range\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "tab-finance",
+        "tab-mobile",
+        "tab-ai",
+        "tab-3d",
+        "tab-sites",
+        "tab-testing",
+        "plate-next",
+        "plate-prev",
+        "chips-forward",
+        "chips-back"
+      ],
+      "keys": {
+        "peek-left": {
+          "board": "#cabinet div[aria-hidden]:first-child",
+          "site": "[data-board-key=\"peek-left\"]"
+        },
+        "peek-right": {
+          "board": "#cabinet div[aria-hidden]:last-child",
+          "site": "[data-board-key=\"peek-right\"]"
+        }
+      }
+    },
+    {
+      "id": "home/plate-dashboards",
+      "section": "plate-dashboards",
+      "route": "/preview/home",
+      "ticket": "PRV-5",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Dashboards,\"]",
+      "site": "[data-board-section=\"home/plate-dashboards\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-finance",
+      "section": "plate-finance",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]",
+      "site": "[data-board-section=\"home/plate-finance\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-finance",
+        "plate-next"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-mobile",
+      "section": "plate-mobile",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]",
+      "site": "[data-board-section=\"home/plate-mobile\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-mobile"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-ai",
+      "section": "plate-ai",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]",
+      "site": "[data-board-section=\"home/plate-ai\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-ai"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-3d",
+      "section": "plate-3d",
+      "route": "/preview/home",
+      "ticket": "PRV-7",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]",
+      "site": "[data-board-section=\"home/plate-3d\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-3d"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-sites",
+      "section": "plate-sites",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]",
+      "site": "[data-board-section=\"home/plate-sites\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-sites"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/plate-testing",
+      "section": "plate-testing",
+      "route": "/preview/home",
+      "ticket": "PRV-6",
+      "built": false,
+      "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]",
+      "site": "[data-board-section=\"home/plate-testing\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "tab-testing",
+        "plate-prev"
+      ],
+      "parent": "home/range"
+    },
+    {
+      "id": "home/people",
+      "section": "people",
+      "route": "/preview/home",
+      "ticket": "PRV-8",
+      "built": false,
+      "board": "#people",
+      "site": "[data-board-section=\"home/people\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home/holly",
+      "section": "holly",
+      "route": "/preview/home",
+      "ticket": "PRV-9",
+      "built": false,
+      "board": "[aria-labelledby=\"holly-title\"]",
+      "site": "[data-board-section=\"home/holly\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "holly-2",
+        "holly-3",
+        "holly-4",
+        "holly-5",
+        "holly-6",
+        "holly-prev",
+        "holly-treat"
+      ]
+    },
+    {
+      "id": "home/three",
+      "section": "three",
+      "route": "/preview/home",
+      "ticket": "PRV-9",
+      "built": false,
+      "board": "main > div:has(figure)",
+      "site": "[data-board-section=\"home/three\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "home/writing",
+      "section": "writing",
+      "route": "/preview/home",
+      "ticket": "PRV-11",
+      "built": false,
+      "board": "[aria-labelledby=\"writing-title\"]",
+      "site": "[data-board-section=\"home/writing\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "links": [
+        {
+          "selector": "a[href=\"/blog/work\"]",
+          "to": "/blog/work"
+        },
+        {
+          "selector": "a[href=\"/blog/life\"]",
+          "to": "/blog/life"
+        }
+      ]
+    },
+    {
+      "id": "home/work",
+      "section": "work",
+      "route": "/preview/home",
+      "ticket": "PRV-11",
+      "built": false,
+      "board": "#work",
+      "site": "[data-board-section=\"home/work\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "range-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "home/contact",
+      "section": "contact",
+      "route": "/preview/home",
+      "ticket": "PRV-11",
+      "built": false,
+      "board": "[aria-labelledby=\"contact-title\"]",
+      "site": "[data-board-section=\"home/contact\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-light-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "seth/title",
+      "section": "title",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"person-name\"]",
+      "site": "[data-board-section=\"seth/title\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seth/work",
+      "section": "work",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"work-title\"]",
+      "site": "[data-board-section=\"seth/work\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "seth/clients",
+      "section": "clients",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"clients-title\"]",
+      "site": "[data-board-section=\"seth/clients\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "seth/highlights",
+      "section": "highlights",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"hl-title\"]",
+      "site": "[data-board-section=\"seth/highlights\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "seth/photos",
+      "section": "photos",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"photos-title\"]",
+      "site": "[data-board-section=\"seth/photos\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "gallery-2",
+        "gallery-3",
+        "gallery-4",
+        "gallery-prev"
+      ]
+    },
+    {
+      "id": "seth/skills",
+      "section": "skills",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"skills-title\"]",
+      "site": "[data-board-section=\"seth/skills\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "seth/other",
+      "section": "other",
+      "route": "/seth",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "section[aria-label=\"Christine\"]",
+      "site": "[data-board-section=\"seth/other\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-seth-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-seth-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "christine/title",
+      "section": "title",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"person-name\"]",
+      "site": "[data-board-section=\"christine/title\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "christine/work",
+      "section": "work",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"work-title\"]",
+      "site": "[data-board-section=\"christine/work\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "christine/highlights",
+      "section": "highlights",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"hl-title\"]",
+      "site": "[data-board-section=\"christine/highlights\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "christine/photos",
+      "section": "photos",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"photos-title\"]",
+      "site": "[data-board-section=\"christine/photos\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "gallery-2",
+        "gallery-3",
+        "gallery-4",
+        "gallery-prev"
+      ]
+    },
+    {
+      "id": "christine/skills",
+      "section": "skills",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "[aria-labelledby=\"skills-title\"]",
+      "site": "[data-board-section=\"christine/skills\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "christine/other",
+      "section": "other",
+      "route": "/christine",
+      "ticket": "PRV-10",
+      "built": false,
+      "board": "section[aria-label=\"Seth\"]",
+      "site": "[data-board-section=\"christine/other\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "range-profile-christine-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-christine-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/title",
+      "section": "title",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"case-title\"]",
+      "site": "[data-board-section=\"case/title\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/lead",
+      "section": "lead",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-13",
+      "built": false,
+      "board": "main > div",
+      "site": "[data-board-section=\"case/lead\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/why",
+      "section": "why",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"why-title\"]",
+      "site": "[data-board-section=\"case/why\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/who",
+      "section": "who",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "section[aria-label=\"Who did what\"]",
+      "site": "[data-board-section=\"case/who\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/does",
+      "section": "does",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"does-title\"]",
+      "site": "[data-board-section=\"case/does\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/shots",
+      "section": "shots",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-13",
+      "built": false,
+      "board": "[aria-labelledby=\"shots-title\"]",
+      "site": "[data-board-section=\"case/shots\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/stack",
+      "section": "stack",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"stack-title\"]",
+      "site": "[data-board-section=\"case/stack\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/posts",
+      "section": "posts",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"posts-title\"]",
+      "site": "[data-board-section=\"case/posts\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/more",
+      "section": "more",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "nav[aria-label=\"More projects\"]",
+      "site": "[data-board-section=\"case/more\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "case/contact",
+      "section": "contact",
+      "route": "/work/tallyandtrace",
+      "ticket": "PRV-12",
+      "built": false,
+      "board": "[aria-labelledby=\"contact-title\"]",
+      "site": "[data-board-section=\"case/contact\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-case-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "work/list",
+      "section": "list",
+      "route": "/work",
+      "ticket": "PRV-11",
+      "built": false,
+      "board": "[aria-labelledby=\"work-title\"]",
+      "site": "[data-board-section=\"work/list\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-work-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-work-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "filter-live",
+        "filter-qa",
+        "filter-dev"
+      ]
+    },
+    {
+      "id": "work/contact",
+      "section": "contact",
+      "route": "/work",
+      "ticket": "PRV-11",
+      "built": false,
+      "board": "[aria-labelledby=\"contact-title\"]",
+      "site": "[data-board-section=\"work/contact\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "blog-work/list",
+      "section": "list",
+      "route": "/blog/work",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "[aria-labelledby=\"blog-title\"]",
+      "site": "[data-board-section=\"blog-work/list\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-blog-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-blog-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-blog-work-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-blog-work-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "filter-tt",
+        "filter-cc",
+        "filter-site",
+        "filter-workflow"
+      ]
+    },
+    {
+      "id": "blog-life/list",
+      "section": "list",
+      "route": "/blog/life",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "[aria-labelledby=\"blog-title\"]",
+      "site": "[data-board-section=\"blog-life/list\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-blog-life-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-blog-life-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-blog-life-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-blog-life-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-work/header",
+      "section": "header",
+      "route": "/blog/tallyandtrace-per-account-solvency",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "main > header",
+      "site": "[data-board-section=\"post-work/header\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-work/article",
+      "section": "article",
+      "route": "/blog/tallyandtrace-per-account-solvency",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "article",
+      "site": "[data-board-section=\"post-work/article\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-work/toc",
+      "section": "toc",
+      "route": "/blog/tallyandtrace-per-account-solvency",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "aside[aria-label=\"On this page\"]",
+      "site": "[data-board-section=\"post-work/toc\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-work/more",
+      "section": "more",
+      "route": "/blog/tallyandtrace-per-account-solvency",
+      "ticket": "PRV-14",
+      "built": false,
+      "board": "nav[aria-label=\"More posts\"]",
+      "site": "[data-board-section=\"post-work/more\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-work-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-life/header",
+      "section": "header",
+      "route": "/blog/first-marathon",
+      "ticket": "PRV-16",
+      "built": false,
+      "board": "main > header",
+      "site": "[data-board-section=\"post-life/header\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-life/article",
+      "section": "article",
+      "route": "/blog/first-marathon",
+      "ticket": "PRV-16",
+      "built": false,
+      "board": "article",
+      "site": "[data-board-section=\"post-life/article\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "post-life/gallery",
+      "section": "gallery",
+      "route": "/blog/first-marathon",
+      "ticket": "PRV-16",
+      "built": false,
+      "board": "figure[aria-label=\"Gallery\"]",
+      "site": "[data-board-section=\"post-life/gallery\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "gallery-2",
+        "gallery-3",
+        "gallery-4",
+        "gallery-5",
+        "gallery-6",
+        "gallery-prev"
+      ],
+      "parent": "post-life/article"
+    },
+    {
+      "id": "post-life/more",
+      "section": "more",
+      "route": "/blog/first-marathon",
+      "ticket": "PRV-16",
+      "built": false,
+      "board": "nav[aria-label=\"More posts\"]",
+      "site": "[data-board-section=\"post-life/more\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-post-life-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "contact/form",
+      "section": "form",
+      "route": "/contact",
+      "ticket": "PRV-15",
+      "built": false,
+      "board": "[aria-labelledby=\"contact-title\"]",
+      "site": "[data-board-section=\"contact/form\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-contact-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-contact-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-contact-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-contact-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "contact-error",
+        "contact-sent"
+      ]
+    },
+    {
+      "id": "about/title",
+      "section": "title",
+      "route": "/about",
+      "ticket": "PRV-8",
+      "built": false,
+      "board": "[aria-labelledby=\"about-title\"]",
+      "site": "[data-board-section=\"about/title\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "about/people",
+      "section": "people",
+      "route": "/about",
+      "ticket": "PRV-8",
+      "built": false,
+      "board": "#people",
+      "site": "[data-board-section=\"about/people\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ],
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "about/believe",
+      "section": "believe",
+      "route": "/about",
+      "ticket": "PRV-8",
+      "built": false,
+      "board": "[aria-labelledby=\"believe-title\"]",
+      "site": "[data-board-section=\"about/believe\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "about/contact",
+      "section": "contact",
+      "route": "/about",
+      "ticket": "PRV-8",
+      "built": false,
+      "board": "[aria-labelledby=\"contact-title\"]",
+      "site": "[data-board-section=\"about/contact\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-about-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "404/main",
+      "section": "main",
+      "route": "/this-page-does-not-exist",
+      "ticket": "PRV-9",
+      "built": false,
+      "board": "[aria-labelledby=\"nf-title\"]",
+      "site": "[data-board-section=\"404/main\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "pages-404-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-404-desktop.dc.html",
+            "theme": "toggle"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "pages-404-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "pages-404-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    }
+  ]
+}

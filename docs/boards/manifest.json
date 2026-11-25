@@ -1,0 +1,227 @@
+{
+  "boards": {
+    "pages-404-desktop.dc.html": {
+      "sha256": "421f4ee4a8753e82aed7bcbf2d253190d85012c68f11d0ef58c19e3e65ac08a8",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-404-phone.dc.html": {
+      "sha256": "d6f4ddba7c74e025237b7133ce97c561c271453010f154a9fc65449ae7ec3423",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-about-desktop.dc.html": {
+      "sha256": "a6148f2897e934b0a38bb4fa40ffba6d7ce2844b6f2f0a5128c3527937f012da",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-about-phone.dc.html": {
+      "sha256": "a1da14aee6bcbf1ba79543c54d33c5f41a62e733e99665dfa9d5c64969144972",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-blog-life-desktop.dc.html": {
+      "sha256": "92f9e61745ade713d8dc6c5ed7b43ad7862eb1fe1823a0621f000d5b010fccce",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-blog-life-phone.dc.html": {
+      "sha256": "d1ebac5c02381db7a137b08bc17389ee53c72f8a230e2927b3d6cb4810561a34",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-blog-work-desktop.dc.html": {
+      "sha256": "cc61a9d17fec4852603ff4bbf8d7dff5785a062c256c41232f145399d8bdbb09",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-blog-work-phone.dc.html": {
+      "sha256": "176717784bcfe4d910e2eb05d6e01337f42a09e4f6a2920f42515d324d8db9f0",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-case-desktop.dc.html": {
+      "sha256": "6647a2438d268f0481c886461b1a4ea5b7704c921e696d4b863e503ca3592221",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-case-phone.dc.html": {
+      "sha256": "6a5eeeb29bc3319cf726981483a5a911428e102e062296378367f65645fb21dc",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-christine-phone.dc.html": {
+      "sha256": "57925527e1301953891698f052466747782d1761cd7f06b8aff3cdc382157c05",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-contact-desktop.dc.html": {
+      "sha256": "e75017c6e12ef091ce6eb2eb4b45a9c00315c29da7b26ccd891737b6c4da6e05",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-contact-phone.dc.html": {
+      "sha256": "d6362c652d786276b560886708280280bd2b5469e468349a1f3c020d1578fd2f",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-post-life-desktop.dc.html": {
+      "sha256": "b2f7f0ceb4c532b79e05fa69e35c39759b7dd6c398c82865c89a011193c829d4",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-post-life-phone.dc.html": {
+      "sha256": "d1e861606157c1ec94243824fc76ba972291cd5b7efe33c15e52d2097eec6fb8",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-post-work-desktop.dc.html": {
+      "sha256": "a0a0439f9ae673fda30d51787040ae135ccca090602b139c806804c08d37d01f",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-post-work-phone.dc.html": {
+      "sha256": "46425019e3f506928ea00ccbbc1e38cdcbfcd3fba9ba5387572a2a7bdd7fbcf9",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-seth-phone.dc.html": {
+      "sha256": "b4ec59506df64e4e7277e46098bad7753a77a8c2556373687a365607559d89ac",
+      "theme": "light",
+      "width": "390"
+    },
+    "pages-work-desktop.dc.html": {
+      "sha256": "8aaa0ae6aa23b89662c185ff6e1e9c334d9ce7270c33d5c8dcfe0eeb178f5b08",
+      "theme": "light",
+      "width": "1440"
+    },
+    "pages-work-phone.dc.html": {
+      "sha256": "6577677502adeefbd49f4e232c92f244ca5b4b969da44a57c14f11967e10d890",
+      "theme": "light",
+      "width": "390"
+    },
+    "range-dark-desktop.dc.html": {
+      "sha256": "e894c7dc618f967cb927702f003e20a1d76fa54d76d07cb2f0a072839b2e2775",
+      "theme": "dark",
+      "width": "1440"
+    },
+    "range-light-desktop.dc.html": {
+      "sha256": "0e0143be3ffcc9fc88e90f0e0393747ce158dad0da72646f87a82d9a0ed7c173",
+      "theme": "light",
+      "width": "1440"
+    },
+    "range-phone.dc.html": {
+      "sha256": "fe466d615a8a9cd84e632c9cc8c2b9fb070ca125fc097a15cd6525362ee68796",
+      "theme": "light",
+      "width": "390"
+    },
+    "range-profile-christine-desktop.dc.html": {
+      "sha256": "0caae1638c08103c5c3e94a2538df2d4eb5730997e0c0a95fb8ec81cb5fa26ba",
+      "theme": "light",
+      "width": "1440"
+    },
+    "range-profile-seth-desktop.dc.html": {
+      "sha256": "6abb5d350949604fe57aa07f1dd44977a0cafef6638f111c4c53876117df8658",
+      "theme": "light",
+      "width": "1440"
+    }
+  },
+  "fontCss": "google.css",
+  "fonts": {
+    "8vIQ7wUr0m80wwYf0QCXZzYzUoTg8z6hVYs.woff2": {
+      "sha256": "500d3bfa4e42db97b676a8f1ae3fea651011fd4b73fee592b80b242353da9ead"
+    },
+    "8vIQ7wUr0m80wwYf0QCXZzYzUoTg_T6h.woff2": {
+      "sha256": "f7a7830b81e351f89b91f0201de71c8d937e25df5a3e31ecca9b4ee877abedb7"
+    },
+    "RrQXbohi_ic6B3yVSzGBrMxQZqctI8w.woff2": {
+      "sha256": "61aba01cad113acf71205cfe135b3ca84d1d66cfdaf5d59591decb836d798363"
+    },
+    "RrQXbohi_ic6B3yVSzGBrMxQaKct.woff2": {
+      "sha256": "59826f39dcb265c6aa94d978cc0941a083df5acc7f447324ecf6f58ad19d6b7c"
+    },
+    "google.css": {
+      "sha256": "3c15faedeeb777db55808347beb8dc0e297ba288d95f3dae4f3a777a5b203d49"
+    },
+    "xn7gYHE41ni1AdIRggOxSuXd.woff2": {
+      "sha256": "447c49583b1b735cc6f566151db1d24354cec41076c55dd98455cfbde9e806c1"
+    },
+    "xn7gYHE41ni1AdIRggSxSuXd.woff2": {
+      "sha256": "e507c109c31789b33994646b457ee288639324516357250607c9b1398186e069"
+    },
+    "xn7gYHE41ni1AdIRggexSg.woff2": {
+      "sha256": "8c2def024c1bf31aacf3624ae3c4d701269b4ec3dc765c04830839f0d36b2d9e"
+    },
+    "xn7gYHE41ni1AdIRggixSuXd.woff2": {
+      "sha256": "dbf64d973b3987844df30992c93f47d24ac8935ee8c9b1e320942aeb1b367703"
+    },
+    "xn7gYHE41ni1AdIRggmxSuXd.woff2": {
+      "sha256": "2f7335119075b2079f1d882530bbc18728461612bf90743203d73a74a48f4d9b"
+    },
+    "xn7gYHE41ni1AdIRggqxSuXd.woff2": {
+      "sha256": "3c09135e88bbfcd848e99be137710afbb615a8d9a73c5c48e6cb0245a162af1d"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxQKYbABA.woff2": {
+      "sha256": "d160e20920ae4d6556518d352d3af27a74e9b0de3d8fe17b1c1044fc75aa2f81"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxRKYbABA.woff2": {
+      "sha256": "73e7f7b1c980416ae0c2461268b14c7cfcce0668e683dc43fbb11a82a227b9f2"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxTKYbABA.woff2": {
+      "sha256": "7d0037a170882a49e65a45c38ef195237bb07b1cc791d078379f0ac0d7ae1935"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxaKYbABA.woff2": {
+      "sha256": "9409ee21811f0f5272b7e1d828fe8838005b0573481ef906e7e55b63f6610ab0"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxdKYbABA.woff2": {
+      "sha256": "f598dd0700f155e2facfaa8ecfacace397d4c2c153e9ce37ab7ad310e8505bc2"
+    },
+    "zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYY.woff2": {
+      "sha256": "e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470"
+    }
+  },
+  "images": {
+    "christine-alt.jpg": {
+      "sha256": "c8cd546e48d1adc04ecb80fbbba0b2783028f60a4179e8c06ae62af6303f1684"
+    },
+    "christine-holly.jpg": {
+      "sha256": "245d3ec221802559ac16a2a74d2e912f92a743189b6c5b6873bedb86a978decc"
+    },
+    "christine.jpg": {
+      "sha256": "ef265f8108e402f2359d16cc0bb61079cc73ff5165e1d5d7922b4ac2b8e84c85"
+    },
+    "holly-chair.jpg": {
+      "sha256": "d9e7ed5845b065b0736a9a86e9fe99e87415b7e5b6ed30e9d2935134d71c1059"
+    },
+    "holly-collar.jpg": {
+      "sha256": "0894af7875069507eabebde65a0b62851f91b8eb9a56b364a7755b254315cf9f"
+    },
+    "holly-garden.jpg": {
+      "sha256": "ec61ed096a2ff7d8a1e5fae8fe92beb1780aa30d0122223dc45c5a2771f60023"
+    },
+    "holly-nose.jpg": {
+      "sha256": "e16f20ce0ce51720c1d24f7764a0875631179a35128ac5e007d8e7aaec8c7225"
+    },
+    "holly-side-eye.jpg": {
+      "sha256": "39de5a9ce28627a99d5619593d7d891d47db2f5cdc6791a3be656bed0baf8988"
+    },
+    "holly-upside-down.jpg": {
+      "sha256": "108776d684868efd3923206cf59a3f0d75b5b98afb19d9a5a6b12dcc5164f2bf"
+    },
+    "seth-holly.jpg": {
+      "sha256": "3e478ba8f7067fdb6d9e9f8d9cad895c842f45a167f58bce33083421d995262e"
+    },
+    "seth.jpg": {
+      "sha256": "dad4716c338f9007012b60a262e9b819bf46c058794a41b7953ac44328c5b67f"
+    },
+    "us-three.jpg": {
+      "sha256": "d18741a8879de44658e9e3afb64d9d47a8299c5464eec94dde0118e60aa6ad8f"
+    }
+  },
+  "runtime": {
+    "sha256": "c4929939a4fa0ff409afd395a75cd87a7a7412d26bf4cf34d7292a94c05ea482",
+    "source": "the Design canvas type's runtime (artifact-type/dc-runtime.js), served to the boards as support.js",
+    "url": null
+  },
+  "version": 1
+}
