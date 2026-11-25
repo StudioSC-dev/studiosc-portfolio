@@ -1,0 +1,45 @@
+{
+  "boards": {
+    "fx-dark-desktop.dc.html": {
+      "sha256": "e7788abd49574c8902238b16582768a4c1b0b70e39a2f432d053ad6b81c6af8d",
+      "theme": "dark",
+      "width": "1440"
+    },
+    "fx-desktop.dc.html": {
+      "sha256": "75a5460de0eaa26a85a506789a295d7047ba4d6ad0ef881c80637a656bef119c",
+      "theme": "light",
+      "width": "1440"
+    },
+    "fx-phone.dc.html": {
+      "sha256": "dc1c4075885c5b25e9cea8d146386589c3355949f3e5c98f02e3fe1532a35f05",
+      "theme": "light",
+      "width": "390"
+    }
+  },
+  "fontCss": "google.css",
+  "fonts": {
+    "RrQXbohi_ic6B3yVSzGBrMxQaKct.woff2": {
+      "sha256": "59826f39dcb265c6aa94d978cc0941a083df5acc7f447324ecf6f58ad19d6b7c"
+    },
+    "google.css": {
+      "sha256": "dcdf7ec07be33164bfc995967d3fdb1e1c742d7408ebfce281e211ca64d07754"
+    }
+  },
+  "images": {
+    "one.webp": {
+      "sha256": "a6db18e70776f9ae3debdbe07ceb3c3463c9ff0ec22fbd9f73dcf995e33227d9"
+    },
+    "three.webp": {
+      "sha256": "cf783851f81ca1526c4a1c621bcf39e3f2b34937b0257769a6e50f3d124d3959"
+    },
+    "two.webp": {
+      "sha256": "c5feaba8eeb52f08ec4012ebf6bde4259137c9f4e528c1ed2d373d05d9b33f98"
+    }
+  },
+  "runtime": {
+    "sha256": "3ae8456794c62cd3efcc5de0466dd174704a9e45f5b6bceb79457e479083a79a",
+    "source": "the stand-in runtime, e2e/fixtures/fidelity/runtime/support.js, served by the harness",
+    "url": null
+  },
+  "version": 1
+}

@@ -1,0 +1,384 @@
+{
+  "version": 1,
+  "clock": "2026-11-20T12:00:00+08:00",
+  "timezone": "Asia/Manila",
+  "viewports": {
+    "1440": {
+      "width": 1440,
+      "height": 900
+    },
+    "390": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  "theme": {
+    "light": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Switch to the dark theme"
+        }
+      }
+    ],
+    "dark": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Switch to the light theme"
+        }
+      }
+    ]
+  },
+  "keys": {
+    "heading": "h1, h2, h3, h4",
+    "control": "a[href], button, input, select, textarea, [role=\"tab\"]",
+    "frame": "[aria-roledescription=\"slide\"], article, figure",
+    "image": "img",
+    "text": "p, dt, dd, figcaption, label"
+  },
+  "states": {
+    "theme-reveal": {
+      "toggleTheme": true,
+      "inFlight": true
+    },
+    "tab-2": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Two"
+          }
+        }
+      ]
+    },
+    "tab-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Three"
+          }
+        }
+      ]
+    },
+    "plate-next": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next plate"
+          }
+        }
+      ]
+    },
+    "plate-prev": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Previous plate"
+          }
+        }
+      ]
+    },
+    "gallery-2": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "gallery-3": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        },
+        {
+          "click": {
+            "role": "button",
+            "name": "Next photo"
+          }
+        }
+      ]
+    },
+    "filter-live": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Live"
+          }
+        }
+      ]
+    },
+    "filter-draft": {
+      "steps": [
+        {
+          "click": {
+            "role": "button",
+            "name": "Draft"
+          }
+        }
+      ]
+    }
+  },
+  "rows": [
+    {
+      "id": "fx/header",
+      "section": "header",
+      "route": "/",
+      "ticket": "PRV-91",
+      "built": true,
+      "board": "header",
+      "site": "[data-board-section=\"fx/header\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "theme-reveal"
+      ],
+      "pageMotion": true,
+      "later": [
+        {
+          "ticket": "PRV-19",
+          "hide": [
+            {
+              "selector": "a[href^=\"/cv/\"]",
+              "mode": "remove"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fx/opener",
+      "section": "opener",
+      "route": "/",
+      "ticket": "PRV-92",
+      "built": true,
+      "board": "#opener",
+      "site": "[data-board-section=\"fx/opener\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "fx/range",
+      "section": "range",
+      "route": "/",
+      "ticket": "PRV-92",
+      "built": true,
+      "board": "#range",
+      "site": "[data-board-section=\"fx/range\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "tab-2",
+        "tab-3",
+        "plate-next",
+        "plate-prev"
+      ]
+    },
+    {
+      "id": "fx/gallery",
+      "section": "gallery",
+      "route": "/",
+      "ticket": "PRV-93",
+      "built": true,
+      "board": "#gallery",
+      "site": "[data-board-section=\"fx/gallery\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "gallery-2",
+        "gallery-3"
+      ]
+    },
+    {
+      "id": "fx/notes",
+      "section": "notes",
+      "route": "/",
+      "ticket": "PRV-94",
+      "built": false,
+      "board": "#notes",
+      "site": "[data-board-section=\"fx/notes\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default"
+      ]
+    },
+    {
+      "id": "fx/list",
+      "section": "list",
+      "route": "/",
+      "ticket": "PRV-95",
+      "built": true,
+      "board": "#list",
+      "site": "[data-board-section=\"fx/list\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": {
+          "light": {
+            "board": "fx-phone.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-phone.dc.html",
+            "theme": "toggle"
+          }
+        }
+      },
+      "states": [
+        "default",
+        "filter-live",
+        "filter-draft"
+      ]
+    },
+    {
+      "id": "fx/footer",
+      "section": "footer",
+      "route": "/",
+      "ticket": "PRV-91",
+      "built": true,
+      "board": "footer",
+      "site": "[data-board-section=\"fx/footer\"]",
+      "sources": {
+        "1440": {
+          "light": {
+            "board": "fx-desktop.dc.html",
+            "theme": "drawn"
+          },
+          "dark": {
+            "board": "fx-dark-desktop.dc.html",
+            "theme": "drawn"
+          }
+        },
+        "390": null
+      },
+      "states": [
+        "default"
+      ]
+    }
+  ]
+}
