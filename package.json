@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "boards:regen": "tsx scripts/boards-regen.ts",
     "prepare": "husky"
   },
   "dependencies": {

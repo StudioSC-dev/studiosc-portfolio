@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — Tally &amp; Trace case study, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery); width: 390px; box-sizing: border-box; padding-bottom: 3rem; position: relative; overflow: hidden;">
+
+  <header style="position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 4rem; padding: 0 1rem;">
+    <div style="justify-self: start;">
+  <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+    </div>
+    <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem; text-decoration: none;">StudioSC</a>
+    <div style="justify-self: end;">
+  <button type="button" aria-expanded="false" aria-controls="phone-menu" style="min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Menu</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Case study template, drawn with Tally & Trace -->
+    <section aria-labelledby="case-title" style="position: relative; padding: 0.5rem 1rem 0;">
+      <svg aria-hidden="true" width="120" height="200" viewBox="0 0 120 200" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M36 4h0M68 4h0M84 4h0M100 4h0M108 4h0M116 4h0M76 12h0M92 12h0M108 12h0M52 20h0M68 20h0M84 20h0M100 20h0M116 20h0M92 28h0M108 28h0M36 36h0M68 36h0M84 36h0M100 36h0M108 36h0M116 36h0M92 44h0M108 44h0M52 52h0M84 52h0M100 52h0M116 52h0M92 60h0M108 60h0M68 68h0M84 68h0M100 68h0M116 68h0M108 76h0M84 84h0M100 84h0M116 84h0M68 100h0M84 100h0M100 100h0M116 100h0M108 108h0M84 116h0M100 116h0M116 116h0M68 132h0M84 132h0M100 132h0M116 132h0M84 148h0M116 148h0M100 164h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative;">
+        <a href="/work" style="display: inline-flex; align-items: center; gap: 0.375rem; min-height: 2.75rem; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; text-decoration: none;"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M16 10H4M9 5L4 10L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Every project</a>
+        <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem;"><span aria-hidden="true" style="flex: 0 0 auto; width: 0.875rem; height: 0.875rem; border-radius: 2px; background: #1F4D3A; box-shadow: 0 0 0 1px var(--rule);"></span><span style="font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">Case study</span></div>
+        <h1 id="case-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.625rem; line-height: 2.875rem; letter-spacing: -0.035em; margin-top: 0.5rem;">Tally &amp; Trace</h1>
+        <p style="margin: 0.75rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">A full-stack, type-safe financial management tool for personal and business finances.</p>
+        <p style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Built by <a href="/seth">Seth</a> · Tested by <a href="/christine">Christine</a></p>
+        <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+          <a href="https://tallyandtrace.studiosc.dev" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery);">Open Tally &amp; Trace<svg aria-hidden="true" width="16" height="16" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M8 4H4.75C4.34 4 4 4.34 4 4.75V15.25C4 15.66 4.34 16 4.75 16H15.25C15.66 16 16 15.66 16 15.25V12M11 4H16V9M16 4L9 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></a>
+          <a href="https://github.com/StudioSC-dev/tally-and-trace" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; border: 1px solid var(--ink); color: var(--ink);">Code on GitHub</a>
+        </div>
+        <div style="margin-top: 1.5rem;"><dl style="margin: 0; display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.375rem 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+          <dt style="color: var(--muted);">Status</dt><dd style="margin: 0; font-weight: 600;">In QA with Christine</dd>
+          <dt style="color: var(--muted);">Started</dt><dd style="margin: 0;">February 2026</dd>
+          <dt style="color: var(--muted);">Stack</dt><dd style="margin: 0;">React, FastAPI and PostgreSQL</dd>
+          <dt style="color: var(--muted);">Runs on</dt><dd style="margin: 0;">Render and Supabase</dd>
+        </dl></div>
+      </div>
+    </section>
+    <div style="padding: 2rem 1rem 0;">
+          <div style="aspect-ratio: 16 / 10; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek); color: var(--muted); text-align: center;">
+            <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="4.5" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"></rect><path d="M3 8.5H21M6 6.5H6.01M8.5 6.5H8.51" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+            <span style="font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600;">Screenshot to come: the dashboard</span>
+          </div>
+    </div>
+
+    <section aria-labelledby="why-title" style="padding: 3rem 1rem 0;">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem;">
+        <h2 id="why-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">Why we built it</h2>
+        <p style="margin: 0; font-size: 1rem; line-height: 1.625rem;">Tally And Trace was developed to solve our own need for a simple, flexible financial tracking tool that would replace our aging Google Sheet tracker. Existing solutions were either too complex, too expensive, or lacked the multi-entity support we needed to manage both personal and business finances in one place.</p>
+      </div>
+    </section>
+
+    <!-- Build and break: the same split frame as The two of us -->
+    <section aria-label="Who did what" style="padding: 3rem 1rem 0;">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr); background: var(--plate); border: 1px solid var(--ink); border-radius: 14px;">
+          <div style="min-width: 0; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <img src="img/seth.jpg" alt="Seth Palileo" width="922" height="1153" style="display: block; flex: 0 0 auto; width: 3.5rem; height: 3.5rem; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 35%; border-radius: 4px;">
+              <div>
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 2rem; letter-spacing: -0.015em;">What Seth built</h2>
+                <p style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem;"><a href="/seth" style="font-weight: 600;">More about Seth</a></p>
+              </div>
+            </div>
+            <ul style="list-style: none; margin: 1.25rem 0 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Architected a monorepo structure with shared TypeScript package</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Built React web frontend with TanStack Router and Redux Toolkit</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Developed FastAPI backend with Pydantic v2 for type safety</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Implemented PostgreSQL database with SQLAlchemy ORM</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Created React Native mobile app foundation (Expo)</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Deployed on Render with Supabase for database hosting</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Wired Sentry error and performance monitoring across the API and web app — production-only, with request bodies, cookies, auth headers, and typed-input breadcrumbs scrubbed before send</li>
+            </ul>
+          </div>
+        <div aria-hidden="true" style="background: var(--ink); margin: 0 1.5rem; height: 1px;"></div>
+          <div style="min-width: 0; padding: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <img src="img/christine.jpg" alt="Christine Nacar-Palileo" width="738" height="921" style="display: block; flex: 0 0 auto; width: 3.5rem; height: 3.5rem; box-sizing: border-box; object-fit: cover; border: 1px solid var(--rule); background: var(--peek); object-position: 50% 35%; border-radius: 4px;">
+              <div>
+                <h2 style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.375rem; line-height: 2rem; letter-spacing: -0.015em;">What Christine broke</h2>
+                <p style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem;"><a href="/christine" style="font-weight: 600;">More about Christine</a></p>
+              </div>
+            </div>
+            <ul style="list-style: none; margin: 1.25rem 0 0; padding: 0; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Test baseline for the cash-flow forecast engine, with CI gating on backend and shared-package suites</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">API endpoint validation and error handling</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Multi-currency transaction testing</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Data integrity and security audits</li>
+              <li style="padding: 0.625rem 0; border-top: 1px solid var(--rule);">Performance testing for large transaction sets</li>
+            </ul>
+          </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="does-title" style="padding: 3rem 1rem 0;">
+      <h2 id="does-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">What it does</h2>
+      <dl style="margin: 1.25rem 0 0; display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 3rem; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Multi-Entity Architecture</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Manage personal and business finances under separate entities</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Account Management</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Cash, e-wallets, savings, checking, and credit accounts with multi-currency support</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Transaction Tracking</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Record income, expenses, and transfers with FX fields</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Cash-Flow Forecast</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Day-ordered running-balance timeline that surfaces the lowest point before payday and flags shortfalls — not just the reassuring month-end total</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Mark Paid</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Materialise a due entry into a real transaction, moving the account balance and rolling the recurring schedule to its next date</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Budget Entries</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Recurring income/expense items with configurable cadence — weekly, biweekly, semi-monthly, monthly, quarterly, semi-annual, and annual</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Allocations</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Savings goals, budgets, and period-based allocations</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Wishlist</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">Prioritised wishlist items linked to categories and entities</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Data Export</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">One-click JSON/CSV export of your entire dataset</dd></div>
+          <div style="padding: 1rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Mobile App</dt><dd style="margin: 0.125rem 0 0; color: var(--muted);">React Native (Expo) app with NativeWind styling (coming soon)</dd></div>
+      </dl>
+    </section>
+
+    <section aria-labelledby="shots-title" style="padding: 3rem 1rem 0;">
+      <h2 id="shots-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">Screenshots</h2>
+      <div style="margin-top: 1.25rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem;">
+          <figure style="margin: 0; min-width: 0;">
+          <div style="aspect-ratio: 16 / 10; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek); color: var(--muted); text-align: center;">
+            <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="4.5" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"></rect><path d="M3 8.5H21M6 6.5H6.01M8.5 6.5H8.51" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+            <span style="font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600;">Screenshot to come: Accounts</span>
+          </div>
+            <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Accounts</figcaption>
+          </figure>
+          <figure style="margin: 0; min-width: 0;">
+          <div style="aspect-ratio: 16 / 10; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek); color: var(--muted); text-align: center;">
+            <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="4.5" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"></rect><path d="M3 8.5H21M6 6.5H6.01M8.5 6.5H8.51" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+            <span style="font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600;">Screenshot to come: Transactions</span>
+          </div>
+            <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Transactions</figcaption>
+          </figure>
+          <figure style="margin: 0; min-width: 0;">
+          <div style="aspect-ratio: 16 / 10; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; border: 1px solid var(--rule); border-radius: 14px; background: var(--peek); color: var(--muted); text-align: center;">
+            <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="3" y="4.5" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"></rect><path d="M3 8.5H21M6 6.5H6.01M8.5 6.5H8.51" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+            <span style="font-size: 0.8125rem; line-height: 1.25rem; font-weight: 600;">Screenshot to come: Light mode</span>
+          </div>
+            <figcaption style="margin-top: 0.5rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Light mode</figcaption>
+          </figure>
+      </div>
+    </section>
+
+    <section aria-labelledby="stack-title" style="padding: 3rem 1rem 0;">
+      <h2 id="stack-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">Stack</h2>
+      <dl style="margin: 1.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; border-bottom: 1px solid var(--rule);">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Frontend</dt><dd style="margin: 0;">React, TypeScript, Vite, TanStack Router, Redux Toolkit, Tailwind CSS</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Backend</dt><dd style="margin: 0;">FastAPI, Python 3.12, SQLAlchemy, Pydantic v2</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Database</dt><dd style="margin: 0;">PostgreSQL (Supabase)</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Mobile</dt><dd style="margin: 0;">React Native, Expo SDK 52, NativeWind</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Deployment</dt><dd style="margin: 0;">Render (backend + frontend), Supabase (database)</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Monitoring</dt><dd style="margin: 0;">Sentry, production-only, PII scrubbed before send</dd></div>
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 0.875rem 0; border-top: 1px solid var(--rule);"><dt style="font-weight: 600;">Shared</dt><dd style="margin: 0;">TypeScript package for type definitions and utilities</dd></div>
+      </dl>
+    </section>
+
+    <section aria-labelledby="posts-title" style="padding: 3rem 1rem 0;">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 2rem;">
+        <h2 id="posts-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem;">Writing about Tally &amp; Trace</h2>
+        <a href="/blog/work?project=tallyandtrace" style="font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">All 9 posts</a>
+      </div>
+      <ol style="list-style: none; margin: 1.25rem 0 0; padding: 0; border-bottom: 1px solid var(--rule);">
+          <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 1rem 0; border-top: 1px solid var(--rule);"><p style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">19 Nov 2026</p><p style="margin: 0;"><a href="/blog/tallyandtrace-columnar-pad-redesign" style="font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.625rem; text-decoration: none;">Redesigning Tally &amp; Trace So It Stops Looking Generated</a></p></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 1rem 0; border-top: 1px solid var(--rule);"><p style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">18 Nov 2026</p><p style="margin: 0;"><a href="/blog/tallyandtrace-statement-reconciliation" style="font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.625rem; text-decoration: none;">Checking the Statement Against the App: Reconciliation in Tally &amp; Trace</a></p></li>
+          <li style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.125rem; padding: 1rem 0; border-top: 1px solid var(--rule);"><p style="margin: 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted); font-variant-numeric: tabular-nums;">14 Nov 2026</p><p style="margin: 0;"><a href="/blog/tallyandtrace-performance" style="font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.125rem; line-height: 1.625rem; text-decoration: none;">Why Tally &amp; Trace Felt Slow, and What We Did About It</a></p></li>
+      </ol>
+    </section>
+
+    <nav aria-label="More projects" style="padding: 3rem 1rem 0;">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding-top: 1.25rem; border-top: 2px solid var(--ink);">
+        <a href="/work/fitness-rival" style="display: block; text-decoration: none;"><span style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M16 10H4M9 5L4 10L9 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>Previous project</span><span style="display: block; margin-top: 0.25rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Fitness Rival</span></a>
+        <a href="/work/central-command" style="display: block; text-decoration: none; text-align: left;"><span style="display: flex; align-items: center; justify-content: flex-start; gap: 0.375rem; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted);">Next project<svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" style="flex: 0 0 auto;"><path d="M4 10H16M11 5L16 10L11 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></span><span style="display: block; margin-top: 0.25rem; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 2rem; letter-spacing: -0.015em;">Central Command</span></a>
+      </div>
+    </nav>
+
+  </main>
+
+  <footer style="margin-top: 3.5rem; border-top: 1px solid var(--rule); padding: 2rem 1rem 0;">
+    <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem;">StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+    <nav aria-label="Footer" style="margin-top: 1rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+      <a href="/work" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Work</a>
+      <a href="/blog" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Writing</a>
+      <a href="/about" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">About</a>
+      <a href="/contact" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Contact</a>
+      <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Seth on LinkedIn</a>
+      <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Christine on LinkedIn</a>
+      <a href="https://github.com/StudioSC-dev" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">StudioSC-dev on GitHub</a>
+    </nav>
+    <p style="margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":6180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

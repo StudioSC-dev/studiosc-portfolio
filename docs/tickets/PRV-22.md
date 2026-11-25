@@ -179,4 +179,15 @@ PRV-22
 
 ## Known gaps
 
-- None open after round 2.
+- **Accepted deviation, lossy reference shots (owner, 2026-11-25).** The Scope asks for "a lossless WebP
+  shot"; `boards:regen` writes lossy WebP at quality 0.85 instead (23 MB in 704 files, measured at this regen, for every state, reduced motion
+  and in-flight states included, against several times that lossless). The numbers the fidelity spec checks are
+  measured, never read from the shots, so only the verifier's side-by-side read is affected: fine edges and
+  colours in a board shot can differ slightly from the canvas. Each shot's sha256 is recorded in `spec.json`.
+- **Fragment palettes are not compared.** The boards define the case-study fragment tokens (`--tt-*`,
+  `--cc-*`) beside the page palette; the site's names for them (`--frag-*`) are set by PRV-6, so
+  `sections.json` lists only the page palette for now. PRV-6 adds the pairs.
+- **The canvas runtime has no committed URL.** It is served only behind the owner's canvas sign-in, so the
+  manifest names its path (`runtime.url`) and `boards:regen` resolves it against `BOARDS_RUNTIME_BASE`, set
+  by whoever regenerates; with an empty cache and no base it names the variable and stops. The fixture
+  canvas exercises the same path against a local server.
