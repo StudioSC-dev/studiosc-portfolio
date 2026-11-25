@@ -58,6 +58,11 @@ interface SocialPostProps {
   platform?: "instagram" | "facebook";
   url?: string;
   fallbackUrl?: string;
+  /**
+   * Show only the link card, with no embed script. The site's CSP blocks
+   * Instagram's and Facebook's scripts, so their embeds never load.
+   */
+  linkOnly?: boolean;
 }
 
 // --- Smart fallback component (instagramUrl + optional facebookUrl) ---
@@ -161,7 +166,26 @@ export default function SocialPost({
   platform,
   url,
   fallbackUrl,
+  linkOnly,
 }: SocialPostProps) {
+  // Link-only mode: the card an embed shows before its script runs.
+  if (linkOnly && platform && url) {
+    return (
+      <div className="my-8">
+        <blockquote
+          style={{
+            maxWidth: "540px",
+            minWidth: "326px",
+            width: "100%",
+            margin: "0 auto",
+          }}
+        >
+          <LinkCard platform={platform} url={url} />
+        </blockquote>
+      </div>
+    );
+  }
+
   // Smart fallback mode
   if (instagramUrl) {
     return (

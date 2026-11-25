@@ -1,0 +1,35 @@
+{
+  "file": "app/favicon.ico",
+  "sha": "c10ae1a9a10b9665ccabbca1b470240297d5590b",
+  "note": "Decoded-pixel hashes of every favicon frame before PRV-1 re-encoded it without metadata.",
+  "frames": [
+    {
+      "index": 0,
+      "kind": "bmp",
+      "width": 16,
+      "height": 16,
+      "rgbaSha256": "7b1ab0f6fcd1a58b991bf813815eb7a14089989bb11caebc8c2157b0669e133f"
+    },
+    {
+      "index": 1,
+      "kind": "bmp",
+      "width": 32,
+      "height": 32,
+      "rgbaSha256": "abe78528aad4a97d9f29b3164fe422e5a875d6e50529307b433a7662f08f17e1"
+    },
+    {
+      "index": 2,
+      "kind": "bmp",
+      "width": 48,
+      "height": 48,
+      "rgbaSha256": "acf0613c42c3127d5f3d3a0f3b1eb08d7102fa5daf4eeb6f254cd2ea086d8270"
+    },
+    {
+      "index": 3,
+      "kind": "png",
+      "width": 256,
+      "height": 256,
+      "rgbaSha256": "a2f6d79aecaef0e98d232961d18ffca0e3c7e97e5d3b78a4f353e453e9651069"
+    }
+  ]
+}

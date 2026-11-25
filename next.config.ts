@@ -39,7 +39,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.0.242"],
+  // Extra hosts that may load the dev server (say, a phone on the LAN), as a
+  // comma-separated DEV_ORIGINS. Empty when unset, so no address is committed.
+  allowedDevOrigins: (process.env.DEV_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   images: {
     remotePatterns: [
