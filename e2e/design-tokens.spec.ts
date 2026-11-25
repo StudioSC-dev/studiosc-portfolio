@@ -257,15 +257,19 @@ const perfRecord = () => JSON.parse(read(PERF)) as PerfRecord;
 // ---------------------------------------------------------------------------
 // Git
 
+/** The environment without any GIT_* variable a hook might have set. */
+function gitEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))
+  ) as NodeJS.ProcessEnv;
+}
+
 /** git, without any GIT_* variable a hook might have set. */
 function git(...args: string[]): string {
-  const env = Object.fromEntries(
-    Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))
-  );
   return execFileSync("git", args, {
     cwd: ROOT,
     encoding: "utf8",
-    env: env as NodeJS.ProcessEnv,
+    env: gitEnv(),
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 }
@@ -313,6 +317,28 @@ interface PrRange {
 function prRange(env: Env = process.env): PrRange | null {
   if (env.CI && !env.PR_HEAD_SHA?.trim()) return null;
   return { base: prBase(env), head: prHead(env) };
+}
+
+/**
+ * Files changed between two commits, both sides of a rename (PRV-1's
+ * --no-renames): a file moved into Scope from outside it shows at its source.
+ */
+function changedFiles(base: string, head: string, cwd = ROOT): string[] {
+  return execFileSync(
+    "git",
+    ["diff", "--name-only", "--no-renames", base, head],
+    { cwd, encoding: "utf8", env: gitEnv() }
+  )
+    .split("\n")
+    .filter(Boolean);
+}
+
+/** The files Scope does not list. */
+function outsideScope(files: readonly string[]): string[] {
+  return files.filter(
+    (f) =>
+      !SCOPE_FILES.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
+  );
 }
 
 /** A push build: no PR, so the PR-only checks skip with this reason. */
@@ -1668,14 +1694,45 @@ test.describe("Range design system", () => {
     // The PR head against its base, as PRV-1's scope check does: what a local
     // run writes into the working tree is not part of the PR.
     expect(SCOPE_FILES as readonly string[]).not.toContain(DEVIATIONS);
-    const changed = git("diff", "--name-only", base, head)
-      .split("\n")
-      .filter(Boolean);
-    const outside = changed.filter(
-      (f) =>
-        !SCOPE_FILES.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
-    );
-    expect(outside, "files changed outside PRV-2's Scope").toEqual([]);
+    expect(
+      outsideScope(changedFiles(base, head)),
+      "files changed outside PRV-2's Scope"
+    ).toEqual([]);
+
+    // Control: a file moved from outside Scope into an allowed directory
+    // counts at its source too, as PRV-1's --no-renames does.
+    const moved = fs.mkdtempSync(path.join(os.tmpdir(), "prv2-rename-"));
+    try {
+      const inRepo = (...args: string[]) =>
+        execFileSync(
+          "git",
+          [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            ...args,
+          ],
+          { cwd: moved, stdio: "ignore", env: gitEnv() }
+        );
+      inRepo("init", "-q");
+      fs.writeFileSync(path.join(moved, "README.md"), "outside\n".repeat(20));
+      inRepo("add", "README.md");
+      inRepo("commit", "-q", "--no-verify", "-m", "before");
+      fs.mkdirSync(path.join(moved, "e2e/fixtures/design-tokens"), {
+        recursive: true,
+      });
+      inRepo("mv", "README.md", "e2e/fixtures/design-tokens/README.md");
+      inRepo("commit", "-q", "--no-verify", "-m", "after");
+      expect(
+        outsideScope(changedFiles("HEAD~1", "HEAD", moved)),
+        "a rename's source"
+      ).toEqual(["README.md"]);
+    } finally {
+      fs.rmSync(moved, { recursive: true, force: true });
+    }
 
     // Routes: the base, built from the PR base, against this server.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "prv2-base-"));
