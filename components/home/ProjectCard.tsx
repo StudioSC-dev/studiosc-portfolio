@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Github } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import CtaLink from "@/components/ui/CtaLink";
+import type { ProjectStatus } from "@/lib/statuses";
 
 interface ProjectProps {
   slug: string;
@@ -13,9 +14,7 @@ interface ProjectProps {
   thumbnail?: string;
   githubUrl?: string;
   liveUrl?: string;
-  qaVerified?: boolean;
-  qaInProgress?: boolean;
-  underDevelopment?: boolean;
+  status: ProjectStatus;
 }
 
 const ProjectCard = ({
@@ -26,9 +25,7 @@ const ProjectCard = ({
   thumbnail,
   githubUrl,
   liveUrl,
-  qaVerified,
-  qaInProgress,
-  underDevelopment,
+  status,
 }: ProjectProps) => {
   return (
     <div className="group relative flex h-full flex-col border border-line bg-surface transition-colors hover:border-line-strong">
@@ -62,11 +59,7 @@ const ProjectCard = ({
         <div className="mb-4 flex items-start justify-between gap-4">
           <h3 className="font-serif text-xl leading-snug text-ink">{title}</h3>
           <span className="mt-1">
-            <StatusBadge
-              qaVerified={qaVerified}
-              qaInProgress={qaInProgress}
-              underDevelopment={underDevelopment}
-            />
+            <StatusBadge status={status} />
           </span>
         </div>
 
