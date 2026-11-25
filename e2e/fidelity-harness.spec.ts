@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -115,12 +115,27 @@ function childEnv(extra: Record<string, string | undefined> = {}) {
   return { ...env, ...extra };
 }
 
+/**
+ * boards:regen in a child process. It runs asynchronously so this worker's
+ * fixture server can answer the runtime fetch meanwhile.
+ */
 const regen = (dir: string, env: Record<string, string>, args: string[] = []) =>
-  spawnSync(
-    path.join(ROOT, "node_modules/.bin/tsx"),
-    [path.join(ROOT, "scripts/boards-regen.ts"), "--dir", dir, ...args],
-    { cwd: ROOT, env: childEnv(env), encoding: "utf8", timeout: 15 * 60_000 }
-  );
+  new Promise<{ status: number | null; stderr: string }>((resolve, reject) => {
+    const child = spawn(
+      path.join(ROOT, "node_modules/.bin/tsx"),
+      [path.join(ROOT, "scripts/boards-regen.ts"), "--dir", dir, ...args],
+      { cwd: ROOT, env: childEnv(env), stdio: ["ignore", "ignore", "pipe"] }
+    );
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d: string) => (stderr += d));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 15 * 60_000);
+    child.on("error", reject);
+    child.on("close", (status) => {
+      clearTimeout(timer);
+      resolve({ status, stderr });
+    });
+  });
 
 /** Every file under `dir` with its sha256, links followed. */
 const snapshot = (dir: string) =>
@@ -451,7 +466,7 @@ test.describe("fidelity harness", () => {
         BOARDS_RUNTIME_URL: `${server.url}/published/support.js`,
       };
       expect(existsSync(cache)).toBe(false);
-      const first = regen(work, env);
+      const first = await regen(work, env);
       expect(first.status, first.stderr).toBe(0);
       const pinned = readJson<Manifest>(path.join(CANVAS, "manifest.json"))
         .runtime.sha256;
@@ -478,7 +493,7 @@ test.describe("fidelity harness", () => {
       );
       const before = snapshot(work);
       const specBefore = readSpec(path.join(work, "spec.json"));
-      const second = regen(work, env, ["--board", changed]);
+      const second = await regen(work, env, ["--board", changed]);
       expect(second.status, second.stderr).toBe(0);
       const after = snapshot(work);
       const specAfter = readSpec(path.join(work, "spec.json"));
@@ -509,7 +524,7 @@ test.describe("fidelity harness", () => {
       server.setRuntime(bad);
       const emptyCache = path.join(dir, "cache-2");
       const held = snapshot(work);
-      const fetched = regen(work, { ...env, BOARDS_CACHE: emptyCache });
+      const fetched = await regen(work, { ...env, BOARDS_CACHE: emptyCache });
       expect(fetched.status).not.toBe(0);
       expect(fetched.stderr).toContain(sha256(bad));
       expect(fetched.stderr).toContain(pinned);
@@ -519,7 +534,7 @@ test.describe("fidelity harness", () => {
       // A cached runtime one byte off: the same.
       mkdirSync(path.join(dir, "cache-3"));
       writeFileSync(path.join(dir, "cache-3", "support.js"), bad);
-      const cached = regen(work, {
+      const cached = await regen(work, {
         ...env,
         BOARDS_CACHE: path.join(dir, "cache-3"),
       });
