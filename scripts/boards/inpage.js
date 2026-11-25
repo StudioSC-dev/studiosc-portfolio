@@ -123,14 +123,19 @@
     };
   };
 
+  /** Whether the animation plays its keyframes last to first. */
+  const backwardsOf = (anim) => {
+    const t = anim.effect.getTiming ? anim.effect.getTiming() : {};
+    return (
+      (t.direction === "reverse" || t.direction === "alternate-reverse") !==
+      anim.playbackRate < 0
+    );
+  };
+
   /** The keyframes in the order the animation plays them. */
   const played = (anim) => {
     const frames = anim.effect.getKeyframes();
-    const t = anim.effect.getTiming ? anim.effect.getTiming() : {};
-    const backwards =
-      (t.direction === "reverse" || t.direction === "alternate-reverse") !==
-      anim.playbackRate < 0;
-    return backwards ? [...frames].reverse() : frames;
+    return backwardsOf(anim) ? [...frames].reverse() : frames;
   };
 
   /** Where an animation moves its element, from its keyframes as played. */
@@ -189,19 +194,35 @@
     return parts.join(" ") || "none";
   };
 
-  /** Notes one animation, once. */
+  /**
+   * Notes one animation, once. Its direction is read as it starts and read
+   * again when the record is taken if the page has turned it round since
+   * (reverse() or a negative rate straight after animate() or play()).
+   */
   const record = (anim, el, pseudo, name) => {
     if (!anim || !anim.effect || seen.has(anim)) return;
     seen.add(anim);
     if (!recording) return;
-    const timing = anim.effect.getComputedTiming();
     records.push({
       el,
       pseudo,
       name,
-      duration: round(Number(timing.duration) || 0, 1),
+      anim,
+      backwards: backwardsOf(anim),
       direction: direction(played(anim)),
     });
+  };
+
+  /** A record's duration and direction as the animation now stands. */
+  const asPlayed = (rec) => {
+    const timing = rec.anim.effect.getComputedTiming();
+    return {
+      duration: round(Number(timing.duration) || 0, 1),
+      direction:
+        backwardsOf(rec.anim) === rec.backwards
+          ? rec.direction
+          : direction(played(rec.anim)),
+    };
   };
 
   const nameOf = (anim) =>
@@ -230,6 +251,17 @@
       (opts && typeof opts === "object" && opts.pseudoElement) || "";
     record(anim, this, pseudo, nameOf(anim));
     return anim;
+  };
+
+  // An Animation built by hand starts with play(), and no event: note it
+  // there, before a short one can finish ahead of any sweep.
+  const play = Animation.prototype.play;
+  Animation.prototype.play = function (...args) {
+    const out = play.apply(this, args);
+    const effect = this.effect;
+    if (effect && effect.target)
+      record(this, effect.target, effect.pseudoElement || "", nameOf(this));
+    return out;
   };
 
   const note = (event) => {
@@ -594,12 +626,13 @@
         } else if (rec.pseudo) {
           key = "page";
         }
+        const now = asPlayed(rec);
         return {
           row: best ? best.row.id : spec.owner || null,
           key,
           name: rec.name,
-          duration: rec.duration,
-          direction: rec.direction,
+          duration: now.duration,
+          direction: now.direction,
         };
       });
       out.sort((a, b) =>

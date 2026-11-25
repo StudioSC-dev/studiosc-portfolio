@@ -37,7 +37,7 @@ import {
   type Sections,
 } from "../scripts/boards/model";
 import { checkImage, isImageCandidate } from "../scripts/image-metadata";
-import { pickShot } from "../scripts/boards/capture";
+import { INPAGE, pickShot } from "../scripts/boards/capture";
 import { runtimeBytes, runtimeSource } from "../scripts/boards-regen";
 import {
   CANVAS,
@@ -702,6 +702,68 @@ test.describe("fidelity harness", () => {
     );
   });
 
+  /** A small page with the measurement script, as boards and the site get it. */
+  async function measuredPage(browser: Browser) {
+    const page = await browser.newPage();
+    await page.addInitScript({ path: INPAGE });
+    // A navigation, so the init script runs (setContent would not).
+    await page.goto(
+      `data:text/html,${encodeURIComponent(
+        '<main><section id="r"><h1>Heading</h1><p>Text</p></section></main>'
+      )}`
+    );
+    return page;
+  }
+  type Fid = {
+    __fidelity: {
+      motionStart(): void;
+      motionTake(s: unknown): { name: string; direction: string }[];
+      hide(e: { selector: string; mode?: string }[]): void;
+    };
+  };
+
+  test("records motion as it plays", async ({ browser }) => {
+    chromiumOnly();
+    const page = await measuredPage(browser);
+    try {
+      const motion = await page.evaluate(async () => {
+        const f = (window as unknown as Fid).__fidelity;
+        f.motionStart();
+        const h1 = document.querySelector("h1")!;
+        // Turned round straight after animate(): it plays backwards.
+        h1.animate(
+          [
+            { transform: "translateX(24px)", opacity: 0 },
+            { transform: "none", opacity: 1 },
+          ],
+          { duration: 240, id: "turned" }
+        ).reverse();
+        // Built by hand and started with play(), done within a frame.
+        const short = new Animation(
+          new KeyframeEffect(
+            document.querySelector("p"),
+            [{ opacity: 0 }, { opacity: 1 }],
+            { duration: 1 }
+          ),
+          document.timeline
+        );
+        short.id = "short";
+        short.play();
+        await new Promise((r) => setTimeout(r, 100));
+        return f.motionTake({
+          rows: [{ id: "r", selector: "#r", exclude: [], named: [] }],
+          keys: { heading: "h1", text: "p" },
+        });
+      });
+      expect(motion.map((m) => `${m.name} ${m.direction}`).sort()).toEqual([
+        "animate:short fade-in",
+        "animate:turned exit x+ fade-out",
+      ]);
+    } finally {
+      await page.close();
+    }
+  });
+
   test.describe("against the fixture site", () => {
     let server: FixtureServer;
     test.beforeAll(async () => {
@@ -1075,6 +1137,18 @@ test.describe("fidelity harness", () => {
         // Web Animations, and motion started by the first theme toggle.
         [
           "rm-waapi",
+          opener(true),
+          () => ({
+            section: "fx/opener",
+            state: "default-rm",
+            property: "reduced motion",
+            expected: "no animation",
+            actual: "animate:effect on heading:0",
+          }),
+        ],
+        // A short effect started by play(), finished before any sweep.
+        [
+          "rm-play",
           opener(true),
           () => ({
             section: "fx/opener",

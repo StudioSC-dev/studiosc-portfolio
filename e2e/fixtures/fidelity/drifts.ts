@@ -109,6 +109,10 @@ export const DRIFTS: Record<string, Drift> = {
   "rm-waapi": {
     js: 'if (matchMedia("(prefers-reduced-motion: reduce)").matches) document.querySelector("#opener h1").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400 });',
   },
+  // A short effect started with play(): done before any sweep could see it.
+  "rm-play": {
+    js: 'if (matchMedia("(prefers-reduced-motion: reduce)").matches) new Animation(new KeyframeEffect(document.querySelector("#opener h1"), [{ opacity: 0 }, { opacity: 1 }], { duration: 1 }), document.timeline).play();',
+  },
   "rm-toggle-motion": {
     css: '@media (prefers-reduced-motion: reduce) { :root[data-theme="dark"] header { animation: fade-in 300ms ease-out !important; } }',
   },
