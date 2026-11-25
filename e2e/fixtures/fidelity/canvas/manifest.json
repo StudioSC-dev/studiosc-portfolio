@@ -1,0 +1,48 @@
+{
+  "boards": {
+    "fx-dark-desktop.dc.html": {
+      "sha256": "41672cae614faa37085f92c9772ce393acd71ad36b3c09efe2e2d362d918fb85",
+      "theme": "dark",
+      "width": "1440"
+    },
+    "fx-desktop.dc.html": {
+      "sha256": "97482ea720d105674b8e0315cf501938567f71eba9270f8189675512dfe90158",
+      "theme": "light",
+      "width": "1440"
+    },
+    "fx-phone.dc.html": {
+      "sha256": "9545cc5ec79dc10be637c55f804c1971d09687937f9d16c9cd32a129e61d1d62",
+      "theme": "light",
+      "width": "390"
+    }
+  },
+  "fontCss": "google.css",
+  "fonts": {
+    "RrQXbohi_ic6B3yVSzGBrMxQaKct.woff2": {
+      "sha256": "59826f39dcb265c6aa94d978cc0941a083df5acc7f447324ecf6f58ad19d6b7c"
+    },
+    "google.css": {
+      "sha256": "dcdf7ec07be33164bfc995967d3fdb1e1c742d7408ebfce281e211ca64d07754"
+    }
+  },
+  "images": {
+    "four.webp": {
+      "sha256": "3c6e2bc399879bedffd707e36935c3d3f7e737d695bd7d258ab7e57b27d42cea"
+    },
+    "one.webp": {
+      "sha256": "a6db18e70776f9ae3debdbe07ceb3c3463c9ff0ec22fbd9f73dcf995e33227d9"
+    },
+    "three.webp": {
+      "sha256": "cf783851f81ca1526c4a1c621bcf39e3f2b34937b0257769a6e50f3d124d3959"
+    },
+    "two.webp": {
+      "sha256": "c5feaba8eeb52f08ec4012ebf6bde4259137c9f4e528c1ed2d373d05d9b33f98"
+    }
+  },
+  "runtime": {
+    "sha256": "51ce3e9e2847a676278c4d4a8359f61b61b2de77d7c95ab95e09eeaab124ce24",
+    "source": "the stand-in runtime, e2e/fixtures/fidelity/runtime/support.js, served by the harness under BOARDS_RUNTIME_BASE",
+    "url": "published/support.js"
+  },
+  "version": 1
+}

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fixture site</title>
+<link rel="stylesheet" href="/fonts.css">
+<style>
+:root { --ink: #1d1f23; --paper: #f7f7f5; --plate: #ffffff; --accent: #1f4fd1; --rule: #d0d3d8; --muted: #5e636b; }
+:root[data-theme="dark"] { --ink: #eceef1; --paper: #141619; --plate: #1d2024; --accent: #7fa2ff; --rule: #30343a; --muted: #a3a9b2; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--paper); }
+.page { background: var(--paper); color: var(--ink); }
+body { background: var(--paper); color: var(--ink); font-family: "Red Hat Text", sans-serif; font-size: 16px; line-height: 24px; }
+body.board { -webkit-text-fill-color: transparent; }
+header { display: flex; align-items: center; gap: 24px; height: 72px; padding: 0 80px; border-bottom: 1px solid var(--rule); }
+header .brand { font-weight: 700; color: var(--ink); text-decoration: none; margin-right: auto; }
+header nav { display: flex; gap: 16px; }
+header nav a { color: var(--ink); text-decoration: none; font-weight: 600; font-size: 15px; }
+[data-toggle] { width: 40px; height: 40px; border-radius: 20px; border: 1px solid var(--rule); background: var(--plate); }
+section { padding: 0 80px; }
+#opener { padding-top: 48px; padding-bottom: 32px; }
+#opener h1 { font-size: 56px; line-height: 64px; letter-spacing: -0.02em; font-weight: 600; animation: rise 560ms ease-out both; }
+#opener p { margin-top: 16px; max-width: 560px; color: var(--muted); animation: fade-in 420ms ease-out both; }
+#range { padding-top: 16px; padding-bottom: 32px; }
+.tabs { display: flex; gap: 8px; }
+.tabs button, .filters button { height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid var(--rule); background: transparent; color: var(--ink); font: 600 15px/24px "Red Hat Text", sans-serif; }
+.tabs button[aria-pressed="true"], .filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.plate { margin-top: 24px; padding: 32px; min-height: 200px; background: var(--plate); border: 1px solid var(--rule); border-radius: 8px; }
+.plate h2 { font-size: 28px; line-height: 36px; font-weight: 600; }
+.plate p { margin-top: 8px; }
+.plate.from-right { animation: plate-from-right 240ms ease-out; }
+.plate.from-left { animation: plate-from-left 240ms ease-out; }
+.pager { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+.pager button { width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--rule); background: var(--plate); }
+.pager p { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+#gallery { padding-top: 16px; padding-bottom: 32px; }
+#gallery h2, #list h2, #notes h2, #holly h2, #contact h2 { font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.01em; }
+#gallery figure { margin-top: 16px; width: 480px; max-width: 100%; }
+.frame { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.frame img.on { opacity: 1; animation: photo-fade 300ms ease-out; }
+.thumbs { display: flex; gap: 8px; margin-top: 12px; }
+.thumbs button { width: 48px; height: 36px; border-radius: 4px; border: 1px solid var(--rule); background: var(--plate); }
+.thumbs button[aria-pressed="true"] { border-color: var(--ink); }
+.badge img { display: block; width: 64px; height: 48px; margin-top: 12px; object-fit: cover; border-radius: 4px; }
+.chips-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.chips span { flex: 0 0 auto; height: 32px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 16px; font-size: 14px; line-height: 30px; }
+.chips-row button { display: none; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 16px; border: 1px solid var(--rule); background: var(--plate); }
+#holly, #contact { padding-top: 16px; padding-bottom: 32px; }
+.frame.holly { width: 240px; max-width: 100%; margin-top: 16px; }
+#holly .pager button[data-treat] { width: auto; padding: 0 16px; font: 600 15px/24px "Red Hat Text", sans-serif; color: var(--ink); }
+#holly p, #contact p { margin-top: 8px; }
+#contact form { display: flex; gap: 12px; align-items: end; margin-top: 16px; }
+#contact label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+#contact input { height: 40px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--plate); color: var(--ink); font: 400 15px/24px "Red Hat Text", sans-serif; }
+#contact button { height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); font: 600 15px/24px "Red Hat Text", sans-serif; }
+#list a.view { display: inline-block; margin-top: 16px; color: var(--accent); font-weight: 600; }
+footer a { color: var(--muted); }
+.strip { display: flex; gap: 8px; padding: 8px 80px; }
+figcaption { margin-top: 8px; font-size: 14px; line-height: 20px; color: var(--muted); }
+#notes { padding-top: 16px; padding-bottom: 32px; }
+#notes p { margin-top: 8px; }
+#list { padding-top: 16px; padding-bottom: 48px; }
+.filters { display: flex; gap: 8px; margin-top: 16px; }
+#list p { margin-top: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+footer { padding: 24px 80px; border-top: 1px solid var(--rule); font-size: 14px; color: var(--muted); }
+@keyframes rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes plate-from-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes plate-from-left { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes photo-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes theme-reveal { from { clip-path: circle(0px at var(--rx) var(--ry)); } to { clip-path: circle(150vmax at var(--rx) var(--ry)); } }
+::view-transition-old(root) { animation: none; }
+::view-transition-new(root) { animation: theme-reveal 560ms ease-out; }
+@media (max-width: 600px) {
+  header { height: 64px; padding: 0 16px; gap: 12px; }
+  header nav a.work { display: none; }
+  section { padding-left: 16px; padding-right: 16px; }
+  #opener { padding-top: 32px; }
+  #opener h1 { font-size: 36px; line-height: 44px; }
+  .plate { padding: 20px; }
+  .chips-row button { display: block; }
+  #contact form { flex-direction: column; align-items: stretch; }
+  footer { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, ::view-transition-new(root) { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body class="site">
+<div class="page">
+<header data-board-section="fx/header">
+  <a class="brand" href="/">Fixture studio</a>
+  <nav><a class="work" href="/work">Work</a><a href="/cv/fixture.pdf">Download CV</a></nav>
+  <button type="button" data-toggle aria-label="Switch to the dark theme"></button>
+</header>
+<main>
+  <section id="opener" aria-labelledby="opener-title" data-board-section="fx/opener">
+    <h1 id="opener-title">We build fixtures.</h1>
+    <p>A page made to be measured, with one of each thing the fidelity check reads.</p>
+  </section>
+  <section id="range" aria-label="Plates" data-board-section="fx/range">
+    <div class="tabs" role="group" aria-label="Choose a plate">
+      <button type="button" data-tab aria-pressed="true">One</button>
+      <button type="button" data-tab aria-pressed="false">Two</button>
+      <button type="button" data-tab aria-pressed="false">Three</button>
+    </div>
+    <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="1 of 3: One"><h2>Plate one</h2><p>The first plate, drawn plainly.</p></div>
+    <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="2 of 3: Two" hidden><h2>Plate two</h2><p>The second plate has a longer line, so it wraps on a phone.</p></div>
+    <div class="plate" data-plate role="group" aria-roledescription="slide" aria-label="3 of 3: Three" hidden><h2>Plate three</h2><p>The last plate.</p></div>
+    <div class="chips-row">
+      <button type="button" data-chips-back aria-label="Scroll the categories back"></button>
+      <div class="chips" aria-label="Categories"><span>Dashboards</span><span>Finance</span><span>Mobile</span><span>AI features</span><span>3D and motion</span><span>Sites</span><span>Testing</span><span>Writing</span></div>
+      <button type="button" data-chips-forward aria-label="Scroll the categories forward"></button>
+    </div>
+    <div class="pager">
+      <button type="button" data-prev-plate aria-label="Previous plate"></button>
+      <p data-count>1 of 3</p>
+      <button type="button" data-next-plate aria-label="Next plate"></button>
+    </div>
+  </section>
+  <section id="gallery" aria-labelledby="gallery-title" data-board-section="fx/gallery">
+    <h2 id="gallery-title">Photos</h2>
+    <figure aria-label="Gallery">
+      <div class="frame">
+        <img data-photo class="on" src="/_next/image?url=%2Fimg%2Fone.webp&amp;w=640&amp;q=75" alt="A made-up picture, one">
+        <img data-photo src="/_next/image?url=%2Fimg%2Ftwo.webp&amp;w=640&amp;q=75" alt="A made-up picture, two">
+        <img data-photo src="/_next/image?url=%2Fimg%2Fthree.webp&amp;w=640&amp;q=75" alt="A made-up picture, three">
+      </div>
+      <figcaption>Three made-up pictures.</figcaption>
+    </figure>
+    <div class="pager">
+      <button type="button" data-prev-photo aria-label="Previous photo"></button>
+      <p data-shown>1 of 3</p>
+      <button type="button" data-next-photo aria-label="Next photo"></button>
+    </div>
+    <div class="thumbs" role="group" aria-label="Pick a photo">
+      <button type="button" data-thumb aria-label="Photo 1 of 3" aria-pressed="true"></button>
+      <button type="button" data-thumb aria-label="Photo 2 of 3" aria-pressed="false"></button>
+      <button type="button" data-thumb aria-label="Photo 3 of 3" aria-pressed="false"></button>
+    </div>
+    <picture class="badge"><source media="(max-width: 600px)" srcset="img/four.webp"><img src="img/one.webp" alt="A made-up badge"></picture>
+  </section>
+  <section id="list" aria-labelledby="list-title" data-board-section="fx/list">
+    <h2 id="list-title">Every fixture</h2>
+    <div class="filters" role="group" aria-label="Filter the fixtures">
+      <button type="button" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" data-filter="live" aria-pressed="false">Live</button>
+      <button type="button" data-filter="draft" aria-pressed="false">Draft</button>
+    </div>
+    <p data-kind="live">Fixture one, live</p>
+    <p data-kind="draft">Fixture two, a draft</p>
+    <p data-kind="live">Fixture three, live</p>
+    <a class="view" href="/blog/work">Read the writing</a>
+  </section>
+  <section id="holly" aria-labelledby="holly-title" data-board-section="fx/holly">
+    <h2 id="holly-title">Holly</h2>
+    <div class="frame holly">
+      <img data-holly class="on" src="img/two.webp" alt="Holly, made up, one">
+      <img data-holly src="img/three.webp" alt="Holly, made up, two">
+    </div>
+    <div class="pager">
+      <button type="button" data-holly-next aria-label="Next photo of Holly"></button>
+      <button type="button" data-treat>Give Holly a treat</button>
+    </div>
+    <p data-treats>No treats yet.</p>
+  </section>
+  <section id="contact" aria-labelledby="contact-title" data-board-section="fx/contact">
+    <h2 id="contact-title">Write to us</h2>
+    <form data-contact>
+      <label>Your name <input name="name" autocomplete="off"></label>
+      <button type="submit">Send message</button>
+    </form>
+    <p data-status>Nothing sent yet.</p>
+  </section>
+</main>
+<footer data-board-section="fx/footer"><p>A made-up footer. <a href="/cv/fixture.pdf">CV</a></p></footer>
+</div>
+<script src="/site.js"></script>
+</body>
+</html>

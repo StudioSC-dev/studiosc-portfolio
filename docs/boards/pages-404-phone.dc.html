@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pages — 404, phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400..800&family=Red+Hat+Text:wght@400..700&family=IBM+Plex+Sans:wght@400;500;600&family=Manrope:wght@400..800&display=swap">
+<style>
+body{margin:0;background:#E9EAEC}
+a{color:var(--ink);text-decoration-thickness:1px;text-underline-offset:0.2em}a:hover{color:var(--muted)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button{cursor:pointer}
+@keyframes rise{from{opacity:0;transform:translateY(0.35em)}to{opacity:1;transform:none}}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+@keyframes wiggle-a{0%{transform:rotate(0)}20%{transform:rotate(-3deg)}45%{transform:rotate(2deg)}70%{transform:rotate(-1.5deg)}100%{transform:rotate(0)}}
+@keyframes ears-a{0%{transform:rotate(0)}30%{transform:rotate(-9deg)}60%{transform:rotate(5deg)}100%{transform:rotate(0)}}
+@keyframes theme-reveal{from{clip-path:circle(0px at var(--rx, 100%) var(--ry, 0px))}to{clip-path:circle(150vmax at var(--rx, 100%) var(--ry, 0px))}}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:theme-reveal 560ms ease-in-out}
+@media (prefers-reduced-motion: reduce){[data-motion]{animation:none !important}[data-fade]{transition:none !important}::view-transition-new(root){animation:none}}
+</style>
+</helmet>
+<div style="--gallery: {{t.bg}}; --plate: {{t.plate}}; --peek: {{t.peek}}; --ink: {{t.ink}}; --muted: {{t.muted}}; --rule: {{t.rule}}; --accent: {{t.accent}}; --tt-band:#1F4D3A; --tt-ink:#1C2420; --tt-muted:#58615B; --tt-rule:#DCE3DE; --tt-pad:#F6F9F6; --tt-red:#B3261E; --tt-green:#23613F; --cc-bg:#EEF1F6; --cc-panel:#FFFFFF; --cc-ink:#1A2233; --cc-muted:#4F5A70; --cc-line:#D9DFEA; --cc-accent:#2F6FED; font-family: 'Red Hat Text', sans-serif; font-size: 1rem; line-height: 1.625rem; color: var(--ink); background: var(--gallery); width: 390px; box-sizing: border-box; padding-bottom: 3rem; position: relative; overflow: hidden;">
+
+  <header style="position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; height: 4rem; padding: 0 1rem;">
+    <div style="justify-self: start;">
+  <button type="button" aria-label="{{themeLabel}}" onClick="{{toggleTheme}}" style="appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink);"><sc-if value="{{isDark}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="3.75" stroke="currentColor" stroke-width="1.5"></circle><path d="M10 1.75V3.75M10 16.25V18.25M1.75 10H3.75M16.25 10H18.25M4.17 4.17L5.58 5.58M14.42 14.42L15.83 15.83M4.17 15.83L5.58 14.42M14.42 5.58L15.83 4.17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg></sc-if><sc-if value="{{isLight}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.5 12.1A7 7 0 0 1 7.9 3.5A7 7 0 1 0 16.5 12.1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg></sc-if></button>
+    </div>
+    <a href="/" aria-label="StudioSC, home" style="font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem; text-decoration: none;">StudioSC</a>
+    <div style="justify-self: end;">
+  <button type="button" aria-expanded="false" aria-controls="phone-menu" style="min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--ink); border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Menu</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 404: Holly ate this page -->
+    <section aria-labelledby="nf-title" style="position: relative; padding: 2.5rem 1rem 1rem; text-align: center;">
+      <svg aria-hidden="true" width="120" height="200" viewBox="0 0 120 200" fill="none" data-motion="" style="position: absolute; top: 0; right: 0; opacity: {{t.dots}}; animation: {{load.dots}} 900ms ease-out 120ms both; pointer-events: none;"><path d="M36 4h0M68 4h0M84 4h0M100 4h0M108 4h0M116 4h0M76 12h0M92 12h0M108 12h0M52 20h0M68 20h0M84 20h0M100 20h0M116 20h0M92 28h0M108 28h0M36 36h0M68 36h0M84 36h0M100 36h0M108 36h0M116 36h0M92 44h0M108 44h0M52 52h0M84 52h0M100 52h0M116 52h0M92 60h0M108 60h0M68 68h0M84 68h0M100 68h0M116 68h0M108 76h0M84 84h0M100 84h0M116 84h0M68 100h0M84 100h0M100 100h0M116 100h0M108 108h0M84 116h0M100 116h0M116 116h0M68 132h0M84 132h0M100 132h0M116 132h0M84 148h0M116 148h0M100 164h0" style="stroke: var(--accent);" stroke-width="2.6" stroke-linecap="round"></path></svg>
+      <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+        <svg aria-hidden="true" viewBox="10 0 130 84" fill="none" style="display: block; width: 13rem; height: auto; color: var(--ink); overflow: visible;"><g data-motion="" style="transform-box: view-box; transform-origin: 86px 77px; animation: wiggle-a 360ms ease-in-out 700ms both;"><g stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M44 68V77H50M74 71V77H79"></path><path d="M96 34C80 35 50 35 34 36C22 36 15 45 17 55C18 61 22 65 27 66L28 77H37L37 67C52 69 68 71 80 71L81 77H90L92 68C99 65 104 57 104 48C104 45 105 43 106 42C110 39 114 37 118 35L127 33C131 33 133 30 132 28L120 24C117 20 113 18 108 19C102 20 97 26 96 34Z"></path><path d="M21 49C23 51 24 54 23 58M100 54C98.5 56 98.5 59 100 61"></path><g data-motion="" style="transform-box: view-box; transform-origin: 108px 21px; animation: ears-a 300ms ease-out 1200ms both;"><path d="M101 23L98 5L108.5 19.5M108.5 19.5L114 3.5L118.5 22"></path><path d="M103 18L100.5 10.5M113.3 18L113.7 9.5"></path></g></g><circle cx="114" cy="25.5" r="1.3" fill="currentColor"></circle><circle cx="132" cy="28.5" r="1.7" fill="currentColor"></circle></g></svg>
+        <p style="margin: 1.5rem 0 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--muted); font-weight: 600;">404 · Page not found</p>
+        <h1 id="nf-title" style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 600; font-size: 2.625rem; line-height: 2.875rem; letter-spacing: -0.035em; margin-top: 0.5rem;">Holly ate this page</h1>
+        <p style="margin: 0.75rem 0 0; font-size: 1.0625rem; line-height: 1.625rem;">It was here a moment ago. Now there's just a corgi looking pleased with herself. The link may be old, or mistyped.</p>
+        <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.75rem 1.5rem;">
+          <a href="/" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.25rem; border-radius: 6px; box-sizing: border-box; text-decoration: none; font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600; background: var(--ink); color: var(--gallery);">Back to the home page</a>
+          <a href="/work" style="font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Every project</a>
+          <a href="/blog" style="font-size: 0.9375rem; line-height: 1.5rem; font-weight: 600;">Writing</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="margin-top: 3.5rem; border-top: 1px solid var(--rule); padding: 2rem 1rem 0;">
+    <p style="margin: 0; font-family: 'Red Hat Display', sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.75rem;">StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.9375rem; line-height: 1.5rem; color: var(--muted);">Seth builds. Christine tests.</p>
+    <nav aria-label="Footer" style="margin-top: 1rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; font-size: 0.9375rem; line-height: 1.5rem;">
+      <a href="/work" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Work</a>
+      <a href="/blog" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Writing</a>
+      <a href="/about" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">About</a>
+      <a href="/contact" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Contact</a>
+      <a href="https://www.linkedin.com/in/sethcharlespalileo/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Seth on LinkedIn</a>
+      <a href="https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">Christine on LinkedIn</a>
+      <a href="https://github.com/StudioSC-dev" style="display: flex; align-items: center; min-height: 2.75rem; text-decoration: none;">StudioSC-dev on GitHub</a>
+    </nav>
+    <p style="margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);">© 2026 StudioSC</p>
+    <p style="margin: 0.25rem 0 0; font-size: 0.8125rem; line-height: 1.25rem;"><a href="/privacy/hermes-personal-assistant" style="color: var(--muted);">Hermes Personal Assistant privacy policy</a></p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const dark = typeof st.dark === 'boolean' ? st.dark : false;
+    const themes = {
+      light: { bg: '#E9EAEC', plate: '#FFFFFF', peek: '#F4F5F6', ink: '#1D1F23', muted: '#5E636B', rule: '#D0D3D8', accent: '#1F4FD1', dots: '0.55', error: '#B3261E' },
+      dark: { bg: '#141619', plate: '#1D2024', peek: '#191B1F', ink: '#ECEEF1', muted: '#A3A9B2', rule: '#30343A', accent: '#7FA2FF', dots: '0.7', error: '#FF9B8F' }
+    };
+    const theme = dark ? themes.dark : themes.light;
+    const set = (patch) => this.setState(patch);
+    const toggleTheme = (ev) => {
+      const apply = () => set({ dark: !dark });
+      const doc = typeof document !== 'undefined' ? document : null;
+      const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!doc || !doc.startViewTransition || still) { apply(); return; }
+      const el = ev && ev.currentTarget;
+      if (el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        doc.documentElement.style.setProperty('--rx', (r.left + r.width / 2) + 'px');
+        doc.documentElement.style.setProperty('--ry', (r.top + r.height / 2) + 'px');
+      }
+      doc.startViewTransition(() => new Promise((done) => { apply(); requestAnimationFrame(() => requestAnimationFrame(done)); }));
+    };
+
+    return {
+      t: theme,
+      isDark: dark,
+      isLight: !dark,
+      themeLabel: dark ? 'Switch to the light theme' : 'Switch to the dark theme',
+      toggleTheme,
+      load: { dots: 'none' }
+    };
+  }
+}
+</script>
+</body>
+</html>

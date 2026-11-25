@@ -8,3 +8,7 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 docs/tickets
+docs/boards
+e2e/fixtures/fidelity/canvas
+e2e/fixtures/fidelity/site
+e2e/fixtures/fidelity/runtime
