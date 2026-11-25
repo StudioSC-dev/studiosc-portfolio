@@ -808,6 +808,9 @@
           .map(([a, b]) => `${parseInt(a, 16)}-${parseInt(b || a, 16)}`)
           .join(",");
       const loaded = [...document.fonts];
+      // document.fonts lists the CSS faces in rule order: each rule takes the
+      // next face with its descriptors, so two rules alike keep their own.
+      const taken = new Set();
       for (const sheet of document.styleSheets) {
         let rules;
         try {
@@ -832,11 +835,13 @@
           ].map((m) => new URL(m[1], sheet.href || location.href).href);
           const face = loaded.find(
             (f) =>
+              !taken.has(f) &&
               f.family.replace(/^["']|["']$/g, "") === fam &&
               f.weight === weight &&
               f.style === style &&
               ranges(f.unicodeRange) === range
           );
+          if (face) taken.add(face);
           faces.push({
             family: fam,
             weight,

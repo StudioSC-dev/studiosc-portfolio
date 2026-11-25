@@ -3,6 +3,19 @@
  * thing the check reads (or, for `picture-only`, only what a frame holds).
  * The harness injects them into the unchanged fixture site.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+/** The pinned fixture font, and another font's bytes inline. */
+const PINNED_FONT = "/fonts/RrQXbohi_ic6B3yVSzGBrMxQaKct.woff2";
+const INLINE_FONT = `data:font/woff2;base64,${readFileSync(
+  path.join(__dirname, "site", "alt-font.woff2")
+).toString("base64")}`;
+const face = (src: string) =>
+  `@font-face { font-family: 'Red Hat Text'; font-style: normal; font-weight: 400 700; src: ${src}; }`;
+const swapFonts = (to: string) =>
+  `document.querySelector('link[href="/fonts.css"]').href = ${JSON.stringify(to)};`;
+
 export interface Drift {
   css?: string;
   js?: string;
@@ -151,5 +164,16 @@ export const DRIFTS: Record<string, Drift> = {
   },
   "fonts-missing": {
     replace: [['href="/fonts.css"', 'href="/fonts-missing.css"']],
+  },
+  // The pinned file, behind a local() source tried first.
+  "fonts-local": { css: face(`local('Red Hat Text'), url(${PINNED_FONT})`) },
+  // Another font's bytes inline: loaded, from no file the site served.
+  "fonts-inline": { css: face(`url(${INLINE_FONT})`) },
+  // The wrong file only with reduced motion, or only once a tab is picked.
+  "fonts-wrong-rm": {
+    js: `if (matchMedia("(prefers-reduced-motion: reduce)").matches) ${swapFonts("/fonts-wrong.css")}`,
+  },
+  "fonts-wrong-on-tab": {
+    js: `document.querySelectorAll("[data-tab]").forEach((t) => t.addEventListener("click", () => { ${swapFonts("/fonts-wrong.css")} }));`,
   },
 };

@@ -175,8 +175,10 @@ const covers = (range: string, weight: number) => {
 
 /**
  * The site's fonts are the pinned ones: every face of a pinned family loads
- * a pinned file, none fails to load, and every family and weight the rows'
- * text uses has a loaded face, so a fallback under the family's name fails.
+ * a pinned file and nothing else (no local() font, no inline or unseen
+ * bytes), none fails to load, and every family and weight the rows' text
+ * uses has a face loaded from a pinned file, so a fallback or a system font
+ * under the family's name fails.
  */
 function fontFailures(
   report: { faces: FontFaceReport[]; used: string[] },
@@ -191,8 +193,22 @@ function fontFailures(
   const faces = report.faces
     .map((f) => ({ ...f, ...faceFamily(f.family) }))
     .filter((f) => pinned.has(f.family) && !f.fallback);
+  const fromPin = (f: (typeof faces)[number]) =>
+    !f.local && f.urls.some((u) => pinned.get(f.family)!.has(served.get(u)!));
   for (const f of faces) {
     const property = `font ${f.family} ${f.weight}`;
+    if (f.local)
+      push(
+        property,
+        "loaded from a pinned file",
+        "a local() source: whatever font the machine has"
+      );
+    else if (f.status === "loaded" && !f.urls.some((u) => served.has(u)))
+      push(
+        property,
+        "loaded from a pinned file",
+        "loaded from no file the site served"
+      );
     if (f.status === "error")
       push(
         property,
@@ -217,6 +233,7 @@ function fontFailures(
       (f) =>
         f.family === family &&
         f.status === "loaded" &&
+        fromPin(f) &&
         f.style === style &&
         covers(f.weight, Number(weight))
     );
@@ -294,6 +311,8 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
   };
   const lightTokens = new Map<string, Record<string, string>>();
   const pinned = pinnedFaces(boards);
+  /** Font failures already reported, once each per page and width. */
+  const fontsSeen = new Set<string>();
 
   for (const g of groups(boards, built, only, result.undrawn)) {
     const ref0 = spec.boards[g.board];
@@ -344,20 +363,26 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
           rm,
           Object.keys(ref.tokens),
           async (page, cap, fonts) => {
-            if (state === "default" && !rm && g.rows.length)
-              failures.push(
-                ...fontFailures(
-                  await fontsReport(
-                    page,
-                    rowQueries(g.rows, sections.rows, "site"),
-                    sections
-                  ),
-                  pinned,
-                  fonts,
-                  g.rows[0].id,
-                  where
-                )
-              );
+            // In every state, motion on and reduced: a font a step or the
+            // reduced-motion styles swap in is still the site's font. Each
+            // failure is named once, in the first state it shows.
+            if (g.rows.length)
+              for (const f of fontFailures(
+                await fontsReport(
+                  page,
+                  rowQueries(g.rows, sections.rows, "site"),
+                  sections
+                ),
+                pinned,
+                fonts,
+                g.rows[0].id,
+                where
+              )) {
+                const id = `${g.route}|${g.width}|${g.theme}|${f.property}|${f.actual}`;
+                if (fontsSeen.has(id)) continue;
+                fontsSeen.add(id);
+                failures.push(f);
+              }
             if (!opts.pairsDir) return;
             for (const row of rowsHere) {
               const b = ref.rows[row.id];

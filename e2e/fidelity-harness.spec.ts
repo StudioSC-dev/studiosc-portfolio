@@ -1017,6 +1017,10 @@ test.describe("fidelity harness", () => {
           actual: `it stays ${list(ref(c, row).shows.photos)}`,
         });
 
+      const altFont = `alt-font.woff2 with sha256 ${sha256(
+        readFileSync(path.join(CANVAS, "../site/alt-font.woff2"))
+      )}`;
+
       const cases: Case[] = [
         // One thing each, named with its value.
         [
@@ -1328,9 +1332,7 @@ test.describe("fidelity harness", () => {
             section: "fx/opener",
             property: "font red hat text 400 700",
             expected: "a pinned red hat text file",
-            actual: `alt-font.woff2 with sha256 ${sha256(
-              readFileSync(path.join(CANVAS, "../site/alt-font.woff2"))
-            )}`,
+            actual: altFont,
           }),
         ],
         [
@@ -1341,6 +1343,50 @@ test.describe("fidelity harness", () => {
             property: "font red hat text 400 700",
             expected: "loaded from a pinned file",
             actual: "failed to load missing.woff2",
+          }),
+        ],
+        // The pinned file behind a local() source, and another font inline.
+        [
+          "fonts-local",
+          opener(),
+          () => ({
+            section: "fx/opener",
+            property: "font red hat text 400 700",
+            expected: "loaded from a pinned file",
+            actual: "a local() source: whatever font the machine has",
+          }),
+        ],
+        [
+          "fonts-inline",
+          opener(),
+          () => ({
+            section: "fx/opener",
+            property: "font red hat text 400 700",
+            expected: "loaded from a pinned file",
+            actual: "loaded from no file the site served",
+          }),
+        ],
+        // Fonts are checked in every state, reduced motion included.
+        [
+          "fonts-wrong-rm",
+          opener(true),
+          () => ({
+            section: "fx/opener",
+            state: "default-rm",
+            property: "font red hat text 400 700",
+            expected: "a pinned red hat text file",
+            actual: altFont,
+          }),
+        ],
+        [
+          "fonts-wrong-on-tab",
+          rowsIn(["fx/range"], ["tab-2"]),
+          () => ({
+            section: "fx/range",
+            state: "tab-2",
+            property: "font red hat text 400 700",
+            expected: "a pinned red hat text file",
+            actual: altFont,
           }),
         ],
         // Every other property in scope.
