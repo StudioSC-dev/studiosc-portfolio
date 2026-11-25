@@ -309,6 +309,7 @@ export const COMPONENT_DETAILS: Record<
   "Person frame": {
     boards: [
       "range-light-desktop",
+      "range-phone",
       "range-profile-seth-desktop",
       "range-profile-christine-desktop",
     ],
@@ -317,14 +318,14 @@ export const COMPONENT_DETAILS: Record<
       "text-person-phone",
       "Or hire us both for your project or idea",
       "14px radius",
-      "pads 2.5rem",
-      "7rem photo",
+      "pads 2.5rem on desktop and 1.5rem 1rem on a phone",
+      "a 7rem photo on desktop and 5.5rem on a phone",
       "36/44, -0.02em",
-      "20/28",
+      "20/28 on desktop and 18/24 on a phone",
     ],
   },
   "Holly's pile": {
-    boards: ["range-light-desktop"],
+    boards: ["range-light-desktop", "range-phone"],
     details: [
       "Photos of Holly.",
       "12rem on a phone",
@@ -332,7 +333,7 @@ export const COMPONENT_DETAILS: Record<
       "Give Holly a treat",
       "a 2.5rem radius",
       "4° and -3°",
-      "44/48",
+      "44/48 on desktop and 36/40 on a phone",
       "20/28",
     ],
   },

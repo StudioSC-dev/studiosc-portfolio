@@ -435,32 +435,34 @@ Board: `range-light-desktop`, the Mobile, AI features and 3D & motion plates.
 ### Person frame
 
 Board: `range-light-desktop`, "The two of us: a deliberate pair in one frame,
-split by an ink rule"; `range-profile-seth-desktop` and
-`range-profile-christine-desktop` for the person pages.
+split by an ink rule"; `range-phone` for the phone sizes;
+`range-profile-seth-desktop` and `range-profile-christine-desktop` for the
+person pages.
 
 - One frame on `--plate` with a 1px `--ink` border and a 14px radius, split by a
   1px `--ink` rule; stacked on a phone.
-- Each panel pads 2.5rem: a 7rem photo (1px `--rule` border, 4px radius), the
+- Each panel pads 2.5rem on desktop and 1.5rem 1rem on a phone: a 7rem photo
+  on desktop and 5.5rem on a phone (1px `--rule` border, 4px radius), the
   name (Red Hat Display 600, 36/44, -0.02em, `text-person`; 28/36 on a phone,
   `text-person-phone`), the role (16/24, 600), the fact
   line (15/24, `--muted`), the pitch (17/26), "Open to", "What I did here" (a
   14/20 600 `--muted` heading over a ruled list), Download CV and Email, then
   LinkedIn and GitHub.
-- Under it, centred, Red Hat Display 600, 20/28: "Or hire us both for your
-  project or idea".
+- Under it, centred, Red Hat Display 600, 20/28 on desktop and 18/24 on a
+  phone: "Or hire us both for your project or idea".
 
 ### Holly's pile
 
 Board: `range-light-desktop`, "Holly: the studio dog. Not staff, so a softer
-radius than the people blocks".
+radius than the people blocks"; `range-phone` for the phone sizes.
 
 - A 13rem square group (12rem on a phone, `range-phone`) labelled "Photos of Holly. The left and right arrow keys
   flip through them.", focusable. Six prints, each with a 1px `--rule` border,
   a 2.5rem radius, on `--plate`; the next two show behind at 4° and -3°.
 - Back and next (2.75rem, 6px) around an "n / 6" counter.
-- "And" (Red Hat Display 400, 44/48) bridges from "The two of us"; "Holly"
-  (Red Hat Display 600, 44/48, -0.02em); "Chief Morale Officer" (20/28, 600,
-  `--accent`).
+- "And" (Red Hat Display 400, -0.02em) bridges from "The two of us"; "Holly"
+  (Red Hat Display 600, -0.02em). Both are 44/48 on desktop and 36/40 on a
+  phone. "Chief Morale Officer" (20/28, 600, `--accent`).
 - "Very flexible rates: anything beef or duck will do." and a "Give Holly a
   treat" pill (2.75rem, 1px `--ink` border), with "Treats today: n" announced.
 - Motion as in the Motion table: `tuck-a`/`tuck-b`, `untuck-a`/`untuck-b`,
