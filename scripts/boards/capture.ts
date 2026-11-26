@@ -339,6 +339,17 @@ const fid = (page: Page) => ({
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hide(x), e),
 });
 
+/** A read of the viewport, then the page's first full-page shot. */
+async function fixRendering(page: Page) {
+  await page.screenshot({ animations: "allow", caret: "hide" });
+  await page.screenshot({
+    fullPage: true,
+    animations: "allow",
+    caret: "hide",
+    clip: { x: 0, y: 0, width: 1, height: 1 },
+  });
+}
+
 /**
  * Runs a state's steps, each one from rest: the motions a step starts are
  * noted, then settled, before the next step. A step that lands while the
@@ -436,6 +447,12 @@ export async function captureState(
   )) as Capture;
   if (opts.allMotion)
     everything.push(...(await takeMotion(page, rows, sections)));
+  // The first full-page shot of a settled page fixes how every later shot
+  // draws an element whose finished animation still fills, and which way
+  // it draws it depends on how soon the shot lands. Straight after a read
+  // of the viewport it is always drawn one way, the way reduced motion
+  // draws it, so the capture takes that first full-page shot itself.
+  if (!def?.inFlight) await fixRendering(page);
   const capture: Capture = {
     tokens: measured.tokens,
     rows: measured.rows,
