@@ -24,7 +24,7 @@ import {
 } from "../scripts/boards/model";
 import { TSX } from "./support/config";
 import { collectErrors, stubVercelInsights } from "./support/page";
-import { ROOT } from "./support/git";
+import { existsAt, git, prRange, type PrRange, ROOT } from "./support/git";
 
 /**
  * PRV-4: the shared header and footer, the theme switch, and the shared
@@ -275,6 +275,78 @@ function filesUnder(dir: string): string[] {
     else out.push(rel);
   }
   return out;
+}
+
+/** The files PRV-4 may change (AC12), and the ticket it commits. */
+const SCOPE = [
+  "app/layout.tsx",
+  "app/not-found.tsx",
+  "lib/theme.ts",
+  "lib/links.ts",
+  "components/layout/",
+  "components/ui/",
+  "components/contact/ContactForm.tsx",
+  "e2e/fixtures/perf-baseline.json",
+  "e2e/guards.spec.ts",
+  "docs/boards/sections.json",
+  "docs/boards/merged.json",
+  "e2e/chrome.spec.ts",
+  "e2e/navigation.spec.ts",
+  "docs/tickets/PRV-4.md",
+];
+
+/** Files PRV-4 may change only where a line calls a changed primitive. */
+const CALLERS = [
+  "app/work/page.tsx",
+  "app/work/[slug]/page.tsx",
+  "app/blog/page.tsx",
+  "app/about/page.tsx",
+  "app/contact/page.tsx",
+  "app/privacy/hermes-personal-assistant/page.tsx",
+  "components/home/Hero.tsx",
+  "components/home/ProjectCard.tsx",
+  "app/page.tsx",
+];
+
+/**
+ * What a change in a caller may be about: a changed primitive (its import,
+ * its call, the removed `label` eyebrow and `size`), or the removed export.
+ */
+const CALLER_HUNK =
+  /StatusBadge|StatusText|CtaLink|PageHeader|^\s*label="|INSTAGRAM|Sized `sm`/m;
+
+/** An outer content wrapper, moved onto the shared left edge. */
+const WRAPPER_LINE = /^\s*<(?:section|div) className="[^"]*">\s*$/;
+
+/** The callers whose outer content wrappers may move to the shared edge. */
+const WRAPPER_FILES = [
+  "components/home/Hero.tsx",
+  "components/home/ProjectCard.tsx",
+  "app/page.tsx",
+  // The /work wrapper carries the shared left edge AC1 asks for.
+  "app/work/page.tsx",
+];
+
+/** A file's changed hunks, each as its removed and added lines. */
+function hunks(fork: string, head: string, file: string): string[][] {
+  const out: string[][] = [];
+  for (const line of git(["diff", "-U0", fork, head, "--", file]).split("\n")) {
+    if (line.startsWith("@@")) out.push([]);
+    else if (out.length && /^[+-](?![+-]{2} )/.test(line))
+      out[out.length - 1].push(line.slice(1));
+  }
+  return out;
+}
+
+const SPEC_FILE = "e2e/chrome.spec.ts";
+
+/** PRV-4's own PR, or why its one-time checks skip. */
+function ownPr(): { range: PrRange } | { skip: string } {
+  const range = prRange();
+  if (!range) return { skip: "a push build has no PR to judge" };
+  if (existsAt(range.base, SPEC_FILE))
+    return { skip: `${range.base} already holds ${SPEC_FILE}` };
+  return { range };
 }
 
 test.describe("chrome", () => {
@@ -961,5 +1033,37 @@ test.describe("chrome", () => {
     expect(found).toEqual([
       "content/blog/first-marathon.mdx https://www.instagram.com/p/DUxtiRsARJw/",
     ]);
+  });
+});
+
+test.describe("chrome", () => {
+  test("changes stay within scope", async ({}, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    const own = ownPr();
+    test.skip("skip" in own, "skip" in own ? own.skip : "");
+    if (!("range" in own)) return;
+    const { base, head } = own.range;
+    const fork = git(["merge-base", base, head]).trim();
+    const changed = git(["diff", "--name-only", fork, head])
+      .split("\n")
+      .filter(Boolean);
+    expect(
+      changed.filter(
+        (f) =>
+          !CALLERS.includes(f) &&
+          !SCOPE.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
+      )
+    ).toEqual([]);
+
+    // Each hunk in a caller is about a changed primitive or the removed
+    // export, or (in the files allowed it) only moves an outer wrapper.
+    for (const file of changed.filter((f) => CALLERS.includes(f))) {
+      const stray = hunks(fork, head, file).filter((lines) => {
+        if (CALLER_HUNK.test(lines.join("\n"))) return false;
+        const wrapper = lines.every((l) => WRAPPER_LINE.test(l));
+        return !(wrapper && WRAPPER_FILES.includes(file));
+      });
+      expect(stray, file).toEqual([]);
+    }
   });
 });
