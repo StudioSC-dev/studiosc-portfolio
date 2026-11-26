@@ -13,6 +13,7 @@ import {
 import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
+import { isDeepStrictEqual } from "node:util";
 import path from "node:path";
 import {
   chromium,
@@ -23,6 +24,7 @@ import {
 } from "@playwright/test";
 import { checkSite, pairName, type Only } from "../scripts/boards/check";
 import {
+  TOLERANCE,
   describe as describeFailure,
   type Failure,
 } from "../scripts/boards/compare";
@@ -37,11 +39,22 @@ import {
   readSpec,
   runtimeCopies,
   sha256,
+  stableJson,
+  stateName,
+  unpackSpec,
   walk,
+  WIDTHS,
   type BoardsDir,
+  type Capture,
   type Deviation,
+  type KeyMeasure,
   type Manifest,
+  type Row,
+  type RowMeasure,
   type Sections,
+  type SpecFile,
+  type Theme,
+  type Width,
 } from "../scripts/boards/model";
 import { checkImage, isImageCandidate } from "../scripts/image-metadata";
 import {
@@ -66,7 +79,17 @@ import {
   type FixtureServer,
 } from "./fixtures/fidelity/server";
 import { DRIFTS } from "./fixtures/fidelity/drifts";
-import { boardThemes, plannedCaptures } from "../scripts/boards/plan";
+import {
+  boardThemes,
+  hiddenFor,
+  laterSelector,
+  plannedCaptures,
+  rowStates,
+  type BoardTheme,
+  type Hide,
+  type PlannedCapture,
+  type Register,
+} from "../scripts/boards/plan";
 import { scanText, isBinary } from "./support/denylist";
 import { exifGpsSegment, jpegWithSegment } from "./support/dirty-images";
 import {
@@ -76,6 +99,7 @@ import {
   git,
   prRange,
   treeFiles,
+  type PrRange,
 } from "./support/git";
 import { throwawayRepo } from "./support/throwaway";
 
@@ -2498,6 +2522,486 @@ test.describe("fidelity harness", () => {
       expect(none).toEqual(expect.arrayContaining(missed));
     });
   });
+
+  test("hidden header links leave no gap", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    test.setTimeout(40 * 60_000);
+    const inputs = inputsAt(null);
+    const d9 = inputs.register.deviations.find((d) => d.id === "D9")!;
+    test.skip(inputs.register.merged.includes(d9.expires!), "D9 has expired");
+    expect(d9.section).toEqual(["chrome/header"]);
+    const row = inputs.sections.rows.find((r) => r.id === "chrome/header")!;
+    /** The header's rendered nav links and its rendered empty list items. */
+    const nav = (page: Page) =>
+      page.evaluate((scope) => {
+        const shown = (el: Element) => el.getClientRects().length > 0;
+        const items = [...document.querySelectorAll(`:is(${scope}) li`)].filter(
+          shown
+        );
+        return {
+          links: [...document.querySelectorAll(`:is(${scope}) nav a`)]
+            .filter(shown)
+            .map((a) => (a.textContent ?? "").trim()),
+          empty: items.filter(
+            (li) => ![...li.querySelectorAll("*")].some(shown)
+          ).length,
+        };
+      }, row.board);
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    const dirs: string[] = [];
+    try {
+      let checked = 0;
+      for (const width of d9.width as Width[])
+        for (const theme of d9.theme as Theme[]) {
+          const board = row.sources[width]![theme].board;
+          const bt = boardThemes(inputs.sections, board, width).find(
+            (b) => b.theme === theme
+          )!;
+          const plans = plannedCaptures(inputs.sections, bt, inputs.register);
+          const partial = plans.filter((p) => p.pending.includes("D9"));
+          const states = partial.map((p) => stateName(p.state, { rm: p.rm }));
+          const listed = [...d9.state].sort();
+          expect(states.sort(), `${board} ${theme}`).toEqual(listed);
+          // The control: the same board with the Seth and Christine list
+          // items left out of its source. The phone header draws neither.
+          const html = readFileSync(path.join(BOARDS, board), "utf8");
+          const items =
+            /\s*<li><a href="\/(?:seth|christine)"[^>]*>[^<]*<\/a><\/li>/g;
+          const found = html.match(items)?.length ?? 0;
+          expect(found, board).toBe(width === "1440" ? 2 : 0);
+          const control = boardsWith(board, html.replace(items, ""));
+          dirs.push(control);
+          for (const plan of partial) {
+            const at = `${board} ${plan.key}`;
+            const d9Hides = hidesOf(inputs, [row], plan, bt, "D9");
+            expect(d9Hides.length, at).toBe(1);
+            const rendered = await renderPlan(
+              browser,
+              BOARDS,
+              inputs,
+              runtime!,
+              board,
+              bt,
+              plan,
+              plan.hide,
+              nav
+            );
+            const ref =
+              inputs.spec.boards[board].captures[plan.key].rows[row.id]!;
+            const made = rendered.capture.rows[row.id]!;
+            // The rendered header is the one the partial reference holds.
+            expect(keyBoxes(made), at).toEqual(keyBoxes(ref));
+            expect(rendered.seen.empty, at).toBe(0);
+            const others = plan.hide.filter(
+              (h) => !d9Hides.includes(h.selector)
+            );
+            const ctl = await renderPlan(
+              browser,
+              control,
+              inputs,
+              runtime!,
+              board,
+              bt,
+              plan,
+              others,
+              nav
+            );
+            const clean = ctl.capture.rows[row.id]!;
+            expect(ctl.seen.empty, at).toBe(0);
+            if (width === "1440") {
+              const want = ["Work", "Writing", "Start a project"];
+              expect(rendered.seen.links, at).toEqual(want);
+              expect(ctl.seen.links, at).toEqual(want);
+              const work = ref.keys.find((k) => k.label === "Work")!;
+              const cleanWork = clean.keys.find((k) => k.label === "Work")!;
+              const dx = Math.abs(work.box[0] - cleanWork.box[0]);
+              expect(dx, at).toBeLessThanOrEqual(TOLERANCE.key);
+            } else {
+              // Theme toggle, wordmark and Menu button, as the unmodified header.
+              const labels = ref.keys.map((k) => k.label);
+              expect(labels.slice(1), at).toEqual(["StudioSC, home", "Menu"]);
+              const toggle = /^Switch to the (light|dark) theme$/;
+              expect(labels[0], at).toMatch(toggle);
+              const cleanLabels = clean.keys.map((k) => k.label);
+              expect(cleanLabels, at).toEqual(labels);
+              for (const [i, k] of ref.keys.entries()) {
+                const drift = keyDrift(k, clean.keys[i]);
+                expect(drift, `${at} ${k.label}`).toEqual([]);
+              }
+            }
+            checked++;
+          }
+        }
+      const cases = d9.width.length * d9.theme.length * d9.state.length;
+      expect(checked).toBe(cases);
+    } finally {
+      await browser.close();
+      for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  test("hidden CV links leave no gap", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    test.setTimeout(60 * 60_000);
+    const inputs = inputsAt(null);
+    const d5 = inputs.register.deviations.find((d) => d.id === "D5")!;
+    test.skip(inputs.register.merged.includes(d5.expires!), "D5 has expired");
+    const cv = 'a[href^="/cv/"]';
+    expect(d5.board).toBe(cv);
+    /**
+     * Every CV link on the page in document order: whether it sits in the
+     * row, its key label, whether it is rendered, and whether its wrapper
+     * holds anything else (a wrapper shared with other content stays).
+     */
+    const links = (scope: string) => (page: Page) =>
+      page.evaluate(
+        ([scope, sel]) => {
+          const shown = (el: Element) => el.getClientRects().length > 0;
+          const rows = [...document.querySelectorAll(scope)];
+          return [...document.querySelectorAll(sel)].map((a) => ({
+            inRow: rows.some((r) => r.contains(a)),
+            label: (a.textContent ?? "")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 40),
+            shown: shown(a),
+            shared: [...(a.parentElement?.children ?? [])].some(
+              (c) => c !== a && shown(c)
+            ),
+          }));
+        },
+        [scope, cv] as const
+      );
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    const dirs: string[] = [];
+    try {
+      let checked = 0;
+      for (const id of d5.section) {
+        const row = inputs.sections.rows.find((r) => r.id === id)!;
+        for (const width of WIDTHS) {
+          if (!row.sources[width] || !d5.width.includes(width)) continue;
+          for (const theme of d5.theme as Theme[]) {
+            const board = row.sources[width]![theme].board;
+            const bt = boardThemes(inputs.sections, board, width).find(
+              (b) => b.theme === theme
+            )!;
+            const plans = plannedCaptures(inputs.sections, bt, inputs.register);
+            // The states sections.json maps for this row that D5 lists.
+            const mapped = rowStates(inputs.sections, row, width);
+            const partial = plans.filter(
+              (p) =>
+                p.pending.includes("D5") &&
+                mapped.includes(p.state) &&
+                d5.state.includes(stateName(p.state, { rm: p.rm }))
+            );
+            const where = `${id} ${board} ${theme}`;
+            expect(partial.length, where).toBeGreaterThan(0);
+            const html = readFileSync(path.join(BOARDS, board), "utf8");
+            for (const plan of partial) {
+              const at = `${id} ${board} ${plan.key}`;
+              const d5Hides = hidesOf(inputs, [row], plan, bt, "D5");
+              expect(d5Hides.length, at).toBe(1);
+              const rendered = await renderPlan(
+                browser,
+                BOARDS,
+                inputs,
+                runtime!,
+                board,
+                bt,
+                plan,
+                plan.hide,
+                links(row.board)
+              );
+              const inRow = rendered.seen.filter((l) => l.inRow);
+              expect(inRow.length, at).toBeGreaterThan(0);
+              const shown = inRow.filter((l) => l.shown);
+              const alone = inRow.filter((l) => !l.shared);
+              expect(shown, at).toEqual([]);
+              expect(alone, at).toEqual([]);
+              // The partial reference omits the CV links the full one draws.
+              const caps = inputs.spec.boards[board].captures;
+              const ref = caps[plan.key].rows[id]!;
+              const fullKey = `${bt.theme}/${stateName(plan.state, { rm: plan.rm })}`;
+              const full = caps[fullKey].rows[id]!;
+              const cvLabels = inRow.map((l) => l.label);
+              const refLabels = ref.keys.map((k) => k.label);
+              const fullLabels = full.keys.map((k) => k.label);
+              const leftIn = cvLabels.filter((l) => refLabels.includes(l));
+              const notDrawn = cvLabels.filter((l) => !fullLabels.includes(l));
+              expect(leftIn, at).toEqual([]);
+              expect(notDrawn, at).toEqual([]);
+              // The control: the row's CV links left out of the source.
+              let n = 0;
+              const omitted = html.replace(
+                /\s*<a href="\/cv\/[^"]*"[^>]*>[\s\S]*?<\/a>/g,
+                (m) => (rendered.seen[n++]?.inRow ? "" : m)
+              );
+              const inDom = rendered.seen.length;
+              expect(n, `${at}: CV links in the source`).toBe(inDom);
+              const control = boardsWith(board, omitted);
+              dirs.push(control);
+              const others = plan.hide.filter(
+                (h) => !d5Hides.includes(h.selector)
+              );
+              const ctl = await renderPlan(
+                browser,
+                control,
+                inputs,
+                runtime!,
+                board,
+                bt,
+                plan,
+                others,
+                links(row.board)
+              );
+              const kept = ctl.seen.filter((l) => l.inRow);
+              expect(kept, at).toEqual([]);
+              const clean = ctl.capture.rows[id]!;
+              const [x, , w, h] = ref.box;
+              const [cx, , cw, ch] = clean.box;
+              const { sectionX, sectionWidth, sectionHeight } = TOLERANCE;
+              expect(Math.abs(x - cx), at).toBeLessThanOrEqual(sectionX);
+              expect(Math.abs(w - cw), at).toBeLessThanOrEqual(sectionWidth);
+              expect(Math.abs(h - ch), at).toBeLessThanOrEqual(sectionHeight);
+              const names = (r: RowMeasure) => r.keys.map((k) => k.label);
+              expect(names(clean), at).toEqual(names(ref));
+              for (const [i, k] of ref.keys.entries()) {
+                const drift = keyDrift(k, clean.keys[i]);
+                expect(drift, `${at} ${k.key} ${k.label}`).toEqual([]);
+              }
+              checked++;
+            }
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    } finally {
+      await browser.close();
+      for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  test("regenerates the affected board references exactly", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    test.setTimeout(60 * 60_000);
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    const affected = affectedBoards(base, head);
+    expect(affected.length).toBeGreaterThan(0);
+    const changed = changedCaptures(base, head);
+    // A field the unpacking would drop, on a changed D9 capture, is caught.
+    const headText = git(["show", `${range!.head}:docs/boards/spec.json`]);
+    const [first] = affected;
+    const extra = repacked(headText, first, (b) => {
+      b.captures[changed[first][0]].extra = true;
+    });
+    expect(() => specOf(extra, "mutation")).toThrow(/canonical/);
+    // Committed: every capture whose plan is unchanged, and its reference
+    // files, as at the base; only changed captures' references differ.
+    const blobs = (sha: string) =>
+      new Map(
+        git(["ls-tree", "-r", sha, "--", "docs/boards/ref/"])
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => {
+            const [meta, file] = l.split("\t");
+            return [file.slice("docs/boards/".length), meta.split(" ")[2]];
+          })
+      );
+    const baseBlobs = blobs(fork);
+    const headBlobs = blobs(range!.head);
+    const shots = (spec: SpecFile, board: string, keys: string[]) =>
+      keys.flatMap((k) =>
+        Object.values(spec.boards[board].captures[k]?.rows ?? {})
+          .map((r) => r?.shot)
+          .filter((f): f is string => !!f)
+      );
+    for (const board of affected) {
+      const keys = changed[board];
+      expect(keys.length, board).toBeGreaterThan(0);
+      const { captures: was, ...wasMeta } = base.spec.boards[board];
+      const { captures: now, ...nowMeta } = head.spec.boards[board];
+      expect(nowMeta, board).toEqual(wasMeta);
+      const kept = Object.keys(now).filter((k) => !keys.includes(k));
+      const keptSince = Object.keys(was).filter((k) => !keys.includes(k));
+      expect(kept.sort(), board).toEqual(keptSince.sort());
+      for (const k of kept) {
+        const entry = JSON.stringify(now[k]);
+        expect(entry, `${board} ${k}`).toBe(JSON.stringify(was[k]));
+        for (const f of shots(head.spec, board, [k]))
+          expect(headBlobs.get(f), `${board} ${k} ${f}`).toBe(baseBlobs.get(f));
+      }
+      // Reference files that differ from the base belong to changed captures.
+      const mine = new Set([
+        ...shots(head.spec, board, keys),
+        ...shots(base.spec, board, keys),
+      ]);
+      const prefix = `ref/${board.replace(/\.dc\.html$/, "")}/`;
+      const moved = [...new Set([...baseBlobs.keys(), ...headBlobs.keys()])]
+        .filter((f) => f.startsWith(prefix))
+        .filter((f) => baseBlobs.get(f) !== headBlobs.get(f));
+      expect(
+        moved.filter((f) => !mine.has(f)),
+        board
+      ).toEqual([]);
+    }
+    // Regenerated from the committed tree with the pinned runtime: every
+    // changed capture's entry, reference paths and bytes are the committed ones.
+    const dir = tmp("fidelity-prv27-");
+    try {
+      const archive = spawnSync(
+        "git",
+        ["archive", "--format=tar", range!.head, "docs/boards"],
+        { cwd: ROOT, env: cleanEnv(), maxBuffer: 1 << 30 }
+      );
+      expect(archive.status).toBe(0);
+      const untar = spawnSync("tar", ["-x", "-C", dir], {
+        input: archive.stdout,
+      });
+      expect(untar.status).toBe(0);
+      const work = path.join(dir, "docs/boards");
+      const committed = snapshot(work);
+      const cache = runtimeCache();
+      // One board per run, each inside regen's time limit on a loaded host.
+      for (const board of affected) {
+        const run = await regen(work, { BOARDS_CACHE: cache }, [
+          "--board",
+          board,
+        ]);
+        expect(run.status, `${board}: ${run.stderr}`).toBe(0);
+      }
+      const made = specOf(
+        readFileSync(path.join(work, "spec.json"), "utf8"),
+        "the regenerated tree"
+      );
+      const fresh = snapshot(work);
+      for (const board of affected)
+        for (const k of changed[board]) {
+          const at = `${board} ${k}`;
+          const entry = JSON.stringify(made.boards[board].captures[k]);
+          const want = JSON.stringify(head.spec.boards[board].captures[k]);
+          expect(entry, at).toBe(want);
+          for (const f of shots(made, board, [k])) {
+            expect(committed[f], `${at} ${f}`).toBeDefined();
+            expect(fresh[f], `${at} ${f}`).toBe(committed[f]);
+          }
+        }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("deviations carry the owner's signatures", () => {
+    chromiumOnly();
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    const before = base.register.deviations;
+    const after = head.register.deviations;
+    const ids = (rows: Deviation[]) => rows.map((d) => d.id);
+    expect(ids(after)).toEqual(ids(before));
+    const accepted = Object.fromEntries(after.map((d) => [d.id, d.accepted]));
+    expect(accepted.D1).toBe("");
+    for (let n = 2; n <= 14; n++)
+      expect(accepted[`D${n}`], `D${n}`).toBe("owner, 2026-11-26");
+    // Every other field as at the base, but D9's board selector (D5 is
+    // unchanged).
+    const rest = (d: Deviation) => ({
+      ...d,
+      accepted: "",
+      board: d.id === "D9" ? "" : d.board,
+    });
+    for (const [i, d] of after.entries())
+      expect(rest(d), d.id).toEqual(rest(before[i]));
+    const d9 = after.find((d) => d.id === "D9")!;
+    const items = 'li:has(> a[href="/seth"]), li:has(> a[href="/christine"])';
+    expect(d9.board).toBe(items);
+    // The mapped sections hide exactly the D9 and D5 board selectors, and
+    // every other value in sections.json is as at the base.
+    expect(sectionProblems(base, head)).toEqual([]);
+    // A hide mode changed alongside D9's selector (the list items kept in
+    // the layout, invisible) is caught.
+    const mutated = structuredClone(head);
+    const header = mutated.sections.rows.find((r) => r.id === "chrome/header")!;
+    header.later!.find((l) => l.ticket === "PRV-10")!.hide[0].mode = "hide";
+    expect(sectionProblems(base, mutated).length).toBeGreaterThan(0);
+    // The register's text: only the sentence on acceptance changed.
+    const prose = (sha: string) =>
+      git(["show", `${sha}:docs/boards/deviations.md`])
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("|"));
+    const was = prose(fork);
+    const now = prose(range!.head);
+    const old =
+      "PRV-22 seeds the rows below. None is accepted: the owner signs each one, with the date, before it applies.";
+    const sentence =
+      "PRV-22 seeds the rows below. A row applies once the owner signs and dates it in the `accepted` column, subject to the matching and expiry rules above.";
+    expect(was).toContain(old);
+    expect(now).toEqual(was.map((l) => (l === old ? sentence : l)));
+  });
+
+  test("PRV-27 changes only scoped paths", () => {
+    chromiumOnly();
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    // Affected boards: those whose capture plans (hide selectors included)
+    // differ between the base and the head.
+    const affected = affectedBoards(base, head);
+    expect(affected.length).toBeGreaterThan(0);
+    const refDir = (board: string) =>
+      `docs/boards/ref/${board.replace(/\.dc\.html$/, "")}/`;
+    const scoped = [
+      "docs/boards/deviations.md",
+      "docs/boards/sections.json",
+      "docs/boards/spec.json",
+      "e2e/fidelity-harness.spec.ts",
+      PRV27_TICKET,
+    ];
+    const changed = git([
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${range!.base}...${range!.head}`,
+    ])
+      .split("\n")
+      .filter(Boolean);
+    const inScope = (f: string) =>
+      scoped.includes(f) || affected.some((b) => f.startsWith(refDir(b)));
+    expect(changed).toContain(PRV27_TICKET);
+    expect(changed.filter((f) => !inScope(f))).toEqual([]);
+    // Every unaffected board: its spec.json entry and its reference files'
+    // paths and bytes as at the base.
+    const files = (sha: string, board: string) =>
+      git(["ls-tree", "-r", sha, "--", refDir(board)]);
+    const boards = Object.keys(head.manifest.boards).sort();
+    expect(boards).toEqual(Object.keys(base.manifest.boards).sort());
+    // An unused table entry on an unaffected board is caught.
+    const unaffected = boards.find((b) => !affected.includes(b))!;
+    const headText = git(["show", `${range!.head}:docs/boards/spec.json`]);
+    const padded = repacked(headText, unaffected, (b) => {
+      b.table["0000000000000000"] = { unused: true };
+    });
+    expect(() => specOf(padded, "mutation")).toThrow(/canonical/);
+    for (const board of boards.filter((b) => !affected.includes(b))) {
+      const entry = JSON.stringify(head.spec.boards[board]);
+      expect(entry, board).toBe(JSON.stringify(base.spec.boards[board]));
+      expect(files(range!.head, board), board).toBe(files(fork, board));
+    }
+  });
 });
 
 /** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
@@ -2574,3 +3078,267 @@ const NO_VIEW_TRANSITION =
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
+
+/** PRV-27's ticket: its PR-boundary checks run on the PR that adds it. */
+const PRV27_TICKET = "docs/tickets/PRV-27.md";
+const PRV27_ONLY = "PRV-27's checks run on the PR that adds its ticket";
+const NO_RUNTIME =
+  "needs the pinned canvas runtime in .cache/boards/ (run locally; CI has none)";
+
+/** Where a PR forked from its base: what it changed is judged from here. */
+const forkOf = (range: PrRange) =>
+  git(["merge-base", range.base, range.head]).trim();
+
+/** The gitignored runtime cache regen reads. */
+const runtimeCache = () =>
+  path.resolve(ROOT, process.env.BOARDS_CACHE || ".cache/boards");
+
+/**
+ * The pinned canvas runtime from the gitignored cache, or null when the
+ * cache has none. A cached runtime that is not the pinned bytes fails.
+ */
+function pinnedRuntime(): Buffer | null {
+  const file = path.join(runtimeCache(), "support.js");
+  if (!existsSync(file)) return null;
+  const bytes = readFileSync(file);
+  const pinned = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
+  expect(sha256(bytes), file).toBe(pinned.runtime.sha256);
+  return bytes;
+}
+
+interface BoardInputs {
+  manifest: Manifest;
+  sections: Sections;
+  register: Register;
+  spec: SpecFile;
+}
+
+/** The board inputs in the working tree (sha null) or at a commit. */
+function inputsAt(sha: string | null): BoardInputs {
+  const read = (f: string) =>
+    sha
+      ? git(["show", `${sha}:docs/boards/${f}`])
+      : readFileSync(path.join(BOARDS, f), "utf8");
+  return {
+    manifest: JSON.parse(read("manifest.json")) as Manifest,
+    sections: JSON.parse(read("sections.json")) as Sections,
+    register: {
+      deviations: parseDeviations(read("deviations.md")),
+      merged: JSON.parse(read("merged.json")) as string[],
+    },
+    spec: specOf(read("spec.json"), sha ?? "the working tree"),
+  };
+}
+
+/**
+ * Every board's capture plan (its rows, themes, states, partial builds and
+ * hide selectors, and the rows it is the undrawn evidence for), as text.
+ */
+function capturePlans(inputs: BoardInputs): Record<string, string> {
+  const { manifest, sections, register } = inputs;
+  const out: Record<string, string> = {};
+  for (const [board, pin] of Object.entries(manifest.boards)) {
+    const evidence = sections.rows
+      .filter((r) => r.undrawn?.[pin.width] === board)
+      .map((r) => r.id);
+    const themes = boardThemes(sections, board, pin.width).map((bt) => ({
+      theme: bt.theme,
+      toggle: bt.toggle,
+      rows: bt.rows.map((r) => r.id),
+      captures: plannedCaptures(sections, bt, register),
+    }));
+    out[board] = JSON.stringify({ evidence, themes });
+  }
+  return out;
+}
+
+/** The boards whose capture plans differ between two sets of inputs. */
+function affectedBoards(base: BoardInputs, head: BoardInputs): string[] {
+  const a = capturePlans(base);
+  const b = capturePlans(head);
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((board) => a[board] !== b[board])
+    .sort();
+}
+
+/**
+ * Per affected board, the capture keys whose plan (state, motion, partial
+ * build and hide selectors) differs between the base and the head, or that
+ * only one of them has.
+ */
+function changedCaptures(
+  base: BoardInputs,
+  head: BoardInputs
+): Record<string, string[]> {
+  const plans = (inputs: BoardInputs, board: string) => {
+    const pin = inputs.manifest.boards[board];
+    const out = new Map<string, string>();
+    for (const bt of boardThemes(inputs.sections, board, pin.width))
+      for (const plan of plannedCaptures(inputs.sections, bt, inputs.register))
+        out.set(plan.key, JSON.stringify({ toggle: bt.toggle, plan }));
+    return out;
+  };
+  const out: Record<string, string[]> = {};
+  for (const board of affectedBoards(base, head)) {
+    const a = plans(base, board);
+    const b = plans(head, board);
+    out[board] = [...new Set([...a.keys(), ...b.keys()])]
+      .filter((k) => a.get(k) !== b.get(k))
+      .sort();
+  }
+  return out;
+}
+
+/**
+ * What differs in sections.json beyond PRV-27's one permitted change: each
+ * section D9 and D5 list must hide exactly that deviation's board selector;
+ * D5's entries equal the base; and with only the selector values of D9's
+ * entries put back, the sections equal the base (a changed hide mode or an
+ * added hide is a difference).
+ */
+function sectionProblems(base: BoardInputs, head: BoardInputs): string[] {
+  const problems: string[] = [];
+  const entry = (inputs: BoardInputs, section: string, ticket: string) =>
+    inputs.sections.rows
+      .find((r) => r.id === section)
+      ?.later?.find((l) => l.ticket === ticket);
+  const reset = structuredClone(head);
+  for (const id of ["D9", "D5"]) {
+    const d = head.register.deviations.find((x) => x.id === id)!;
+    for (const section of d.section) {
+      const now = entry(head, section, d.expires!);
+      const was = entry(base, section, d.expires!);
+      if (!now || !was) {
+        problems.push(`${id} ${section}: no ${d.expires} entry`);
+        continue;
+      }
+      if (laterSelector(now.hide) !== d.board)
+        problems.push(`${id} ${section}: hides ${laterSelector(now.hide)}`);
+      if (id === "D5" && !isDeepStrictEqual(now, was))
+        problems.push(`D5 ${section}: its entry differs from the base`);
+      if (id !== "D9" || now.hide.length !== was.hide.length) continue;
+      const mine = entry(reset, section, d.expires!)!;
+      mine.hide.forEach((h, i) => (h.selector = was.hide[i].selector));
+    }
+  }
+  if (!isDeepStrictEqual(reset.sections, base.sections))
+    problems.push("sections.json differs from the base beyond D9's selector");
+  return problems;
+}
+
+/**
+ * A committed spec.json, unpacked for comparison once it is exactly its own
+ * canonical pack: an unknown field or an unused table entry, which unpacking
+ * would drop, fails here instead.
+ */
+function specOf(text: string, where: string): SpecFile {
+  const spec = unpackSpec(text);
+  if (packSpec(spec) !== text)
+    throw new Error(
+      `${where}: spec.json is not its canonical pack (a field or table entry unpacking would drop)`
+    );
+  return spec;
+}
+
+/** A spec.json text with one packed board changed in memory. */
+function repacked(
+  text: string,
+  board: string,
+  change: (packed: {
+    table: Record<string, unknown>;
+    captures: Record<string, Record<string, unknown>>;
+  }) => void
+): string {
+  const raw = JSON.parse(text) as {
+    boards: Record<string, Parameters<typeof change>[0]>;
+  };
+  change(raw.boards[board]);
+  return stableJson(raw, 4);
+}
+
+/** The boards directory with one board's source replaced, for a control. */
+function boardsWith(board: string, source: string): string {
+  const dir = tmp("fidelity-control-");
+  for (const f of readdirSync(BOARDS))
+    if (f !== "ref" && f !== board)
+      symlinkSync(path.join(BOARDS, f), path.join(dir, f));
+  writeFileSync(path.join(dir, board), source);
+  return dir;
+}
+
+/**
+ * One planned capture rendered as regen renders it, from `dir`, with the
+ * given hides; `inspect` reads the page once the state is measured.
+ */
+async function renderPlan<T>(
+  browser: Browser,
+  dir: string,
+  inputs: BoardInputs,
+  runtime: Buffer,
+  board: string,
+  bt: BoardTheme,
+  plan: PlannedCapture,
+  hide: Hide[],
+  inspect: (page: Page) => Promise<T>
+): Promise<{ capture: Capture; seen: T }> {
+  const { manifest, sections } = inputs;
+  const evidence = sections.rows.filter(
+    (r) => r.undrawn?.[bt.width] === board && !bt.rows.includes(r)
+  );
+  const queries = rowQueries([...bt.rows, ...evidence], sections.rows, "board");
+  const refused: string[] = [];
+  const ctx = await boardContext(
+    browser,
+    sections,
+    dir,
+    manifest,
+    runtime,
+    { width: bt.width, reducedMotion: plan.rm },
+    refused
+  );
+  try {
+    const page = await ctx.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await load(page, `${BOARD_ORIGIN}/${board}`, sections.clock);
+    const capture = await captureState(
+      page,
+      sections,
+      queries,
+      { state: plan.state, theme: bt.theme, toggle: bt.toggle },
+      "board",
+      { hide, allMotion: plan.rm }
+    );
+    const seen = await inspect(page);
+    expect(errors, `${board} ${plan.key}`).toEqual([]);
+    expect(refused, `${board} ${plan.key}`).toEqual([]);
+    return { capture, seen };
+  } finally {
+    await ctx.close();
+  }
+}
+
+/** The hides a plan applies for one deviation's entries, on these rows. */
+function hidesOf(
+  inputs: BoardInputs,
+  rows: Row[],
+  plan: PlannedCapture,
+  where: { width: string; theme: string },
+  id: string
+): string[] {
+  const { deviations, merged } = inputs.register;
+  const state = stateName(plan.state, { rm: plan.rm });
+  return hiddenFor(deviations, merged, rows, { ...where, state }, [id]).map(
+    (h) => h.selector
+  );
+}
+
+/** The key boxes of a row measure, by label, one line per key. */
+const keyBoxes = (row: RowMeasure) =>
+  row.keys.map((k) => `${k.key} ${k.label} ${k.box.join(",")}`);
+
+/** The axes on which two key boxes differ by more than the key tolerance. */
+const keyDrift = (a: KeyMeasure, b: KeyMeasure) =>
+  (["x", "y", "width", "height"] as const).filter(
+    (_, i) => Math.abs(a.box[i] - b.box[i]) > TOLERANCE.key
+  );
