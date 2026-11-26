@@ -317,6 +317,7 @@ async function takeMotion(page: Page, rows: RowQuery[], sections: Sections) {
 type Fid = {
   __fidelity: {
     motionStart(): void;
+    holdArm(at: number): void;
     settle(): Promise<void>;
     hold(at: number): Promise<[number, number, number, number] | null>;
     hide(e: { selector: string; mode?: string }[]): void;
@@ -331,6 +332,8 @@ const fid = (page: Page) => ({
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hold(x), at),
   motionStart: () =>
     page.evaluate(() => (window as unknown as Fid).__fidelity.motionStart()),
+  holdArm: (at: number) =>
+    page.evaluate((x) => (window as unknown as Fid).__fidelity.holdArm(x), at),
   hide: (e: { selector: string; mode?: string }[]) =>
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hide(x), e),
 });
@@ -377,6 +380,9 @@ export async function captureState(
   const def = sections.states[req.state];
   if (req.state !== "default") {
     await fid(page).motionStart();
+    // An in-flight state's transition is held the moment it is ready, so it
+    // cannot finish before hold() below, however slow the host.
+    if (def?.inFlight) await fid(page).holdArm(IN_FLIGHT_AT);
     await runSteps(
       page,
       def?.toggleTheme ? sections.theme[req.theme] : stepsFor(def, side)

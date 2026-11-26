@@ -2356,48 +2356,84 @@ test.describe("fidelity harness", () => {
         }
         return { ctx, page };
       };
-      const late = await site(LATE_REVEAL);
-      try {
-        const capture = await captureState(
-          late.page,
-          fx.sections,
-          rowQueries(
-            fx.sections.rows.filter((r) => r.built),
-            fx.sections.rows,
+      /** The dark row's reveal captured, and what the page then holds. */
+      const reveal = async (js: string) => {
+        const { ctx, page } = await site(js);
+        try {
+          const capture = await captureState(
+            page,
+            fx.sections,
+            rowQueries(
+              fx.sections.rows.filter((r) => r.built),
+              fx.sections.rows,
+              "site"
+            ),
+            { state: "theme-reveal", theme: "dark", toggle: true },
             "site"
-          ),
-          { state: "theme-reveal", theme: "dark", toggle: true },
-          "site"
-        );
-        expect(capture.motion).toEqual(motion);
-        expect(capture.frame).toEqual({
+          );
+          const held = await page.evaluate(() =>
+            document
+              .getAnimations()
+              .filter((a) => a.playState !== "finished")
+              .map((a) => {
+                const t = a.effect!.getComputedTiming();
+                return {
+                  name: (a as CSSAnimation).animationName,
+                  state: a.playState,
+                  at: Number(t.localTime) / Number(t.activeDuration),
+                };
+              })
+          );
+          const theme = await page.evaluate(
+            () => document.documentElement.dataset.theme
+          );
+          return { capture, held, theme };
+        } finally {
+          await ctx.close();
+        }
+      };
+      const halfway = [
+        {
+          name: "-ua-view-transition-group-anim-root",
+          state: "paused",
           at: IN_FLIGHT_AT,
-          viewport: [0, 0, 1440, 900],
-        });
-        const held = await late.page.evaluate(() =>
-          document
-            .getAnimations()
-            .filter((a) => a.playState !== "finished")
-            .map((a) => {
-              const t = a.effect!.getComputedTiming();
-              return {
-                name: (a as CSSAnimation).animationName,
-                state: a.playState,
-                at: Number(t.localTime) / Number(t.activeDuration),
-              };
-            })
-        );
-        expect(held).toEqual([
-          {
-            name: "-ua-view-transition-group-anim-root",
-            state: "paused",
-            at: IN_FLIGHT_AT,
-          },
-          { name: "theme-reveal", state: "paused", at: IN_FLIGHT_AT },
-        ]);
+        },
+        { name: "theme-reveal", state: "paused", at: IN_FLIGHT_AT },
+      ];
+      const frame = { at: IN_FLIGHT_AT, viewport: [0, 0, 1440, 900] };
+      const late = await reveal(LATE_REVEAL);
+      expect(late.capture.motion).toEqual(motion);
+      expect(late.capture.frame).toEqual(frame);
+      expect(late.held).toEqual(halfway);
+
+      // The driver resuming 800 ms after the reveal is ready, longer than
+      // either animation runs: both are still held at the midpoint, armed
+      // before the step and held in the page the moment the reveal is ready.
+      const slow = await reveal(SLOW_DRIVER);
+      expect(slow.capture.motion).toEqual(motion);
+      expect(slow.capture.frame).toEqual(frame);
+      expect(slow.held).toEqual(halfway);
+      expect(await failures(checkSite, SLOW_DRIVER)).toEqual([]);
+
+      // A reveal the page skips once it is ready never plays: the theme
+      // still switches, and neither motion counts.
+      const skipped = await site(SKIP_ON_READY);
+      try {
+        const page = skipped.page;
+        const theme = () =>
+          page.evaluate(() => document.documentElement.dataset.theme);
+        await runSteps(page, fx.sections.theme.light);
+        await expect.poll(theme).toBe("dark");
+        await runSteps(page, fx.sections.theme.dark);
+        await expect.poll(theme).toBe("light");
       } finally {
-        await late.ctx.close();
+        await skipped.ctx.close();
       }
+      const cancelled = await reveal(SKIP_ON_READY);
+      expect(cancelled.capture.motion).toEqual([]);
+      expect(cancelled.theme).toBe("light");
+      const skips = await failures(checkSite, SKIP_ON_READY);
+      expect(skips).toEqual(expect.arrayContaining(missed));
 
       // A page whose reveal really does not run still fails: no view
       // transition, the theme toggle still switching the theme.
@@ -2446,6 +2482,42 @@ const LATE_REVEAL = `(() => {
         return own[k].apply(this, args);
       };
     return start.call(this, () => held.then(update));
+  };
+})();`;
+
+/**
+ * A slow driver: the harness's wait for the dark row's reveal returns 800 ms
+ * after the reveal is ready, longer than either of its animations runs.
+ */
+const SLOW_DRIVER = `(() => {
+  const f = window.__fidelity;
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  let late = false;
+  Document.prototype.startViewTransition = function (update) {
+    if (++n === 2) late = true;
+    return start.call(this, update);
+  };
+  const ready = f.transitionReady;
+  f.transitionReady = async function (...args) {
+    await ready.apply(this, args);
+    if (!late) return;
+    late = false;
+    await new Promise((r) => setTimeout(r, 800));
+  };
+})();`;
+
+/**
+ * The page skips the dark row's reveal in its own ready callback: the theme
+ * switches, and the reveal never plays.
+ */
+const SKIP_ON_READY = `(() => {
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  Document.prototype.startViewTransition = function (update) {
+    const t = start.call(this, update);
+    if (++n === 2) t.ready.then(() => t.skipTransition());
+    return t;
   };
 })();`;
 

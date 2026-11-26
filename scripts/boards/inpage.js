@@ -199,7 +199,7 @@
    * again when the record is taken if the page has turned it round since
    * (reverse() or a negative rate straight after animate() or play()).
    */
-  const record = (anim, el, pseudo, name) => {
+  const record = (anim, el, pseudo, name, provisional = false) => {
     if (!anim || !anim.effect || seen.has(anim)) return;
     seen.add(anim);
     if (!recording) return;
@@ -208,6 +208,7 @@
       pseudo,
       name,
       anim,
+      provisional,
       backwards: backwardsOf(anim),
       direction: direction(played(anim)),
     });
@@ -264,17 +265,62 @@
     return out;
   };
 
+  /** Pauses an animation at the fraction `at` of its active duration. */
+  const holdAt = (a, at) => {
+    const t = a.effect.getComputedTiming();
+    a.pause();
+    a.currentTime = (Number(t.delay) || 0) + Number(t.activeDuration) * at;
+  };
+  const finite = (a) =>
+    a.effect && Number.isFinite(a.effect.getComputedTiming().endTime);
+
   // The view transition the page started last, while it runs: its
   // pseudo-elements and their animations exist only once it is ready.
   let transition = null;
-  /** The animations of a view transition's pseudo-elements, as it is ready. */
-  const noteTransition = () => {
-    for (const anim of document.getAnimations()) {
-      const effect = anim.effect;
-      const pseudo = (effect && effect.pseudoElement) || "";
-      if (!pseudo.startsWith("::view-transition")) continue;
-      record(anim, document.documentElement, pseudo, nameOf(anim));
+  /** Per transition: settles once its animations are noted and confirmed. */
+  const playing = new WeakMap();
+  /** The fraction an in-flight capture holds the next transition at. */
+  let armed = null;
+  const frame = () => new Promise((r) => requestAnimationFrame(r));
+  /**
+   * A transition, once ready: its pseudo-elements' animations are noted the
+   * moment they exist, so none (the UA's short group animation most of all)
+   * can finish before a sweep sees it, and held at once when an in-flight
+   * capture armed a hold, so none can finish before the capture. The notes
+   * stay provisional for two frames: a reveal the page skips once it is
+   * ready never plays, and its animations are cancelled (idle) by then.
+   */
+  const onReady = async () => {
+    const anims = document
+      .getAnimations()
+      .filter((a) =>
+        ((a.effect && a.effect.pseudoElement) || "").startsWith(
+          "::view-transition"
+        )
+      );
+    for (const a of anims)
+      record(
+        a,
+        document.documentElement,
+        a.effect.pseudoElement,
+        nameOf(a),
+        true
+      );
+    if (armed !== null) {
+      const at = armed;
+      armed = null;
+      for (const a of anims)
+        if (a.playState === "running" && finite(a)) holdAt(a, at);
     }
+    await frame();
+    await frame();
+    for (const rec of records)
+      if (
+        rec.provisional &&
+        anims.includes(rec.anim) &&
+        rec.anim.playState !== "idle"
+      )
+        rec.provisional = false;
   };
   const startViewTransition = Document.prototype.startViewTransition;
   if (startViewTransition)
@@ -285,9 +331,10 @@
         if (transition === t) transition = null;
       };
       t.finished.then(done, done);
-      // Noted the moment they exist, so none (the UA's short group animation
-      // most of all) can finish before a sweep sees it.
-      t.ready.then(noteTransition, () => {});
+      playing.set(
+        t,
+        t.ready.then(onReady, () => {})
+      );
       return t;
     };
 
@@ -635,7 +682,16 @@
      */
     async transitionReady() {
       const t = transition;
-      if (t) await t.ready.catch(() => {});
+      if (t) await playing.get(t);
+    },
+
+    /**
+     * Arms a hold at the fraction `at` for the view transition a step is
+     * about to start: it is held the moment it is ready, whenever the
+     * capture itself gets to hold().
+     */
+    holdArm(at) {
+      armed = at;
     },
 
     /**
@@ -650,7 +706,9 @@
         els: rowElements(row),
         excluded: excludedFor(row),
       }));
-      const out = records.splice(0).map((rec) => {
+      // A note never confirmed is a reveal that did not play.
+      const kept = records.splice(0).filter((rec) => !rec.provisional);
+      const out = kept.map((rec) => {
         const target = rec.el;
         // The innermost row that holds the element wins (a child row).
         let best = null;
@@ -734,16 +792,13 @@
      * a view transition is held: the only frame it draws.
      */
     async hold(at) {
+      armed = null;
       const held = transition;
-      if (held) await held.ready.catch(() => {});
-      for (const a of document.getAnimations()) {
-        // Only what is moving now: a finished load animation stays finished.
-        if (a.playState !== "running") continue;
-        const t = a.effect ? a.effect.getComputedTiming() : null;
-        if (!t || !Number.isFinite(t.endTime)) continue;
-        a.pause();
-        a.currentTime = (Number(t.delay) || 0) + Number(t.activeDuration) * at;
-      }
+      if (held) await playing.get(held);
+      // Only what is moving now: a finished load animation stays finished.
+      // A transition armed for this hold is held already.
+      for (const a of document.getAnimations())
+        if (a.playState === "running" && finite(a)) holdAt(a, at);
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))
       );
