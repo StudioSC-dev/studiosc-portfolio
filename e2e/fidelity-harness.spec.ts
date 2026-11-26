@@ -40,6 +40,7 @@ import {
   stateName,
   unpackSpec,
   walk,
+  WIDTHS,
   type BoardsDir,
   type Capture,
   type Deviation,
@@ -77,6 +78,7 @@ import {
   boardThemes,
   hiddenFor,
   plannedCaptures,
+  rowStates,
   type BoardTheme,
   type Hide,
   type PlannedCapture,
@@ -2408,6 +2410,149 @@ test.describe("fidelity harness", () => {
         }
       const cases = d9.width.length * d9.theme.length * d9.state.length;
       expect(checked).toBe(cases);
+    } finally {
+      await browser.close();
+      for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  test("hidden CV links leave no gap", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    test.setTimeout(60 * 60_000);
+    const inputs = inputsAt(null);
+    const d5 = inputs.register.deviations.find((d) => d.id === "D5")!;
+    test.skip(inputs.register.merged.includes(d5.expires!), "D5 has expired");
+    const cv = 'a[href^="/cv/"]';
+    expect(d5.board).toBe(cv);
+    /**
+     * Every CV link on the page in document order: whether it sits in the
+     * row, its key label, whether it is rendered, and whether its wrapper
+     * holds anything else (a wrapper shared with other content stays).
+     */
+    const links = (scope: string) => (page: Page) =>
+      page.evaluate(
+        ([scope, sel]) => {
+          const shown = (el: Element) => el.getClientRects().length > 0;
+          const rows = [...document.querySelectorAll(scope)];
+          return [...document.querySelectorAll(sel)].map((a) => ({
+            inRow: rows.some((r) => r.contains(a)),
+            label: (a.textContent ?? "")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 40),
+            shown: shown(a),
+            shared: [...(a.parentElement?.children ?? [])].some(
+              (c) => c !== a && shown(c)
+            ),
+          }));
+        },
+        [scope, cv] as const
+      );
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    const dirs: string[] = [];
+    try {
+      let checked = 0;
+      for (const id of d5.section) {
+        const row = inputs.sections.rows.find((r) => r.id === id)!;
+        for (const width of WIDTHS) {
+          if (!row.sources[width] || !d5.width.includes(width)) continue;
+          for (const theme of d5.theme as Theme[]) {
+            const board = row.sources[width]![theme].board;
+            const bt = boardThemes(inputs.sections, board, width).find(
+              (b) => b.theme === theme
+            )!;
+            const plans = plannedCaptures(inputs.sections, bt, inputs.register);
+            // The states sections.json maps for this row that D5 lists.
+            const mapped = rowStates(inputs.sections, row, width);
+            const partial = plans.filter(
+              (p) =>
+                p.pending.includes("D5") &&
+                mapped.includes(p.state) &&
+                d5.state.includes(stateName(p.state, { rm: p.rm }))
+            );
+            const where = `${id} ${board} ${theme}`;
+            expect(partial.length, where).toBeGreaterThan(0);
+            const html = readFileSync(path.join(BOARDS, board), "utf8");
+            for (const plan of partial) {
+              const at = `${id} ${board} ${plan.key}`;
+              const d5Hides = hidesOf(inputs, [row], plan, bt, "D5");
+              expect(d5Hides.length, at).toBe(1);
+              const rendered = await renderPlan(
+                browser,
+                BOARDS,
+                inputs,
+                runtime!,
+                board,
+                bt,
+                plan,
+                plan.hide,
+                links(row.board)
+              );
+              const inRow = rendered.seen.filter((l) => l.inRow);
+              expect(inRow.length, at).toBeGreaterThan(0);
+              const shown = inRow.filter((l) => l.shown);
+              const alone = inRow.filter((l) => !l.shared);
+              expect(shown, at).toEqual([]);
+              expect(alone, at).toEqual([]);
+              // The partial reference omits the CV links the full one draws.
+              const caps = inputs.spec.boards[board].captures;
+              const ref = caps[plan.key].rows[id]!;
+              const fullKey = `${bt.theme}/${stateName(plan.state, { rm: plan.rm })}`;
+              const full = caps[fullKey].rows[id]!;
+              const cvLabels = inRow.map((l) => l.label);
+              const refLabels = ref.keys.map((k) => k.label);
+              const fullLabels = full.keys.map((k) => k.label);
+              const leftIn = cvLabels.filter((l) => refLabels.includes(l));
+              const notDrawn = cvLabels.filter((l) => !fullLabels.includes(l));
+              expect(leftIn, at).toEqual([]);
+              expect(notDrawn, at).toEqual([]);
+              // The control: the row's CV links left out of the source.
+              let n = 0;
+              const omitted = html.replace(
+                /\s*<a href="\/cv\/[^"]*"[^>]*>[\s\S]*?<\/a>/g,
+                (m) => (rendered.seen[n++]?.inRow ? "" : m)
+              );
+              const inDom = rendered.seen.length;
+              expect(n, `${at}: CV links in the source`).toBe(inDom);
+              const control = boardsWith(board, omitted);
+              dirs.push(control);
+              const others = plan.hide.filter(
+                (h) => !d5Hides.includes(h.selector)
+              );
+              const ctl = await renderPlan(
+                browser,
+                control,
+                inputs,
+                runtime!,
+                board,
+                bt,
+                plan,
+                others,
+                links(row.board)
+              );
+              const kept = ctl.seen.filter((l) => l.inRow);
+              expect(kept, at).toEqual([]);
+              const clean = ctl.capture.rows[id]!;
+              const [x, , w, h] = ref.box;
+              const [cx, , cw, ch] = clean.box;
+              const { sectionX, sectionWidth, sectionHeight } = TOLERANCE;
+              expect(Math.abs(x - cx), at).toBeLessThanOrEqual(sectionX);
+              expect(Math.abs(w - cw), at).toBeLessThanOrEqual(sectionWidth);
+              expect(Math.abs(h - ch), at).toBeLessThanOrEqual(sectionHeight);
+              const names = (r: RowMeasure) => r.keys.map((k) => k.label);
+              expect(names(clean), at).toEqual(names(ref));
+              for (const [i, k] of ref.keys.entries()) {
+                const drift = keyDrift(k, clean.keys[i]);
+                expect(drift, `${at} ${k.key} ${k.label}`).toEqual([]);
+              }
+              checked++;
+            }
+          }
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
     } finally {
       await browser.close();
       for (const d of dirs) rmSync(d, { recursive: true, force: true });
