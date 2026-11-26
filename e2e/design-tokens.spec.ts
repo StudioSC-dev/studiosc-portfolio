@@ -17,6 +17,7 @@ import {
 
 import { checkSite } from "../scripts/boards/check";
 import { loadBoards } from "../scripts/boards/model";
+import * as ts from "typescript";
 import { scanText } from "./support/denylist";
 import { changedByPr } from "./support/git";
 import {
@@ -2030,6 +2031,31 @@ test.describe("Range design system", () => {
         `Manrope and JetBrains Mono on ${target}, which renders ${JSON.stringify(scope)}`
       ).toEqual([]);
     }
+    // Every font file the production build emits is a pinned file (the Red
+    // Hat and Manrope board pins, the recorded JetBrains Mono SHA-256) or the
+    // IBM Plex Sans cut: a wrong-byte face on a route no sample visits cannot
+    // be there.
+    const allowedFonts: Record<string, string> = {
+      "Red Hat Display": pins["Red Hat Display"].sha256,
+      "Red Hat Text": pins["Red Hat Text"].sha256,
+      Manrope: pins.Manrope.sha256,
+      "JetBrains Mono": JETBRAINS_MONO.sha256,
+      "IBM Plex Sans": sha256Of(fs.readFileSync(path.join(ROOT, PLEX_FILE))),
+    };
+    const emitted = emittedFonts();
+    expect(emitted.length, "font files in the build output").toBeGreaterThan(0);
+    expect(
+      emittedFontProblems(emitted, allowedFonts),
+      "emitted font files"
+    ).toEqual([]);
+    // Controls: a file with other bytes, and a missing pinned file, each fail.
+    expect(
+      emittedFontProblems(
+        [...emitted, { file: "x.woff2", sha256: "0".repeat(64) }],
+        allowedFonts
+      )
+    ).toHaveLength(1);
+    expect(emittedFontProblems(emitted.slice(1), allowedFonts)).toHaveLength(1);
     const injected = await scopeOf("/", FRAGMENT_FIXTURES);
     expect(
       injected.scope.manrope,
@@ -2319,13 +2345,7 @@ test.describe("Range design system", () => {
     // the loader, the source file, `subsets` (a local file has no subsets),
     // `style: "normal"`, an explicit fallback setting, and Manrope's one
     // variable range for its four listed weights; everything else is equal.
-    const optionMap = (source: string, name: string) =>
-      Object.fromEntries(
-        Array.from(
-          fontOptions(source, name).matchAll(/^\s*(\w+):\s*(.+?),?\s*$/gm),
-          (m) => [m[1], m[2]]
-        )
-      ) as Record<string, string>;
+    const optionMap = astOptions;
     const normalised = (map: Record<string, string>, drop: readonly string[]) =>
       Object.fromEntries(
         Object.entries(map).filter(([k]) => !drop.includes(k))
@@ -2337,10 +2357,11 @@ test.describe("Range design system", () => {
       if (head.adjustFontFallback !== "false")
         problems.push("adjustFontFallback is not false");
       if (head.style !== '"normal"') problems.push("style is not normal");
-      const same =
-        JSON.stringify(
-          normalised(head, ["src", "style", "adjustFontFallback"])
-        ) === JSON.stringify(normalised(base, ["subsets"]));
+      // By key and value, whatever the order the keys are written in.
+      const same = sameOptions(
+        normalised(head, ["src", "style", "adjustFontFallback"]),
+        normalised(base, ["subsets"])
+      );
       if (!same) problems.push("options differ from the base");
       return problems;
     };
@@ -2377,6 +2398,22 @@ test.describe("Range design system", () => {
     expect(
       monoProblems(after.replace('weight: "400",', 'weight: "500",'))
     ).not.toEqual([]);
+    // A quoted key is read like an unquoted one, so an extra `"fallback"`
+    // option fails; reordering unchanged options does not.
+    expect(
+      monoProblems(
+        after.replace(
+          "adjustFontFallback: false,",
+          'adjustFontFallback: false,\n  "fallback": ["Arial"],'
+        )
+      )
+    ).not.toEqual([]);
+    const reordered = after.replace(
+      '  display: "swap",\n  preload: false,\n  adjustFontFallback: false,',
+      '  preload: false,\n  adjustFontFallback: false,\n  display: "swap",'
+    );
+    expect(reordered, "the reorder control changes the source").not.toBe(after);
+    expect(monoProblems(reordered), "reordered options").toEqual([]);
     expect(
       declaration(
         after.replace(
@@ -3031,6 +3068,106 @@ function declaration(source: string, name: string): string | undefined {
   return new RegExp(
     `export const ${name} = [A-Za-z_]+\\(\\{[\\s\\S]*?\\}\\);`
   ).exec(source)?.[0];
+}
+
+/**
+ * The option object of `export const <name> = <loader>({ ... })`, read from the
+ * TypeScript syntax tree: each key (quoted or not) to its value, strings as
+ * JSON and anything else as its source with whitespace collapsed. A spread or
+ * a computed key becomes an entry of its own, so it can never match.
+ */
+function astOptions(source: string, name: string): Record<string, string> {
+  const file = ts.createSourceFile(
+    "fonts.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  let found: ts.ObjectLiteralExpression | undefined;
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer)
+    ) {
+      const arg = node.initializer.arguments[0];
+      if (arg && ts.isObjectLiteralExpression(arg)) found = arg;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  if (!found) throw new Error(`lib/fonts.ts has no options for ${name}`);
+  const out: Record<string, string> = {};
+  found.properties.forEach((prop, i) => {
+    const key =
+      ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop)
+        ? ts.isIdentifier(prop.name) ||
+          ts.isStringLiteralLike(prop.name) ||
+          ts.isNumericLiteral(prop.name)
+          ? prop.name.text
+          : `<computed ${i}>`
+        : `<unsupported ${i}>`;
+    out[key] = ts.isPropertyAssignment(prop)
+      ? ts.isStringLiteralLike(prop.initializer)
+        ? JSON.stringify(prop.initializer.text)
+        : prop.initializer.getText(file).replace(/\s+/g, " ")
+      : prop.getText(file).replace(/\s+/g, " ");
+  });
+  return out;
+}
+
+/** Two option objects with the same keys and values, in any order. */
+function sameOptions(
+  a: Record<string, string>,
+  b: Record<string, string>
+): boolean {
+  const ka = Object.keys(a).sort();
+  const kb = Object.keys(b).sort();
+  return (
+    ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k])
+  );
+}
+
+/**
+ * The font files a production build emits (everything under `.next/static`
+ * and `public/` with a font extension) that are not among the allowed hashes,
+ * and the allowed hashes no emitted file has.
+ */
+function emittedFontProblems(
+  files: ReadonlyArray<{ file: string; sha256: string }>,
+  allowed: Record<string, string>
+): string[] {
+  const names = new Map(Object.entries(allowed).map(([n, h]) => [h, n]));
+  const problems = files
+    .filter((f) => !names.has(f.sha256))
+    .map((f) => `${f.file} (${f.sha256}) is not a pinned or allowed font`);
+  const seen = new Set(files.map((f) => f.sha256));
+  for (const [name, hash] of Object.entries(allowed)) {
+    if (!seen.has(hash)) problems.push(`${name} is not emitted by the build`);
+  }
+  return problems;
+}
+
+function emittedFonts(): Array<{ file: string; sha256: string }> {
+  const out: Array<{ file: string; sha256: string }> = [];
+  const walk = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(woff2?|ttf|otf|eot)$/i.test(entry.name)) {
+        out.push({
+          file: path.relative(ROOT, full),
+          sha256: sha256Of(fs.readFileSync(full)),
+        });
+      }
+    }
+  };
+  walk(path.join(ROOT, ".next/static"));
+  walk(path.join(ROOT, "public"));
+  return out;
 }
 
 /** What a route renders that decides which of the two pinned faces it may load. */
