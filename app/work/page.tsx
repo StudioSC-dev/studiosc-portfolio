@@ -45,7 +45,7 @@ export default async function WorkPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
+    <div className="mx-auto box-content max-w-page px-gutter-phone py-16 md:px-gutter">
       <PageHeader
         title="Our Work"
         lead="A catalog of our projects, showcasing our approach to building and breaking software."

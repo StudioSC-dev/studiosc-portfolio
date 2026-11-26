@@ -24,8 +24,8 @@ const disciplines = [
 
 const Hero = () => {
   return (
-    <section className="border-b border-line px-6 py-24 md:py-32">
-      <div className="mx-auto max-w-5xl">
+    <section className="border-b border-line px-gutter-phone py-24 md:px-gutter md:py-32">
+      <div className="mx-auto max-w-page">
         <p className="label mb-8">StudioSC — Engineering &amp; Quality</p>
 
         <h1 className="font-serif text-5xl leading-[1.05] text-ink sm:text-6xl md:text-7xl">
@@ -48,7 +48,7 @@ const Hero = () => {
       {/* The two disciplines, set as a typographic spread rather than icon cards.
           The divider is a real border rather than a gap-px/background trick, so
           these columns stay transparent and the paper texture shows through. */}
-      <div className="mx-auto mt-20 grid max-w-5xl grid-cols-1 border-t border-line md:grid-cols-2">
+      <div className="mx-auto mt-20 grid max-w-page grid-cols-1 border-t border-line md:grid-cols-2">
         {disciplines.map((d, i) => (
           <div
             key={d.heading}

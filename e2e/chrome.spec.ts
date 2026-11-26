@@ -1,10 +1,26 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { THEME_STORAGE_KEY } from "../lib/theme";
 import { STATUS_KEYS, STATUSES } from "../lib/statuses";
+import { checkSite } from "../scripts/boards/check";
+import { describe as describeFailure } from "../scripts/boards/compare";
+import {
+  isAccepted,
+  loadBoards,
+  readJson,
+  type Sections,
+} from "../scripts/boards/model";
 import { TSX } from "./support/config";
 import { collectErrors, stubVercelInsights } from "./support/page";
 import { ROOT } from "./support/git";
@@ -156,6 +172,95 @@ function renderMarkup(renders: Render[]): string[] {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+const PHONE = { width: 390, height: 844 };
+
+/** The header's nav, in order: [label, href]. */
+const NAV: [string, string][] = [
+  ["Work", "/work"],
+  ["Writing", "/blog"],
+  ["Start a project", "/contact"],
+];
+
+/** An arrow glyph at the end of a label: →, ↓, ↗, ⟶, ➔ and the like. */
+const TRAILING_ARROW = /[←-⇿➔-➿⟰-⟿⤀-⥿⬀-⬯]\s*$/u;
+
+/** The files a module reaches through local imports, repo-relative. */
+function localImports(entry: string, seen = new Set<string>()): Set<string> {
+  if (seen.has(entry)) return seen;
+  seen.add(entry);
+  const source = readFileSync(path.join(ROOT, entry), "utf8");
+  const specifiers = [
+    ...source.matchAll(/(?:import|export)[^"']*?from\s+["']([^"']+)["']/g),
+    ...source.matchAll(/import\(\s*["']([^"']+)["']\s*\)/g),
+  ].map((m) => m[1]);
+  for (const spec of specifiers) {
+    let base: string | null = null;
+    if (spec.startsWith("@/")) base = spec.slice(2);
+    else if (spec.startsWith("."))
+      base = path.posix.join(path.posix.dirname(entry), spec);
+    if (!base) continue;
+    const file = [
+      base,
+      `${base}.ts`,
+      `${base}.tsx`,
+      `${base}/index.ts`,
+      `${base}/index.tsx`,
+    ].find(
+      (f) =>
+        /\.(ts|tsx)$/.test(f) &&
+        existsSync(path.join(ROOT, f)) &&
+        statSync(path.join(ROOT, f)).isFile()
+    );
+    if (file) localImports(file, seen);
+  }
+  return seen;
+}
+
+/** The board's footer: its copy, and its links as [label, href]. */
+function boardFooter(board: string) {
+  const html = readFileSync(path.join(ROOT, "docs/boards", board), "utf8");
+  const footer = /<footer[\s\S]*?<\/footer>/.exec(html)?.[0] ?? "";
+  const text = (s: string) =>
+    s
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+  const anchors = [
+    ...footer.matchAll(/<a\s[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g),
+  ].map((m) => [text(m[2]), m[1]]);
+  return { copy: text(footer), links: anchors };
+}
+
+/** Left edges at the shared alignment points: header, first heading, footer. */
+async function leftEdges(page: Page, phone: boolean) {
+  return page.evaluate((isPhone) => {
+    const visible = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    };
+    const header = document.querySelector(
+      '[data-board-section="chrome/header"]'
+    )!;
+    const anchor = isPhone
+      ? [...header.querySelectorAll("button")].find(
+          (b) => visible(b) && /theme$/.test(b.getAttribute("aria-label") ?? "")
+        )
+      : header.querySelector('a[aria-label="StudioSC, home"]');
+    const heading = [
+      ...document.querySelectorAll("main h1, main h2, main h3, main h4"),
+    ].find(visible);
+    const footer = document.querySelector(
+      '[data-board-section="chrome/footer"] p'
+    );
+    return {
+      header: anchor?.getBoundingClientRect().left ?? NaN,
+      heading: heading?.getBoundingClientRect().left ?? NaN,
+      footer: footer?.getBoundingClientRect().left ?? NaN,
+    };
+  }, phone);
 }
 
 test.describe("chrome", () => {
@@ -485,5 +590,321 @@ test.describe("chrome", () => {
         route
       ).toBe("H1");
     }
+  });
+});
+
+test.describe("chrome", () => {
+  test("one left edge", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    for (const route of ["/", "/work"]) {
+      for (const viewport of [DESKTOP, PHONE]) {
+        await page.setViewportSize(viewport);
+        await open(page, route);
+        const edges = await leftEdges(page, viewport === PHONE);
+        const at = `${route} at ${viewport.width}`;
+        expect(Number.isFinite(edges.header), `${at}: header`).toBe(true);
+        expect(
+          Math.abs(edges.heading - edges.header),
+          `${at}: heading`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(edges.footer - edges.header),
+          `${at}: footer`
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test("nav and current page", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name.startsWith("Mobile"), "desktop nav");
+    await page.setViewportSize(DESKTOP);
+    await open(page, "/");
+    const header = page.locator('[data-board-section="chrome/header"]');
+    const home = header.getByRole("link", { name: "StudioSC, home" });
+    await expect(home).toHaveAttribute("href", "/");
+
+    const nav = header.getByRole("navigation", { name: "Main" });
+    const navLinks = nav.getByRole("link");
+    await expect(navLinks).toHaveText(NAV.map(([label]) => label));
+    expect(
+      await navLinks.evaluateAll((as) => as.map((a) => a.getAttribute("href")))
+    ).toEqual(NAV.map(([, href]) => href));
+
+    const start = nav.getByRole("link", { name: "Start a project" });
+    const ink = await tokenColour(page, "--ink");
+    await expect(start).toHaveCSS("background-color", ink);
+
+    const current = () =>
+      nav
+        .locator('a[aria-current="page"]')
+        .evaluateAll((as) => as.map((a) => a.getAttribute("href")));
+    await expect.poll(current).toEqual([]);
+    for (const [label, href] of NAV) {
+      await nav.getByRole("link", { name: label }).click();
+      await expect(page).toHaveURL(href);
+      await expect.poll(current).toEqual([href]);
+    }
+    for (const [, href] of NAV) {
+      await open(page, href);
+      await expect.poll(current).toEqual([href]);
+    }
+  });
+
+  test.describe("phone", () => {
+    test.use({ viewport: PHONE });
+
+    test("phone menu in every project", async ({ page }) => {
+      await open(page, "/");
+      const header = page.locator('[data-board-section="chrome/header"]');
+      const themeButton = toggle(page);
+      const wordmark = header.getByRole("link", { name: "StudioSC, home" });
+      const menu = header.getByRole("button", { name: "Menu" });
+      const panel = page.locator("#phone-menu");
+      const [t, w, m] = await Promise.all(
+        [themeButton, wordmark, menu].map(async (l) => (await l.boundingBox())!)
+      );
+      expect(t.x + t.width).toBeLessThanOrEqual(w.x);
+      expect(Math.abs(w.x + w.width / 2 - PHONE.width / 2)).toBeLessThanOrEqual(
+        1
+      );
+      expect(m.x).toBeGreaterThanOrEqual(w.x + w.width);
+
+      const isOpen = () => panel.evaluate((el) => el.matches(":popover-open"));
+
+      // Opens by click, holding the same three links in order.
+      await menu.click();
+      await expect.poll(isOpen).toBe(true);
+      await expect(menu).toHaveAttribute("aria-expanded", "true");
+      await expect(panel.getByRole("link")).toHaveText(NAV.map(([l]) => l));
+      expect(
+        await panel
+          .getByRole("link")
+          .evaluateAll((as) => as.map((a) => a.getAttribute("href")))
+      ).toEqual(NAV.map(([, href]) => href));
+
+      // A link reaches its page and closes the panel; reopened, it is current.
+      await panel.getByRole("link", { name: "Work" }).click();
+      await expect(page).toHaveURL("/work");
+      await expect.poll(isOpen).toBe(false);
+      await menu.click();
+      await expect.poll(isOpen).toBe(true);
+      await expect(panel.getByRole("link", { name: "Work" })).toHaveAttribute(
+        "aria-current",
+        "page"
+      );
+
+      // Escape closes it and gives focus back to Menu.
+      await page.keyboard.press("Escape");
+      await expect.poll(isOpen).toBe(false);
+      await expect(menu).toBeFocused();
+      await expect(menu).toHaveAttribute("aria-expanded", "false");
+
+      // It opens from the keyboard too.
+      await menu.focus();
+      await page.keyboard.press("Enter");
+      await expect.poll(isOpen).toBe(true);
+      await page.keyboard.press("Escape");
+      await expect.poll(isOpen).toBe(false);
+      await expect(menu).toBeFocused();
+
+      // A click outside closes it.
+      await menu.click();
+      await expect.poll(isOpen).toBe(true);
+      await page.mouse.click(PHONE.width / 2, PHONE.height - 40);
+      await expect.poll(isOpen).toBe(false);
+
+      // So does navigating.
+      await menu.click();
+      await expect.poll(isOpen).toBe(true);
+      await page.goBack();
+      await expect(page).toHaveURL("/");
+      await expect.poll(isOpen).toBe(false);
+    });
+  });
+
+  test("plain chrome", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    // No arrow glyph ends a header, footer or CTA label.
+    const routes = [
+      "/",
+      "/work",
+      `/work/${CASE_SLUGS[0]}`,
+      "/blog",
+      "/about",
+      "/contact",
+      "/no-such-page",
+    ];
+    for (const viewport of [DESKTOP, PHONE]) {
+      await page.setViewportSize(viewport);
+      for (const route of routes) {
+        await open(page, route);
+        const labels = await page
+          .locator(
+            '[data-board-section="chrome/header"] :is(a, button), [data-board-section="chrome/footer"] a, [data-cta]'
+          )
+          .evaluateAll((els) => els.map((el) => el.textContent ?? ""));
+        expect(labels.length, route).toBeGreaterThan(0);
+        expect(
+          labels.filter((l) => TRAILING_ARROW.test(l)),
+          `${route} at ${viewport.width}`
+        ).toEqual([]);
+      }
+    }
+
+    // What the chrome is built from: no framer-motion, and only the theme
+    // toggle and the menu's route handler run on the client.
+    const chrome = [
+      ...localImports("app/layout.tsx"),
+      ...localImports("components/ui/CtaLink.tsx"),
+      ...localImports("components/layout/PageHeader.tsx"),
+      ...localImports("components/ui/StatusText.tsx"),
+      ...localImports("components/ui/FilterGroup.tsx"),
+    ];
+    const files = [...new Set(chrome)].sort();
+    expect(files).toContain("components/layout/Header.tsx");
+    expect(files).toContain("components/layout/Footer.tsx");
+    const source = (f: string) => readFileSync(path.join(ROOT, f), "utf8");
+    expect(
+      files.filter((f) => /["']framer-motion["']/.test(source(f)))
+    ).toEqual([]);
+    expect(
+      files.filter((f) => /^\s*["']use client["']/.test(source(f)))
+    ).toEqual([
+      "components/layout/MenuRouteHandler.tsx",
+      "components/ui/ThemeToggle.tsx",
+    ]);
+  });
+
+  test("footer matches the boards", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    const year = String(new Date().getFullYear());
+    const boards = {
+      1440: boardFooter("pages-work-desktop.dc.html"),
+      390: boardFooter("pages-work-phone.dc.html"),
+    } as const;
+    for (const viewport of [DESKTOP, PHONE]) {
+      const board = boards[viewport.width as 1440 | 390];
+      for (const choice of ["light", "dark"]) {
+        const context = await page.context().browser()!.newContext({
+          baseURL: testInfo.project.use.baseURL,
+          viewport,
+        });
+        const p = await context.newPage();
+        await storeChoice(p, choice);
+        await open(p, "/work");
+        const at = `${viewport.width} ${choice}`;
+        expect(await theme(p), at).toBe(choice);
+        const footer = p.locator('[data-board-section="chrome/footer"]');
+        const copy = (
+          await footer.evaluate((el) => (el as HTMLElement).innerText)
+        )
+          .replace(/\s+/g, " ")
+          .trim();
+        expect(copy, at).toBe(board.copy.replace("© 2026", `© ${year}`));
+        const siteLinks = await footer
+          .locator("a")
+          .evaluateAll((as) =>
+            as.map((a) => [
+              (a.textContent ?? "").trim(),
+              a.getAttribute("href") ?? "",
+            ])
+          );
+        expect(siteLinks, at).toEqual(board.links);
+
+        // Colours from the theme: ink links, muted tagline.
+        const ink = await tokenColour(p, "--ink");
+        const muted = await tokenColour(p, "--muted");
+        await expect(footer.getByRole("link", { name: "Work" })).toHaveCSS(
+          "color",
+          ink
+        );
+        await expect(
+          footer.getByText("Seth builds. Christine tests.")
+        ).toHaveCSS("color", muted);
+
+        // Layout: desktop sets the brand beside the links (3 to 9 columns);
+        // a phone stacks them, with the links in two columns.
+        const box = async (name: string) =>
+          (await footer
+            .getByRole("link", { name, exact: true })
+            .boundingBox())!;
+        const brand = (await footer
+          .getByText("StudioSC", { exact: true })
+          .boundingBox())!;
+        const work = await box("Work");
+        const writing = await box("Writing");
+        const about = await box("About");
+        if (viewport === DESKTOP) {
+          expect(Math.abs(work.y - brand.y), at).toBeLessThanOrEqual(1);
+          expect(work.x, at).toBeGreaterThan(brand.x + brand.width);
+          expect(Math.abs(writing.y - work.y), at).toBeLessThanOrEqual(1);
+          const nav = (await footer
+            .getByRole("navigation", { name: "Footer" })
+            .boundingBox())!;
+          expect(nav.width / brand.width, at).toBeCloseTo(876 / 292, 1);
+        } else {
+          expect(work.y, at).toBeGreaterThan(brand.y + brand.height);
+          expect(Math.abs(work.x - brand.x), at).toBeLessThanOrEqual(1);
+          expect(Math.abs(writing.y - work.y), at).toBeLessThanOrEqual(1);
+          expect(writing.x, at).toBeGreaterThan(work.x + work.width - 1);
+          expect(Math.abs(about.x - work.x), at).toBeLessThanOrEqual(1);
+          expect(work.height, at).toBeGreaterThanOrEqual(44);
+        }
+        await context.close();
+      }
+    }
+  });
+
+  test("PRV-4 fidelity rows", async ({ browser, baseURL }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    test.setTimeout(30 * 60_000);
+    const dir = path.join(ROOT, "docs/boards");
+    const sections = readJson<Sections>(path.join(dir, "sections.json"));
+    const rows = ["chrome/header", "chrome/footer"];
+    for (const id of rows) {
+      const row = sections.rows.find((r) => r.id === id);
+      expect(row?.ticket, id).toBe("PRV-4");
+      expect(row?.built, id).toBe(true);
+    }
+    expect(readJson<string[]>(path.join(dir, "merged.json"))).toContain(
+      "PRV-4"
+    );
+
+    // The desktop header's PRV-4 reference: Seth and Christine wait for PRV-10.
+    const d9 = loadBoards(dir).deviations.find(
+      (d) =>
+        d.section.includes("chrome/header") &&
+        d.property === "later" &&
+        d.expires === "PRV-10"
+    );
+    expect(
+      d9,
+      "a later deviation on chrome/header expiring with PRV-10"
+    ).toBeTruthy();
+    expect(d9!.board).toBe('a[href="/seth"], a[href="/christine"]');
+    expect.soft(isAccepted(d9!), `${d9!.id} accepted by the owner`).toBe(true);
+
+    const result = await checkSite({
+      dir,
+      baseURL: baseURL!,
+      browser,
+      only: { rows },
+    });
+    // Every row, width and theme ran, in every state the row has.
+    const expected = [];
+    for (const width of ["1440", "390"])
+      for (const t of ["light", "dark"]) {
+        for (const s of [
+          "default",
+          "default-rm",
+          "theme-reveal",
+          "theme-reveal-rm",
+        ])
+          expected.push(`chrome/header ${s} ${width} ${t}`);
+        for (const s of ["default", "default-rm"])
+          expected.push(`chrome/footer ${s} ${width} ${t}`);
+      }
+    expect([...result.checked].sort()).toEqual(expected.sort());
+    expect(result.failures.map(describeFailure)).toEqual([]);
   });
 });

@@ -36,8 +36,8 @@ export default async function Home() {
       <Hero />
 
       {/* Featured Work Section */}
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-5xl">
+      <section className="px-gutter-phone py-20 md:px-gutter">
+        <div className="mx-auto max-w-page">
           <h2 className="subhead mb-12 text-3xl">Featured Work</h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {sortedFeaturedProjects.map((project) => (

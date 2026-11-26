@@ -17,3 +17,6 @@ export const LINKEDIN = {
  * studio's profile. Replace with the real handle URL.
  */
 export const INSTAGRAM = "https://instagram.com";
+
+/** The studio's GitHub organisation. */
+export const GITHUB_ORG = "https://github.com/StudioSC-dev";
