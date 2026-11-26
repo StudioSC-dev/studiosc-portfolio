@@ -23,6 +23,8 @@ import {
   isAccepted,
   loadBoards,
   readJson,
+  readSpec,
+  type RowMeasure,
   type Sections,
 } from "../scripts/boards/model";
 import { TSX } from "./support/config";
@@ -331,6 +333,32 @@ function localImports(
   return { modules: seen, missing };
 }
 
+/**
+ * A selector list's members, split at top-level commas and sorted, so two
+ * lists that select the same things in another order or spacing compare equal.
+ */
+function selectorList(list: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quote: string | null = null;
+  let current = "";
+  for (const ch of list) {
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth--;
+    else if (ch === "," && depth === 0) {
+      out.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  out.push(current.trim());
+  return out.filter(Boolean).sort();
+}
+
 /** The board's footer: its copy, and its links as [label, href]. */
 function boardFooter(board: string) {
   const html = readFileSync(path.join(ROOT, "docs/boards", board), "utf8");
@@ -459,6 +487,63 @@ function ownPr(): { range: PrRange } | { skip: string } {
   if (existsAt(range.base, SPEC_FILE))
     return { skip: `${range.base} already holds ${SPEC_FILE}` };
   return { range };
+}
+
+/**
+ * D9, the PRV-4 desktop header's deviation: Seth and Christine wait for
+ * PRV-10. Its selector agrees with the row's PRV-10 hide rule, and the
+ * references made with it pending show neither link.
+ */
+function deferredLinks(dir: string, sections: Sections) {
+  const d9 = loadBoards(dir).deviations.find(
+    (d) =>
+      d.section.includes("chrome/header") &&
+      d.property === "later" &&
+      d.expires === "PRV-10"
+  );
+  expect(
+    d9,
+    "a later deviation on chrome/header expiring with PRV-10"
+  ).toBeTruthy();
+  // It hides exactly what the row's PRV-10 rule hides, however PRV-27 or
+  // a later ticket words the selector.
+  const later = sections.rows
+    .find((r) => r.id === "chrome/header")
+    ?.later?.find((l) => l.ticket === "PRV-10");
+  expect(later, "chrome/header has a PRV-10 hide rule").toBeTruthy();
+  expect(selectorList(d9!.board)).toEqual(
+    selectorList(later!.hide.map((h) => h.selector).join(", "))
+  );
+
+  // The references made with D9 pending show neither deferred link; the
+  // board as drawn, without it, shows both.
+  const DEFERRED = ["Seth", "Christine"];
+  const spec = readSpec(path.join(dir, "spec.json"));
+  const shows = (r: RowMeasure) =>
+    DEFERRED.filter(
+      (name) =>
+        r.keys.some((k) => k.label === name) ||
+        r.copy.split(/\s+/).includes(name)
+    );
+  const withD9: string[] = [];
+  const drawn: string[] = [];
+  for (const [board, ref] of Object.entries(spec.boards)) {
+    for (const [key, capture] of Object.entries(ref.captures)) {
+      const row = capture.rows["chrome/header"];
+      if (!row) continue;
+      const pending = /\+pre-(.+?)(?:-rm)?$/.exec(key)?.[1].split("+") ?? [];
+      if (pending.includes(d9!.id)) {
+        withD9.push(`${board} ${key}`);
+        expect(shows(row), `${board} ${key}`).toEqual([]);
+      } else if (/^\w+\/default$/.test(key) && ref.width === "1440") {
+        drawn.push(`${board} ${key}`);
+        expect(shows(row), `${board} ${key}`).toEqual(DEFERRED);
+      }
+    }
+  }
+  expect(withD9.length, "references made with D9 pending").toBeGreaterThan(0);
+  expect(drawn.length, "desktop boards as drawn").toBeGreaterThan(0);
+  expect.soft(isAccepted(d9!), `${d9!.id} accepted by the owner`).toBe(true);
 }
 
 test.describe("chrome", () => {
@@ -1302,23 +1387,12 @@ test.describe("chrome", () => {
       expect(row?.ticket, id).toBe("PRV-4");
       expect(row?.built, id).toBe(true);
     }
-    expect(readJson<string[]>(path.join(dir, "merged.json"))).toContain(
-      "PRV-4"
-    );
+    const merged = readJson<string[]>(path.join(dir, "merged.json"));
+    expect(merged).toContain("PRV-4");
 
-    // The desktop header's PRV-4 reference: Seth and Christine wait for PRV-10.
-    const d9 = loadBoards(dir).deviations.find(
-      (d) =>
-        d.section.includes("chrome/header") &&
-        d.property === "later" &&
-        d.expires === "PRV-10"
-    );
-    expect(
-      d9,
-      "a later deviation on chrome/header expiring with PRV-10"
-    ).toBeTruthy();
-    expect(d9!.board).toBe('a[href="/seth"], a[href="/christine"]');
-    expect.soft(isAccepted(d9!), `${d9!.id} accepted by the owner`).toBe(true);
+    // The desktop header's PRV-4 reference: Seth and Christine wait for PRV-10
+    // (until PRV-10 merges and the deviation expires).
+    if (!merged.includes("PRV-10")) deferredLinks(dir, sections);
 
     const result = await checkSite({
       dir,
