@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -200,36 +201,73 @@ const NAV: [string, string][] = [
 /** An arrow glyph at the end of a label: →, ↓, ↗, ⟶, ➔ and the like. */
 const TRAILING_ARROW = /[←-⇿➔-➿⟰-⟿⤀-⥿⬀-⬯]\s*$/u;
 
-/** The files a module reaches through local imports, repo-relative. */
-function localImports(entry: string, seen = new Set<string>()): Set<string> {
-  if (seen.has(entry)) return seen;
+/** The module types the app builds: TypeScript and JavaScript, any flavour. */
+const MODULE_FILE = /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/;
+const MODULE_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+];
+
+/**
+ * Every import form: `import … from`, `export … from`, a bare side-effect
+ * `import "x"`, a dynamic `import("x")` and `require("x")`.
+ */
+const IMPORT_FORMS = [
+  /\b(?:import|export)\b[^"';]*?\bfrom\s*["']([^"']+)["']/g,
+  /\bimport\s*["']([^"']+)["']/g,
+  /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+  /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g,
+];
+
+/**
+ * The modules a module reaches through local imports (`@/` and relative),
+ * relative to `root`. A local import that resolves to no file at all is
+ * reported in `missing`, so an unfollowed import cannot pass unseen; one that
+ * resolves to an asset (CSS, an image) is not a module and is not followed.
+ */
+function localImports(
+  entry: string,
+  root = ROOT,
+  seen = new Set<string>(),
+  missing: string[] = []
+): { modules: Set<string>; missing: string[] } {
+  if (seen.has(entry)) return { modules: seen, missing };
   seen.add(entry);
-  const source = readFileSync(path.join(ROOT, entry), "utf8");
-  const specifiers = [
-    ...source.matchAll(/(?:import|export)[^"']*?from\s+["']([^"']+)["']/g),
-    ...source.matchAll(/import\(\s*["']([^"']+)["']\s*\)/g),
-  ].map((m) => m[1]);
+  const source = readFileSync(path.join(root, entry), "utf8");
+  const specifiers = IMPORT_FORMS.flatMap((form) =>
+    [...source.matchAll(form)].map((m) => m[1])
+  );
+  const isFile = (f: string) =>
+    existsSync(path.join(root, f)) && statSync(path.join(root, f)).isFile();
   for (const spec of specifiers) {
     let base: string | null = null;
     if (spec.startsWith("@/")) base = spec.slice(2);
     else if (spec.startsWith("."))
       base = path.posix.join(path.posix.dirname(entry), spec);
     if (!base) continue;
-    const file = [
+    // TypeScript's ESM style names the emitted file: "./x.js" is ./x.ts.
+    const emitted = /\.[cm]?jsx?$/.test(base)
+      ? [".ts", ".tsx", ".mts", ".cts"].map((e) =>
+          base!.replace(/\.[cm]?jsx?$/, e)
+        )
+      : [];
+    const candidates = [
       base,
-      `${base}.ts`,
-      `${base}.tsx`,
-      `${base}/index.ts`,
-      `${base}/index.tsx`,
-    ].find(
-      (f) =>
-        /\.(ts|tsx)$/.test(f) &&
-        existsSync(path.join(ROOT, f)) &&
-        statSync(path.join(ROOT, f)).isFile()
-    );
-    if (file) localImports(file, seen);
+      ...emitted,
+      ...MODULE_EXTENSIONS.map((e) => `${base}${e}`),
+      ...MODULE_EXTENSIONS.map((e) => `${base}/index${e}`),
+    ];
+    const file = candidates.find((f) => MODULE_FILE.test(f) && isFile(f));
+    if (file) localImports(file, root, seen, missing);
+    else if (!isFile(base)) missing.push(`${entry}: ${spec}`);
   }
-  return seen;
+  return { modules: seen, missing };
 }
 
 /** The board's footer: its copy, and its links as [label, href]. */
@@ -942,21 +980,68 @@ test.describe("chrome", () => {
       }
     }
 
+    // The walker follows every module type and import form the app builds.
+    const fixture = mkdtempSync(path.join(tmpdir(), "prv4-imports-"));
+    try {
+      const put = (file: string, text: string) => {
+        mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true });
+        writeFileSync(path.join(fixture, file), text);
+      };
+      put(
+        "entry.tsx",
+        [
+          'import type { A } from "./types";',
+          'import "./side-effect";',
+          'import {\n  b,\n} from "@/b.js";',
+          'export { c } from "./c";',
+          'const d = import("./d");',
+          'const e = require("./e");',
+          'import "./style.css";',
+        ].join("\n")
+      );
+      put("types.ts", "export type A = 1;");
+      put("side-effect.jsx", '"use client";\nimport "framer-motion";');
+      put("b.ts", "export const b = 1;");
+      put("c/index.mjs", "export const c = 1;");
+      put("d.cjs", "module.exports = 1;");
+      put("e.js", "module.exports = 1;");
+      put("style.css", "");
+      const walked = localImports("entry.tsx", fixture);
+      expect([...walked.modules].sort()).toEqual([
+        "b.ts",
+        "c/index.mjs",
+        "d.cjs",
+        "e.js",
+        "entry.tsx",
+        "side-effect.jsx",
+        "types.ts",
+      ]);
+      expect(walked.missing).toEqual([]);
+      put("entry.tsx", 'import "./gone";');
+      expect(localImports("entry.tsx", fixture).missing).toEqual([
+        "entry.tsx: ./gone",
+      ]);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
+
     // What the chrome is built from: no framer-motion, and only the theme
     // toggle and the menu's route handler run on the client.
-    const chrome = [
-      ...localImports("app/layout.tsx"),
-      ...localImports("components/ui/CtaLink.tsx"),
-      ...localImports("components/layout/PageHeader.tsx"),
-      ...localImports("components/ui/StatusText.tsx"),
-      ...localImports("components/ui/FilterGroup.tsx"),
-    ];
-    const files = [...new Set(chrome)].sort();
+    const walks = [
+      "app/layout.tsx",
+      "app/not-found.tsx",
+      "components/ui/CtaLink.tsx",
+      "components/layout/PageHeader.tsx",
+      "components/ui/StatusText.tsx",
+      "components/ui/FilterGroup.tsx",
+    ].map((entry) => localImports(entry));
+    expect(walks.flatMap((w) => w.missing)).toEqual([]);
+    const files = [...new Set(walks.flatMap((w) => [...w.modules]))].sort();
     expect(files).toContain("components/layout/Header.tsx");
     expect(files).toContain("components/layout/Footer.tsx");
     const source = (f: string) => readFileSync(path.join(ROOT, f), "utf8");
     expect(
-      files.filter((f) => /["']framer-motion["']/.test(source(f)))
+      files.filter((f) => /["']framer-motion(?:\/[^"']*)?["']/.test(source(f)))
     ).toEqual([]);
     expect(
       files.filter((f) => /^\s*["']use client["']/.test(source(f)))
