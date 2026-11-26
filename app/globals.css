@@ -2,109 +2,149 @@
 @plugin "@tailwindcss/typography";
 
 /*
-  StudioSC design tokens.
+  The page container, as the boards build it: 75rem of content in a content
+  box, plus 2.5rem gutters (1280px wide in all at desktop). Generated here so
+  the recipe exists before the first page uses it.
+*/
+@source inline("box-content max-w-page px-gutter px-gutter-phone mx-auto");
 
-  Two themes. Components only ever reference the semantic names (--paper, --ink,
-  --line …), never a palette step, so light and dark cannot drift apart — that is
-  what let the old header (light-aware) and hero (hardcoded dark) disagree.
+/*
+  StudioSC design tokens: Range.
+
+  docs/design-system.md is the reference for every value here and quotes the
+  boards it comes from. The e2e spec design-tokens.spec.ts reads that doc and
+  checks this file against it, so change the two together.
 
   The theme is selected by `data-theme` on <html>, which the inline script in
-  layout.tsx sets before first paint. Light is the default; the media query at the
-  bottom only covers the no-JS case, where no attribute is ever set.
-
-  Contrast is deliberately kept off the ceiling in dark: body text lands around
-  8:1 rather than the 15:1 of pure white on near-black, which is fatiguing to read.
+  layout.tsx sets before first paint. Light is the default on :root, dark is
+  written out in full on [data-theme="dark"], and the same dark values are
+  repeated under prefers-color-scheme for the no-JS case, where no attribute is
+  ever set.
 */
 
 :root {
-  /*
-    Dark palette held as constants, so switching themes below is pure aliasing
-    and no colour value is ever written twice.
-  */
-  --dark-paper: #1c1917;
-  --dark-surface: #231f1d;
-  --dark-sunken: #171412;
-  --dark-line: #332e2b;
-  --dark-line-strong: #443d39;
-  --dark-ink: #f5f5f4;
-  --dark-body: #d6d3d1;
-  --dark-muted: #a8a29e;
-  --dark-ok: #a3b18a;
-  --dark-warn: #d9a05b;
-  --dark-info: #a8a29e;
-  --dark-danger: #e0918a;
+  /* Range, light */
+  --gallery: #e9eaec; /* page */
+  --plate: #ffffff; /* plates, panels, tab pill */
+  --peek: #f4f5f6; /* dimmed side plates, photo frames */
+  --ink: #1d1f23; /* text, primary button, person-frame rule */
+  --muted: #5e636b; /* secondary text */
+  --rule: #d0d3d8; /* row rules, plate borders */
+  --accent: #1f4fd1; /* headline word, dot fields, focus ring */
+  --error: #b3261e; /* form error summary, invalid fields and their messages */
+  --dots-opacity: 0.55;
 
-  /*
-    Light theme (default).
+  /* Focus ring colour. Fragments and the turntable stage set their own. */
+  --focus: var(--accent);
 
-    The page is a soft grey, not white: it sits at ~70% of pure white's luminance,
-    because a full-white field at screen brightness is glaring over a long read.
-    Cards sit *lighter* than the page, so they separate without a shadow and
-    without being a near-white glare panel. Ink is pulled back off true black for
-    the same reason.
-
-    Greys are very slightly warm so light and dark read as one family (dark is a
-    warm stone), but the saturation is low enough that they present as neutral.
-
-    Dimming the page compresses contrast against dark text, so the whole ramp is
-    tuned to this specific page tone — every pairing that actually occurs still
-    clears 4.5:1 (worst is muted 11px label text on --sunken, at 4.68:1). If you
-    re-dim the page, re-darken --muted, --ok, --warn and --danger with it.
-
-    70% is the practical floor: dimmer than this and 11px label text cannot hold
-    4.5:1 without the text going so dark the page loses its tonal range.
-
-    The previous, lighter setting (~78%) if you want to go back:
-      --paper #e7e4df  --surface #f1efeb  --sunken #dbd7d1
-      --line  #cdc8c1  --line-strong #b5afa6
-      --ink   #26231f  --body #454140  --muted/--info #5f5b55
-      --ok    #436b0d  --warn #8f4926  --danger #9c2721
-  */
-
-  /* Surfaces — surface is lighter than paper, sunken is darker */
-  --paper: #dedad4;
-  --surface: #e9e6e0;
-  --sunken: #d2cdc6;
-
-  /* Hairlines */
-  --line: #c2bcb4;
-  --line-strong: #a9a29a;
-
-  /* Text */
-  --ink: #201d1a; /* headings */
-  --body: #43403c; /* paragraphs */
-  --muted: #59554f; /* metadata, labels — 4.68:1 on --sunken at 11px */
-
-  /* Status — desaturated, used as small dots and text, never as glowing fills */
+  /* Status, kept from the previous palette until the pages using it are rebuilt */
   --ok: #3c610b;
   --warn: #7f4021;
   --info: #59554f;
   --danger: #8c221d;
 
-  /* Paper texture strength — see the body::before/::after rules below. */
-  --grain-opacity: 0.085;
-  --mottle-opacity: 0.075;
+  /*
+    Old names, aliased to the nearest Range token so pages not yet rebuilt render
+    in the Range palette. PRV-18 deletes every alias left unused.
+  */
+  --paper: var(--gallery);
+  --surface: var(--plate);
+  --sunken: var(--peek);
+  --line: var(--rule);
+  --line-strong: var(--rule);
+  --body: var(--ink);
+
+  /*
+    Product palettes. Used only inside a fragment, under
+    components/range/fragments/. They keep their light values in both themes.
+  */
+
+  /* Tally & Trace ledger */
+  --frag-tt-band: #1f4d3a;
+  --frag-tt-on-band: #ffffff;
+  --frag-tt-ink: #1c2420;
+  --frag-tt-muted: #58615b;
+  --frag-tt-rule: #dce3de;
+  --frag-tt-pad: #f6f9f6;
+  --frag-tt-sheet: #ffffff;
+  --frag-tt-red: #b3261e;
+  --frag-tt-green: #23613f;
+
+  /* Central Command day feed */
+  --frag-cc-bg: #eef1f6;
+  --frag-cc-panel: #ffffff;
+  --frag-cc-ink: #1a2233;
+  --frag-cc-muted: #4f5a70;
+  --frag-cc-line: #d9dfea;
+  --frag-cc-accent: #2f6fed;
+  --frag-cc-sleep: #db4c75;
+  --frag-cc-weather: #3a9abb;
+  --frag-cc-calendar: #9b4ed6;
+  --frag-cc-fitness: #2e9e5b;
+  --frag-cc-tickets: #d94640;
+  --frag-cc-news: #5b72a8;
+
+  /* Pocket habit tracker (lab demo) */
+  --frag-habit-bg: #eef3f1;
+  --frag-habit-line: #d5e2dd;
+  --frag-habit-device: #111315;
+  --frag-habit-screen: #ffffff;
+  --frag-habit-ink: #17201c;
+  --frag-habit-muted: #4f5e58;
+  --frag-habit-rule: #e3eae7;
+  --frag-habit-done: #0e7c66;
+  --frag-habit-ring: #6b7a74;
+
+  /* Form helper (lab demo) */
+  --frag-form-bg: #f7f6f3;
+  --frag-form-line: #e2dfd8;
+  --frag-form-field: #ffffff;
+  --frag-form-draft-line: #c9c4ba;
+  --frag-form-ink: #1f1d1a;
+  --frag-form-on-ink: #ffffff;
+  --frag-form-muted: #5c574f;
+
+  /* Turntable scene (lab demo) */
+  --frag-turntable-stage: #0f1113;
+  --frag-turntable-grid: #2a2e33;
+  --frag-turntable-edge: #7fa2ff;
+  --frag-turntable-control-line: #5a616b;
+  --frag-turntable-control-ink: #e6e8eb;
+
+  /* The site drawn small (Sites and Testing fragments), always in its light colours */
+  --frag-site-gallery: #e9eaec;
+  --frag-site-plate: #ffffff;
+  --frag-site-peek: #f1f2f4;
+  --frag-site-ink: #1d1f23;
+  --frag-site-muted: #5e636b;
+  --frag-site-rule: #d0d3d8;
+  --frag-site-line: #c4c8ce;
+  --frag-site-faint: #9aa0a8;
+
+  /* Focus rings inside fragments: they stay light, so the light accent holds 3:1 */
+  --frag-focus: #1f4fd1;
+  /* The turntable stage is dark in both themes */
+  --frag-turntable-focus: #7fa2ff;
 
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --paper: var(--dark-paper);
-  --surface: var(--dark-surface);
-  --sunken: var(--dark-sunken);
-  --line: var(--dark-line);
-  --line-strong: var(--dark-line-strong);
-  --ink: var(--dark-ink);
-  --body: var(--dark-body);
-  --muted: var(--dark-muted);
-  --ok: var(--dark-ok);
-  --warn: var(--dark-warn);
-  --info: var(--dark-info);
-  --danger: var(--dark-danger);
+  /* Range, dark */
+  --gallery: #141619;
+  --plate: #1d2024;
+  --peek: #191b1f;
+  --ink: #eceef1;
+  --muted: #a3a9b2;
+  --rule: #30343a;
+  --accent: #7fa2ff;
+  --error: #ff9b8f;
+  --dots-opacity: 0.7;
 
-  /* On a dark page the same texture reads as sensor noise, so dial it back. */
-  --grain-opacity: 0.028;
-  --mottle-opacity: 0.022;
+  --ok: #a3b18a;
+  --warn: #d9a05b;
+  --info: #a8a29e;
+  --danger: #e0918a;
 
   color-scheme: dark;
 }
@@ -112,146 +152,502 @@
 /* No-JS fallback only: with scripting on, data-theme is always present. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --paper: var(--dark-paper);
-    --surface: var(--dark-surface);
-    --sunken: var(--dark-sunken);
-    --line: var(--dark-line);
-    --line-strong: var(--dark-line-strong);
-    --ink: var(--dark-ink);
-    --body: var(--dark-body);
-    --muted: var(--dark-muted);
-    --ok: var(--dark-ok);
-    --warn: var(--dark-warn);
-    --info: var(--dark-info);
-    --danger: var(--dark-danger);
+    --gallery: #141619;
+    --plate: #1d2024;
+    --peek: #191b1f;
+    --ink: #eceef1;
+    --muted: #a3a9b2;
+    --rule: #30343a;
+    --accent: #7fa2ff;
+    --error: #ff9b8f;
+    --dots-opacity: 0.7;
 
-    --grain-opacity: 0.028;
-    --mottle-opacity: 0.022;
+    --ok: #a3b18a;
+    --warn: #d9a05b;
+    --info: #a8a29e;
+    --danger: #e0918a;
 
     color-scheme: dark;
   }
 }
 
+/* Utilities for the tokens above. */
 @theme inline {
-  --color-paper: var(--paper);
-  --color-surface: var(--surface);
-  --color-sunken: var(--sunken);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  --color-gallery: var(--gallery);
+  --color-plate: var(--plate);
+  --color-peek: var(--peek);
   --color-ink: var(--ink);
-  --color-body: var(--body);
   --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-error: var(--error);
+
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-info: var(--info);
   --color-danger: var(--danger);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, Menlo, monospace;
+  /* Old names, until PRV-18 retires them */
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-body: var(--body);
+
+  --font-sans: var(--font-red-hat-text), ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
+  /* The old display class, now the display face. PRV-18 retires the name. */
+  --font-serif:
+    var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
+  /*
+    A system stack: JetBrains Mono is loaded only for pre and code. Liberation
+    Mono names the Linux face, so the bare generic never picks a face that a
+    later layout swaps for another (and re-wraps the line).
+  */
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-/*
-  Paper texture.
+/* Shape, shadow, layout and the type scale, from the boards. */
+@theme static {
+  --radius-plate: 14px;
+  --radius-peek: 12px;
+  --radius-person: 14px;
+  --radius-photo: 14px;
+  --radius-holly: 2.5rem;
+  --radius-control: 6px;
+  --radius-fragment: 6px;
+  --radius-tag: 4px;
+  --radius-pill: 999px;
 
-  Real paper is not a flat tone: it has fine grain from the fibre, plus a broader
-  unevenness where the pulp settled thicker or thinner. Two overlays reproduce
-  that — a high-frequency grain and a low-frequency mottle — both generated by
-  SVG feTurbulence inlined as data URIs, so there are no image files, no extra
-  requests, and nothing to go stale.
+  --shadow-plate:
+    0 1px 2px rgba(0, 0, 0, 0.08), 0 28px 56px -28px rgba(0, 0, 0, 0.35);
+  --shadow-plate-phone:
+    0 1px 2px rgba(0, 0, 0, 0.08), 0 20px 40px -20px rgba(0, 0, 0, 0.35);
+  --shadow-pill: 0 8px 20px -12px rgba(0, 0, 0, 0.35);
 
-  Both are painted on fixed, pointer-events-none pseudo-elements at z-index -1:
-  above the page colour (which lives on <html>) but behind all content, so text
-  is never overlaid and hit-testing is untouched. `stitchTiles="stitch"` makes
-  the tiles seamless, which avoids the visible grid you get from naive noise.
+  --container-page: 75rem;
+  --spacing-gutter: 2.5rem;
+  --spacing-gutter-phone: 1rem;
 
-  Card surfaces are opaque and sit on top, so they read as a separate sheet laid
-  on the page — which is the intended effect.
-*/
+  --text-display: 5.75rem;
+  --text-display--line-height: 5.75rem;
+  --text-display--letter-spacing: -0.04em;
+  --text-display-phone: 2.625rem;
+  --text-display-phone--line-height: 2.875rem;
+  --text-display-phone--letter-spacing: -0.035em;
+  --text-section: 2rem;
+  --text-section--line-height: 2.5rem;
+  --text-section--letter-spacing: -0.015em;
+  --text-section-phone: 1.5rem;
+  --text-section-phone--line-height: 2rem;
+  --text-person: 2.25rem;
+  --text-person--line-height: 2.75rem;
+  --text-person--letter-spacing: -0.02em;
+  --text-person-phone: 1.75rem;
+  --text-person-phone--line-height: 2.25rem;
+  --text-person-phone--letter-spacing: -0.02em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-lead: 1.125rem;
+  --text-lead--line-height: 1.75rem;
+  --text-copy: 1rem;
+  --text-copy--line-height: 1.625rem;
+  --text-small: 0.9375rem;
+  --text-small--line-height: 1.5rem;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.125rem;
+}
 
 html {
-  background-color: var(--paper);
-}
-
-body {
-  color: var(--body);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* Fine fibre grain. */
-body::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E");
-  opacity: var(--grain-opacity);
-}
-
-/* Broad pulp mottling — the "traces of wood" unevenness. */
-body::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23m)'/%3E%3C/svg%3E");
-  opacity: var(--mottle-opacity);
-}
-
-/* Texture is a light-mode effect; in dark it reads as sensor noise, so it is
-   dialled well back rather than switched off entirely. */
-@media (prefers-reduced-transparency: reduce) {
-  body::before,
-  body::after {
-    display: none;
-  }
-}
-
-html {
+  background-color: var(--gallery);
   scroll-behavior: smooth;
 }
 
-/*
-  Instrument Serif ships a single 400 weight — bolding it synthesises a fake
-  weight and looks muddy, so display headings get tighter tracking for presence
-  instead of more weight.
-*/
-.font-serif {
-  font-weight: 400;
-  letter-spacing: -0.015em;
+body {
+  color: var(--ink);
+  font-family: var(--font-red-hat-text), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.625rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  /* Headings, tabs and the wordmark use the display face; h4 and below stay in
+     the body face, as the boards draw "What I did here". */
+  h1,
+  h2,
+  h3 {
+    font-family:
+      var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* The code face, and only here. */
+  pre,
+  code {
+    font-family:
+      var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo,
+      "Liberation Mono", monospace;
+    font-weight: 400;
+  }
 }
 
 /*
-  Section headings ("Featured Work", "Related Posts", headings inside an article).
-
-  Deliberately NOT the display serif: at subhead sizes Instrument Serif's single
-  400 weight reads thin and fussy. Bold sans gives these the weight to actually
-  divide a page. The serif is now reserved for display type only — the hero, page
-  titles, article titles, and content titles on cards.
+  Fragment faces. A fragment draws a product in that product's own face, so the
+  two fragment faces apply only under a [data-fragment] root, which only the
+  fragments under components/range/fragments/ render.
 */
+[data-fragment="tallyandtrace"],
+[data-fragment="form-helper"] {
+  font-family: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-fragment="central-command"],
+[data-fragment="habit-tracker"] {
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-fragment] :is(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+}
+
+/*
+  Focus: a 2px ring in --focus at a 3px offset, on keyboard focus only.
+  Fragments keep their light colours in both themes, so they use the light
+  accent; the turntable stage is dark in both themes, so it uses the dark one.
+*/
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+[data-fragment] {
+  --focus: var(--frag-focus);
+}
+
+[data-stage="turntable"] {
+  --focus: var(--frag-turntable-focus);
+}
+
+/*
+  Type classes kept from the previous design, now in sentence case. The display
+  class (.font-serif) is the display face; PRV-18 retires these names.
+*/
+.font-serif {
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+
 .subhead {
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family:
+    var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-transform: none;
   color: var(--ink);
 }
 
-/* Mono eyebrow treatment, used for section labels and metadata. */
 .label {
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  font-size: 0.6875rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-family: var(--font-red-hat-text), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted);
 }
 
 /*
-  Long-form MDX. The typography plugin is now actually registered (it was a
-  dependency but was never loaded, which is why this file used to re-implement
-  it by hand with !important). Theme it through the plugin's own variables so
-  light and dark both follow the tokens above.
+  Motion, from the boards. Each animation is named here once; the element that
+  plays it carries data-motion (or data-fade for a transition), so the
+  reduced-motion rule below can stop it at its final state.
+*/
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stage-in {
+  from {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.3em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plate-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plate-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes plate-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes tick-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes stream-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The -a and -b pairs are identical: alternating the name restarts the animation. */
+@keyframes wiggle-a {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-3deg);
+  }
+  45% {
+    transform: rotate(2deg);
+  }
+  70% {
+    transform: rotate(-1.5deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes wiggle-b {
+  0% {
+    transform: rotate(0);
+  }
+  20% {
+    transform: rotate(-3deg);
+  }
+  45% {
+    transform: rotate(2deg);
+  }
+  70% {
+    transform: rotate(-1.5deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes tuck-a {
+  0% {
+    transform: none;
+    z-index: 7;
+  }
+  45% {
+    transform: translate(-62%, -4%) rotate(-10deg);
+    z-index: 7;
+  }
+  55% {
+    z-index: 0;
+  }
+  100% {
+    transform: translate(-0.75rem, 0.375rem) rotate(-3deg);
+    z-index: 0;
+  }
+}
+
+@keyframes tuck-b {
+  0% {
+    transform: none;
+    z-index: 7;
+  }
+  45% {
+    transform: translate(-62%, -4%) rotate(-10deg);
+    z-index: 7;
+  }
+  55% {
+    z-index: 0;
+  }
+  100% {
+    transform: translate(-0.75rem, 0.375rem) rotate(-3deg);
+    z-index: 0;
+  }
+}
+
+@keyframes untuck-a {
+  0% {
+    transform: translate(-0.75rem, 0.375rem) rotate(-3deg);
+    z-index: 0;
+  }
+  45% {
+    transform: translate(-62%, -4%) rotate(-10deg);
+    z-index: 0;
+  }
+  55% {
+    z-index: 7;
+  }
+  100% {
+    transform: none;
+    z-index: 7;
+  }
+}
+
+@keyframes untuck-b {
+  0% {
+    transform: translate(-0.75rem, 0.375rem) rotate(-3deg);
+    z-index: 0;
+  }
+  45% {
+    transform: translate(-62%, -4%) rotate(-10deg);
+    z-index: 0;
+  }
+  55% {
+    z-index: 7;
+  }
+  100% {
+    transform: none;
+    z-index: 7;
+  }
+}
+
+@keyframes ears-a {
+  0% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(-9deg);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes ears-b {
+  0% {
+    transform: rotate(0);
+  }
+  30% {
+    transform: rotate(-9deg);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+  100% {
+    transform: rotate(0);
+  }
+}
+
+@keyframes turn {
+  from {
+    transform: rotateX(-24deg) rotateY(36deg);
+  }
+  to {
+    transform: rotateX(-24deg) rotateY(396deg);
+  }
+}
+
+/* The theme toggle's circular reveal, from the button (--rx, --ry). */
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0px at var(--rx, 100%) var(--ry, 0px));
+  }
+  to {
+    clip-path: circle(150vmax at var(--rx, 100%) var(--ry, 0px));
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  animation: theme-reveal 560ms ease-in-out;
+}
+
+/* Reduced motion: every animation and transition stops at its final state. */
+@media (prefers-reduced-motion: reduce) {
+  [data-motion] {
+    animation: none !important;
+  }
+
+  [data-fade] {
+    transition: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-image-pair(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/*
+  Long-form MDX. Themed through the typography plugin's own variables so light
+  and dark both follow the tokens above.
 */
 .prose {
   --tw-prose-body: var(--body);
@@ -274,19 +670,17 @@ html {
 
 /* Headings inside an article are subheads, so they follow the .subhead rule. */
 .prose :is(h1, h2, h3, h4) {
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family:
+    var(--font-red-hat-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }
 
+/* Links share the body colour, so the underline, in that colour, is the cue. */
 .prose a {
-  text-decoration-color: var(--line-strong);
+  text-decoration-color: currentColor;
   text-underline-offset: 0.2em;
   font-weight: 400;
-}
-
-.prose a:hover {
-  text-decoration-color: var(--ink);
 }
 
 .prose code {
