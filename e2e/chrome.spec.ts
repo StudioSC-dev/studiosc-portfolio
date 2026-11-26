@@ -685,6 +685,84 @@ function ownPr(): { range: PrRange } | { skip: string } {
 }
 
 /**
+ * In the page: for each project, every place it appears and the status words
+ * there. A place is the largest block around one of its case links that
+ * holds no other project's case link and stays inside its section (a row,
+ * a card); on its own case page (`caseSlug`) the place is `main`. A status
+ * word is an innermost visible element whose whole text is one of `words`.
+ */
+function projectStatuses({
+  slugs,
+  words,
+  caseSlug,
+}: {
+  slugs: string[];
+  words: string[];
+  caseSlug: string | null;
+}) {
+  const main = document.querySelector("main")!;
+  const text = (el: Element) => (el.textContent ?? "").trim();
+  const visible = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    return (
+      r.width > 0 &&
+      r.height > 0 &&
+      getComputedStyle(el).visibility !== "hidden"
+    );
+  };
+  const caseOf = (a: Element) => {
+    const href = a.getAttribute("href") ?? "";
+    const path = new URL(href, location.href).pathname;
+    return /^\/work\/([^/]+)\/?$/.exec(path)?.[1] ?? null;
+  };
+  const casesIn = (el: Element) =>
+    new Set(
+      [...el.querySelectorAll("a[href]")]
+        .map(caseOf)
+        .filter((s): s is string => s !== null)
+    );
+  const boundary = (el: Element) =>
+    el === main || el.matches("section, [role='region'], body");
+  const statusesIn = (root: Element) =>
+    [...root.querySelectorAll("*")]
+      .filter(
+        (el) =>
+          words.includes(text(el)) &&
+          ![...el.children].some((c) => text(c) === text(el)) &&
+          visible(el)
+      )
+      .map((el) => {
+        const own = getComputedStyle(el);
+        const parent = getComputedStyle(el.parentElement!);
+        const pseudo = (at: string) => getComputedStyle(el, at).content;
+        return {
+          text: text(el),
+          children: el.childElementCount,
+          before: pseudo("::before"),
+          after: pseudo("::after"),
+          colourOwn: own.color === parent.color,
+          background: own.backgroundColor,
+        };
+      });
+  return slugs.map((slug) => {
+    if (slug === caseSlug) return { slug, places: [statusesIn(main)] };
+    const places = new Set<Element>();
+    for (const link of main.querySelectorAll("a[href]")) {
+      if (caseOf(link) !== slug) continue;
+      let place: Element = link;
+      while (
+        place.parentElement &&
+        !boundary(place.parentElement) &&
+        [...casesIn(place.parentElement)].every((s) => s === slug)
+      )
+        place = place.parentElement;
+      places.add(place);
+    }
+    return { slug, places: [...places].map(statusesIn) };
+  });
+}
+
+/**
  * D9, the PRV-4 desktop header's deviation: Seth and Christine wait for
  * PRV-10. Its selector agrees with the row's PRV-10 hide rule, and the
  * references made with it pending show neither link.
@@ -959,105 +1037,108 @@ test.describe("chrome", () => {
       )
     );
 
-    // Every project each page shows, found by its case link and title, has
-    // exactly one visible status: the word its content record assigns, plain.
+    // Every project a page shows, found by its case link, has exactly one
+    // visible status in its row or card: a word its content record assigns
+    // (the label, or on a range plate the plate wording), plain.
     const projects = (await getProjects()).map((p) => ({
       slug: p.slug,
       title: p.title,
-      status: p.status as string,
-      label: STATUSES[p.status].label,
+      words: [STATUSES[p.status].label, STATUSES[p.status].plateLabel],
+      description: p.description,
     }));
-    const labels = STATUS_KEYS.map((k) => STATUSES[k].label);
-    const pages: [string, typeof projects | "shown"][] = [
-      ["/", "shown"],
-      ["/work", projects],
-      ...projects.map((p): [string, typeof projects] => [
-        `/work/${p.slug}`,
-        [p],
+    const words = STATUS_KEYS.flatMap((k) => [
+      STATUSES[k].label,
+      STATUSES[k].plateLabel,
+    ]);
+    const plain = {
+      children: 0,
+      before: "none",
+      after: "none",
+      colourOwn: true,
+      background: "rgba(0, 0, 0, 0)",
+    };
+    const verify = (
+      at: string,
+      found: Awaited<ReturnType<typeof projectStatuses>>,
+      slugs: string[] | "shown"
+    ) => {
+      const expected =
+        slugs === "shown" ? found.filter((f) => f.places.length) : found;
+      expect(
+        expected.map((f) => f.slug),
+        `${at}: projects shown`
+      ).not.toEqual([]);
+      for (const f of expected) {
+        const p = projects.find((x) => x.slug === f.slug)!;
+        const where = `${at}: ${p.title}`;
+        // A project that should be here and cannot be found fails.
+        expect(f.places.length, `${where} found`).toBeGreaterThan(0);
+        for (const statuses of f.places) {
+          expect(statuses.length, `${where}: one status`).toBe(1);
+          const [{ text, ...style }] = statuses;
+          expect(p.words, `${where}: its content record's word`).toContain(
+            text
+          );
+          expect(style, `${where}: plain`).toEqual(plain);
+        }
+      }
+    };
+    const shows = (slugs: string[], caseSlug: string | null) =>
+      page.evaluate(projectStatuses, { slugs, words, caseSlug });
+    const all = projects.map((p) => p.slug);
+
+    // The home rows as the Range board draws them (PRV-11): each name a link
+    // in a paragraph, the status beside it, no heading.
+    await open(page, "/no-such-page");
+    const drawnRows = (statusOf: (i: number) => string) =>
+      page.evaluate(
+        (rows) => {
+          const esc = (t: string) =>
+            t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+          document.querySelector("main")!.innerHTML =
+            `<section id="work" aria-labelledby="work-title"><div><h2 id="work-title">Every project</h2><a href="/work">All case studies</a></div><ul>` +
+            rows
+              .map(
+                (r) =>
+                  `<li style="padding: 0.875rem 0; border-top: 1px solid var(--rule);"><p style="margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;"><span style="display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.625rem;"><a href="/work/${r.slug}" aria-label="${esc(r.title)}" style="text-decoration: none; font-weight: 600;">${esc(r.title)}</a></span><span style="flex: 0 0 auto; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600;">${esc(r.status)}</span></p><p style="margin: 0.125rem 0 0; font-size: 0.875rem; color: var(--muted);">${esc(r.description)}</p></li>`
+              )
+              .join("") +
+            `</ul></section>`;
+        },
+        projects.map((p, i) => ({ ...p, status: statusOf(i) }))
+      );
+    await drawnRows((i) => projects[i].words[0]);
+    verify("drawn home rows", await shows(all, null), all);
+    // The same rows with one status missing or wrong are caught.
+    await drawnRows((i) => (i === 0 ? "" : projects[i].words[0]));
+    const missing = await shows(all, null);
+    expect(missing.find((f) => f.slug === all[0])!.places).toEqual([[]]);
+    await drawnRows((i) => {
+      const other = words.find((w) => !projects[i].words.includes(w))!;
+      return i === 0 ? other : projects[i].words[0];
+    });
+    const wrong = await shows(all, null);
+    expect(projects[0].words).not.toContain(
+      wrong.find((f) => f.slug === all[0])!.places[0][0].text
+    );
+
+    // The site itself.
+    const pages: [string, string[] | "shown", string | null][] = [
+      ["/", "shown", null],
+      ["/work", all, null],
+      ...all.map((slug): [string, string[], string] => [
+        `/work/${slug}`,
+        [slug],
+        slug,
       ]),
     ];
-    for (const [route, expected] of pages) {
+    for (const [route, expected, caseSlug] of pages) {
       await open(page, route);
-      const found = await page.evaluate(
-        ({ projects, labels, route }) => {
-          const visible = (el: Element) => {
-            const r = el.getBoundingClientRect();
-            const css = getComputedStyle(el);
-            return r.width > 0 && r.height > 0 && css.visibility !== "hidden";
-          };
-          const text = (el: Element) => (el.textContent ?? "").trim();
-          // The innermost visible elements whose whole text is a status word,
-          // marked or not.
-          const words = (root: Element) =>
-            [...root.querySelectorAll("*")].filter(
-              (el) =>
-                labels.includes(text(el)) &&
-                ![...el.children].some((c) => text(c) === text(el)) &&
-                visible(el)
-            );
-          const heading = (root: Element, title: string) =>
-            [...root.querySelectorAll("h1, h2, h3, h4")].some(
-              (h) => text(h) === title
-            );
-          const main = document.querySelector("main")!;
-          return projects.flatMap((p) => {
-            let card: Element | null = null;
-            if (route === `/work/${p.slug}`) {
-              card = heading(main, p.title) ? main : null;
-            } else {
-              // The smallest block holding both the case link and the title.
-              for (const link of main.querySelectorAll(
-                `a[href="/work/${p.slug}"]`
-              )) {
-                let at: Element | null = link;
-                while (at && at !== main && !heading(at, p.title))
-                  at = at.parentElement;
-                if (at && at !== main && (!card || card.contains(at)))
-                  card = at;
-              }
-            }
-            if (!card) return [{ slug: p.slug, shown: false, statuses: [] }];
-            const statuses = words(card).map((el) => {
-              const own = getComputedStyle(el);
-              const parent = getComputedStyle(el.parentElement!);
-              const pseudo = (at: string) => getComputedStyle(el, at).content;
-              return {
-                status: el.getAttribute("data-status"),
-                text: text(el),
-                children: el.childElementCount,
-                before: pseudo("::before"),
-                after: pseudo("::after"),
-                colourOwn: own.color === parent.color,
-                background: own.backgroundColor,
-              };
-            });
-            return [{ slug: p.slug, shown: true, statuses }];
-          });
-        },
-        {
-          projects: expected === "shown" ? projects : expected,
-          labels,
-          route,
-        }
+      verify(
+        route,
+        await shows(expected === "shown" ? all : expected, caseSlug),
+        expected
       );
-      const shown = expected === "shown" ? found.filter((f) => f.shown) : found;
-      expect(shown.length, `${route}: projects shown`).toBeGreaterThan(0);
-      for (const f of shown) {
-        const p = projects.find((x) => x.slug === f.slug)!;
-        const at = `${route}: ${p.title}`;
-        expect(f.shown, at).toBe(true);
-        expect(f.statuses, at).toEqual([
-          {
-            status: p.status,
-            text: p.label,
-            children: 0,
-            before: "none",
-            after: "none",
-            colourOwn: true,
-            background: "rgba(0, 0, 0, 0)",
-          },
-        ]);
-      }
     }
   });
 
