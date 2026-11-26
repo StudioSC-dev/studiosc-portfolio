@@ -166,6 +166,28 @@ const dotsToken = (page: Page) =>
     )
   );
 
+/**
+ * Starts sampling the page's horizontal overflow on every frame for `ms`;
+ * the returned promise resolves to the largest scrollWidth - clientWidth seen.
+ */
+const sampleOverflow = (page: Page, ms: number) =>
+  page.evaluate(
+    (duration) =>
+      new Promise<number>((resolve) => {
+        const root = document.documentElement;
+        let worst = root.scrollWidth - root.clientWidth;
+        const start = performance.now();
+        const frame = () => {
+          worst = Math.max(worst, root.scrollWidth - root.clientWidth);
+          if (performance.now() - start < duration)
+            requestAnimationFrame(frame);
+          else resolve(worst);
+        };
+        requestAnimationFrame(frame);
+      }),
+    ms
+  );
+
 /** The counter's visible text, without the words only a screen reader reads. */
 const counterText = (page: Page) =>
   counter(page).evaluate((p) =>
@@ -664,7 +686,12 @@ test("phone chip row", async ({ page }, testInfo) => {
   await expect.poll(scroll).toBe(0);
   await expect(tabs(page).nth(0)).toBeInViewport({ ratio: 1 });
 
-  // The page itself never scrolls sideways.
+  // The page never scrolls sideways, not even while a plate slides in.
+  for (const name of ["Next plate", "Previous plate", "Next plate"]) {
+    const sampling = sampleOverflow(page, 500);
+    await page.getByRole("button", { name }).click();
+    expect(await sampling).toBeLessThanOrEqual(0);
+  }
   const sideways = await page.evaluate(
     () =>
       document.documentElement.scrollWidth -

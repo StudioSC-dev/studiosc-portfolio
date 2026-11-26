@@ -147,7 +147,7 @@ export async function Range() {
       data-board-section="home/range"
       aria-roledescription="carousel"
       aria-label="What we build, by category"
-      className="relative pt-12 md:overflow-hidden md:pt-14"
+      className="relative overflow-x-clip pt-12 md:overflow-hidden md:pt-14"
     >
       <svg
         aria-hidden="true"
