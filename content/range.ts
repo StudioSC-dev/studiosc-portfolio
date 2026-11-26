@@ -68,8 +68,164 @@ export type RealPlate = z.infer<typeof realPlateSchema>;
 export type LabPlate = z.infer<typeof labPlateSchema>;
 export type RangeCategory = z.infer<typeof rangeCategorySchema>;
 
-/** PRV-5 to PRV-7 fill this in. */
-export const RANGE_CATEGORIES: RangeCategory[] = [];
+/** The lab line every lab plate carries at 1440 (range-light-desktop). */
+const LAB_LINE =
+  "Nobody's hired us for one of these yet. We built this so you don't have to take our word for it.";
+
+/**
+ * The seven categories, in board order (range-light-desktop, range-phone).
+ * PRV-5 builds the Central Command fragment; PRV-6 and PRV-7 fill the other
+ * plates' fragments in place. Christine lines are added only with a pinned,
+ * audited check.
+ */
+export const RANGE_CATEGORIES: RangeCategory[] = [
+  {
+    id: "dashboards",
+    tab: "Dashboards",
+    word: "dashboards",
+    plate: {
+      kind: "real",
+      slug: "central-command",
+      fragmentId: "central-command",
+      desktopDescription:
+        "A dashboard for one person's day, running on Cloudflare's free tier.",
+      phoneDescription:
+        "A dashboard for one person's day, running on Cloudflare's free tier.",
+      facts: [
+        { label: "Status", value: "In QA with Christine" },
+        { label: "Built with", value: "Cloudflare Workers, Hono and React" },
+        { label: "Started", value: "June 2026" },
+      ],
+      links: [
+        { label: "Read the case study", href: "/work/central-command" },
+        { label: "Open the demo", href: "https://centralcommand.studiosc.dev" },
+      ],
+    },
+  },
+  {
+    id: "finance",
+    tab: "Finance",
+    word: "finance apps",
+    plate: {
+      kind: "real",
+      slug: "tallyandtrace",
+      fragmentId: "tallyandtrace",
+      desktopDescription:
+        "A money app for a household and a small business. It forecasts cash flow day by day and says which account comes up short before a bill is due.",
+      phoneDescription:
+        "A money app that forecasts cash flow day by day and says which account comes up short before a bill is due.",
+      facts: [
+        { label: "Status", value: "In QA with Christine" },
+        { label: "Built with", value: "React, FastAPI and PostgreSQL" },
+        { label: "Started", value: "February 2026" },
+      ],
+      links: [
+        { label: "Read the case study", href: "/work/tallyandtrace" },
+        { label: "Open the app", href: "https://tallyandtrace.studiosc.dev" },
+      ],
+    },
+  },
+  {
+    id: "mobile",
+    tab: "Mobile",
+    word: "mobile apps",
+    plate: {
+      kind: "lab",
+      name: "Pocket habit tracker",
+      fragmentId: "habit-tracker",
+      description:
+        "A small phone-frame app with native-feel lists. Tick a habit and watch the count follow.",
+      builtWith: ["React"],
+      labLine: LAB_LINE,
+    },
+  },
+  {
+    id: "ai",
+    tab: "AI features",
+    word: "AI features",
+    plate: {
+      kind: "lab",
+      name: "Form helper",
+      fragmentId: "form-helper",
+      description:
+        "Drafts a reply and streams it in as it writes. Nothing is sent until you say so.",
+      builtWith: ["React"],
+      labLine: LAB_LINE,
+    },
+  },
+  {
+    id: "3d",
+    tab: "3D & motion",
+    word: "3D scenes",
+    plate: {
+      kind: "lab",
+      name: "Turntable scene",
+      fragmentId: "turntable",
+      description: "A small 3D scene you can turn and pause.",
+      builtWith: ["CSS 3D transforms"],
+      labLine: LAB_LINE,
+    },
+  },
+  {
+    id: "sites",
+    tab: "Sites",
+    word: "websites",
+    plate: {
+      kind: "real",
+      slug: "portfolio-site",
+      fragmentId: "portfolio-site",
+      desktopDescription:
+        "This site. Case studies and posts written in MDX, with a Playwright suite that Christine keeps green.",
+      phoneDescription: "This site. Case studies and posts written in MDX.",
+      facts: [
+        { label: "Status", value: "Live" },
+        { label: "Built with", value: "Next.js, Tailwind and Playwright" },
+        { label: "Started", value: "February 2026" },
+      ],
+      links: [
+        { label: "Read the case study", href: "/work/portfolio-site" },
+        {
+          label: "Source on GitHub",
+          href: "https://github.com/StudioSC-dev/studiosc-portfolio",
+        },
+      ],
+    },
+  },
+  {
+    id: "testing",
+    tab: "Testing",
+    word: "test suites",
+    plate: {
+      kind: "real",
+      slug: "portfolio-site",
+      fragmentId: "route-checks",
+      desktopDescription:
+        "The testing half of this site: a Playwright suite that Christine keeps green, run at both widths the site is built for.",
+      phoneDescription:
+        "This site, with a Playwright suite that Christine keeps green.",
+      facts: [
+        { label: "Status", value: "Live" },
+        { label: "Tested with", value: "Playwright" },
+      ],
+      links: [
+        { label: "Read the case study", href: "/work/portfolio-site" },
+        {
+          label: "Source on GitHub",
+          href: "https://github.com/StudioSC-dev/studiosc-portfolio",
+        },
+      ],
+    },
+  },
+];
+
+/**
+ * The name a real plate shows, by project slug, where the boards name the
+ * project differently from its frontmatter title (range-light-desktop draws
+ * "Tally & Trace"). Any other real plate shows its project's title.
+ */
+export const PLATE_NAMES: Readonly<Record<string, string>> = {
+  tallyandtrace: "Tally & Trace",
+};
 
 /**
  * Check a Range list. Throws one Error naming every offending category.
