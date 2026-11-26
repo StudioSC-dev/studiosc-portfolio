@@ -112,6 +112,29 @@ type RedHatFamily = keyof typeof PINNED_RED_HAT;
 const RED_HAT_FAMILIES = Object.keys(PINNED_RED_HAT) as RedHatFamily[];
 
 /**
+ * Manrope: the board's pinned Latin file, copied the same way (PRV-26
+ * amendment). JetBrains Mono: not on the boards, so no board pin; the file is
+ * the Latin weight-400 woff2 Google Fonts served for the site's declaration on
+ * 2026-11-26, and its SHA-256 and source URL are recorded in the ticket.
+ */
+const MANROPE = {
+  copy: "app/fonts/manrope/manrope-latin.woff2",
+  licence: "app/fonts/manrope/OFL.txt",
+  original: `${BOARD_FONTS}/OFL-manrope.txt`,
+  exportName: "__Manrope_8c2def02",
+} as const;
+const JETBRAINS_MONO = {
+  copy: "app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
+  licence: "app/fonts/jetbrains-mono/OFL.txt",
+  exportName: "__JetBrains_Mono_14425ba9",
+  sha256: "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb",
+  source:
+    "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOV.woff2",
+} as const;
+type PinnedFamily = RedHatFamily | "Manrope";
+const PINNED_FAMILIES: PinnedFamily[] = [...RED_HAT_FAMILIES, "Manrope"];
+
+/**
  * A family as the boards name it: next/font/local scopes the Red Hat faces as
  * `__Red_Hat_Display_<hash>` (see lib/fonts.ts), which reads "Red Hat Display".
  */
@@ -130,23 +153,23 @@ const sha256Of = (buf: Buffer) =>
  * face whose unicode-range opens at U+0000-00FF. Read from the stylesheet,
  * never from a file name.
  */
-function latinPins(): Record<RedHatFamily, { file: string; sha256: string }> {
+function latinPins(): Record<PinnedFamily, { file: string; sha256: string }> {
   const css = read(`${BOARD_FONTS}/google.css`);
-  const out: Partial<Record<RedHatFamily, { file: string; sha256: string }>> =
+  const out: Partial<Record<PinnedFamily, { file: string; sha256: string }>> =
     {};
   for (const block of css.match(/@font-face\s*{[^}]*}/g) ?? []) {
     const family = /font-family:\s*['"]([^'"]+)['"]/.exec(block)?.[1];
     const url = /url\(([^)]+)\)/.exec(block)?.[1];
     const range = /unicode-range:\s*([^;]+);/.exec(block)?.[1] ?? "";
     if (!family || !url || !range.startsWith("U+0000-00FF")) continue;
-    if (!RED_HAT_FAMILIES.includes(family as RedHatFamily)) continue;
+    if (!PINNED_FAMILIES.includes(family as PinnedFamily)) continue;
     const file = path.basename(url);
-    out[family as RedHatFamily] = {
+    out[family as PinnedFamily] = {
       file,
       sha256: sha256Of(fs.readFileSync(path.join(ROOT, BOARD_FONTS, file))),
     };
   }
-  return out as Record<RedHatFamily, { file: string; sha256: string }>;
+  return out as Record<PinnedFamily, { file: string; sha256: string }>;
 }
 
 /**
@@ -155,10 +178,11 @@ function latinPins(): Record<RedHatFamily, { file: string; sha256: string }> {
  */
 function redHatPinProblems(
   loads: readonly FontLoad[],
-  pins: Record<RedHatFamily, { sha256: string }>
+  pins: Record<string, { sha256: string }>,
+  families: readonly string[] = RED_HAT_FAMILIES
 ): string[] {
   const problems: string[] = [];
-  for (const family of RED_HAT_FAMILIES) {
+  for (const family of families) {
     const own = loads.filter((l) => l.family === family);
     const ok = own.filter((l) => l.status >= 200 && l.status < 300);
     if (own.length !== 1 || ok.length !== 1) {
@@ -925,18 +949,26 @@ test.describe("Range design system", () => {
       );
     }
 
-    const mono = fontOptions(source, "jetbrainsMono");
+    // Code and fragment faces: self-hosted too (PRV-26), with the options
+    // they had under next/font/google.
+    const mono = fontOptions(source, JETBRAINS_MONO.exportName);
     expect(optionValue(mono, "weight")).toBe("400");
     expect(optionValue(mono, "preload")).toBe(false);
-    expect(optionValue(mono, "subsets")).toEqual(["latin"]);
-    const manrope = fontOptions(source, "manrope");
-    expect(optionValue(manrope, "subsets"), "Manrope subsets").toEqual([
-      "latin",
-    ]);
+    expect(optionValue(mono, "src")).toBe(`../${JETBRAINS_MONO.copy}`);
+    const manrope = fontOptions(source, MANROPE.exportName);
     expect(optionValue(manrope, "preload"), "Manrope preload").toBe(false);
-    expect(optionValue(manrope, "weight"), "Manrope weights").toEqual([
-      ...BOARD_WEIGHTS.Manrope,
-    ]);
+    expect(optionValue(manrope, "src"), "Manrope file").toBe(
+      `../${MANROPE.copy}`
+    );
+    // One variable file: its range covers the board's Manrope weights.
+    const [lo, hi] = String(optionValue(manrope, "weight"))
+      .split(" ")
+      .map(Number);
+    for (const w of BOARD_WEIGHTS.Manrope) {
+      expect(Number(w) >= lo && Number(w) <= hi, `Manrope serves ${w}`).toBe(
+        true
+      );
+    }
 
     // IBM Plex Sans: the self-hosted cut, Latin plus the peso sign, at the
     // board's weights (400 to 600, one variable file), not preloaded.
@@ -1231,11 +1263,17 @@ test.describe("Range design system", () => {
       const texts = computed.filter((c) => c.fixture === fixture);
       expect(texts.length, `text in ${fixture}`).toBeGreaterThan(0);
       for (const c of texts) {
-        expect(firstFamily(c.family), `${fixture}: "${c.text}"`).toBe(face);
+        expect(
+          plainFamily(firstFamily(c.family)),
+          `${fixture}: "${c.text}"`
+        ).toBe(face);
       }
     }
     const withFragments = await fragmentWatch();
-    const recorded = perfRecord().fragment_font_bytes;
+    // The fragment faces are self-hosted from PRV-26 on, so their bytes are
+    // the ones PRV-26 recorded, not the Google files PRV-2 recorded.
+    const recorded = (JSON.parse(read(PERF_26)) as PerfRecord)
+      .fragment_font_bytes;
     for (const [face, family] of Object.entries(FRAGMENT_FAMILY)) {
       const bytes = bytesOf(withFragments, new RegExp(`^${family}$`));
       expect(recorded[face], `${PERF} records the ${face} bytes`).toBe(bytes);
@@ -1288,7 +1326,7 @@ test.describe("Range design system", () => {
           outside: all
             .filter((el) => !inCode(el) && !el.matches("svg, svg *"))
             .filter((el) =>
-              /JetBrains Mono/.test(
+              /JetBrains[ _]Mono/.test(
                 getComputedStyle(el).fontFamily.split(",")[0]
               )
             )
@@ -1297,7 +1335,7 @@ test.describe("Range design system", () => {
       });
       expect(mono.code.length, `code on ${route}`).toBeGreaterThan(0);
       for (const c of mono.code) {
-        expect(firstFamily(c.family)).toBe("JetBrains Mono");
+        expect(plainFamily(firstFamily(c.family))).toBe("JetBrains Mono");
         expect(c.weight).toBe("400");
       }
       expect(
@@ -1850,6 +1888,84 @@ test.describe("Range design system", () => {
       )
     ).toHaveLength(1);
 
+    // Manrope and JetBrains Mono (PRV-26 amendment): nothing comes from
+    // next/font/google; the Manrope copy is its board pin and the JetBrains
+    // Mono copy is the SHA-256 recorded in the ticket.
+    expect(source).not.toMatch(/from\s+["']next\/font\/google["']/);
+    expect(
+      sha256Of(fs.readFileSync(path.join(ROOT, MANROPE.copy))),
+      "Manrope copy is its pin"
+    ).toBe(pins.Manrope.sha256);
+    expect(read(MANROPE.licence) === read(MANROPE.original)).toBe(true);
+    expect(
+      sha256Of(fs.readFileSync(path.join(ROOT, JETBRAINS_MONO.copy))),
+      "JetBrains Mono copy is its recorded SHA-256"
+    ).toBe(JETBRAINS_MONO.sha256);
+    expect(read(JETBRAINS_MONO.licence)).toMatch(
+      /Copyright .*The JetBrains Mono Project Authors/
+    );
+    expect(read(JETBRAINS_MONO.licence)).toMatch(
+      /SIL OPEN FONT LICENSE Version 1\.1/
+    );
+    const ticket = read(TICKET_26);
+    expect(ticket, "ticket records the JetBrains Mono SHA-256").toContain(
+      JETBRAINS_MONO.sha256
+    );
+    expect(ticket, "ticket records the JetBrains Mono source").toContain(
+      JETBRAINS_MONO.source
+    );
+    // Served bytes: the fragment face where a fragment renders, the code face
+    // where code does, one successful response each.
+    const manropeSettle = watchFonts(page);
+    await page.goto("/");
+    await inject(page, FRAGMENT_FIXTURES);
+    const withFragments = await manropeSettle();
+    expect(
+      redHatPinProblems(withFragments, pins, ["Manrope"]),
+      "Manrope served on a fragment route"
+    ).toEqual([]);
+    const codeSettle = watchFonts(page);
+    await page.goto(CODE_ROUTE);
+    const withCode = (await codeSettle()).filter(
+      (l) => l.family === "JetBrains Mono"
+    );
+    expect(withCode.map((l) => [l.status, l.sha256])).toEqual([
+      [200, JETBRAINS_MONO.sha256],
+    ]);
+    // Limited to where they apply: neither is fetched on `/` without a
+    // fragment or code, nor is Manrope on the code page.
+    const plainPage = await page.context().newPage();
+    const plainSettle = watchFonts(plainPage);
+    await plainPage.goto("/");
+    const plain = await plainSettle();
+    await plainPage.close();
+    expect(
+      plain.filter((l) => /^(Manrope|JetBrains Mono)$/.test(l.family)),
+      "Manrope or JetBrains Mono on a page with neither"
+    ).toEqual([]);
+    // Control: other bytes in place of Manrope's pin fail.
+    const manropeProxy = await swapFontProxy(baseURL!, {
+      sha256: pins.Manrope.sha256,
+      body: fs.readFileSync(
+        path.join(ROOT, PINNED_RED_HAT["Red Hat Text"].copy)
+      ),
+    });
+    try {
+      const swapPage = await page.context().newPage();
+      const swapSettle = watchFonts(swapPage);
+      await swapPage.goto(manropeProxy.url + "/");
+      await inject(swapPage, FRAGMENT_FIXTURES);
+      const swapped = await swapSettle();
+      expect(manropeProxy.swapped()).toBeGreaterThan(0);
+      expect(
+        redHatPinProblems(swapped, pins, ["Manrope"]),
+        "Manrope control"
+      ).toHaveLength(1);
+      await swapPage.close();
+    } finally {
+      await manropeProxy.close();
+    }
+
     // The fidelity harness, on the production build of `/`: an in-memory
     // `chrome/header` row marked built, with a selector that matches the
     // rendered header, reports no font failure for either family.
@@ -1984,21 +2100,48 @@ test.describe("Range design system", () => {
       fs.rmSync(moved, { recursive: true, force: true });
     }
 
-    // The other faces: the same loaders, sources and options at the head as
-    // at the base.
+    // The other faces. IBM Plex Sans is unchanged. Manrope and JetBrains Mono
+    // may change loader and source (PRV-26 amendment), but their options stay
+    // as at the base, and nothing imports next/font/google.
     const before = git("show", `${base}:${FONTS}`);
     const after = git("show", `${head}:${FONTS}`);
-    for (const name of ["jetbrainsMono", "manrope", "ibmPlexSans"]) {
-      expect(declaration(after, name), `${name} at the head`).toBeDefined();
-      expect(declaration(after, name), `${name} unchanged`).toBe(
-        declaration(before, name)
-      );
-    }
-    // Control: a changed option or a changed loader differs.
-    const edited = after.replace('weight: "400",', 'weight: "500",');
-    expect(declaration(edited, "jetbrainsMono")).not.toBe(
-      declaration(after, "jetbrainsMono")
+    expect(
+      declaration(after, "ibmPlexSans"),
+      "ibmPlexSans at the head"
+    ).toBeDefined();
+    expect(declaration(after, "ibmPlexSans"), "ibmPlexSans unchanged").toBe(
+      declaration(before, "ibmPlexSans")
     );
+    const options = (source: string, name: string) => {
+      const opts = fontOptions(source, name);
+      return {
+        variable: optionValue(opts, "variable"),
+        display: optionValue(opts, "display"),
+        preload: optionValue(opts, "preload"),
+        weight: optionValue(opts, "weight"),
+      };
+    };
+    expect(options(after, JETBRAINS_MONO.exportName)).toEqual(
+      options(before, "jetbrainsMono")
+    );
+    const manropeBefore = options(before, "manrope");
+    const manropeAfter = options(after, MANROPE.exportName);
+    expect({ ...manropeAfter, weight: undefined }).toEqual({
+      ...manropeBefore,
+      weight: undefined,
+    });
+    // The base listed four weights; the one variable file covers them all.
+    const listed = (manropeBefore.weight as string[]).map(Number);
+    const [lo, hi] = String(manropeAfter.weight).split(" ").map(Number);
+    for (const w of listed) expect(w >= lo && w <= hi).toBe(true);
+    expect(after).not.toMatch(/from\s+["']next\/font\/google["']/);
+    // Controls: a changed option, and a changed loader on IBM Plex Sans, differ.
+    expect(
+      options(
+        after.replace('weight: "400",', 'weight: "500",'),
+        JETBRAINS_MONO.exportName
+      )
+    ).not.toEqual(options(before, "jetbrainsMono"));
     expect(
       declaration(
         after.replace(
@@ -2638,6 +2781,10 @@ const SCOPE_26 = [
   "app/fonts/red-hat-display/OFL.txt",
   "app/fonts/red-hat-text/red-hat-text-latin.woff2",
   "app/fonts/red-hat-text/OFL.txt",
+  "app/fonts/manrope/manrope-latin.woff2",
+  "app/fonts/manrope/OFL.txt",
+  "app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
+  "app/fonts/jetbrains-mono/OFL.txt",
   "e2e/design-tokens.spec.ts",
   "docs/design-system.md",
   "docs/perf/prv-26.json",

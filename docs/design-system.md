@@ -215,6 +215,14 @@ pairings hold in both themes because the palettes do not change.
   `__Red_Hat_Display_<hash>` and `__Red_Hat_Text_<hash>`, as next/font scoped
   the Google faces, so the faces read "Red Hat Display" and "Red Hat Text" to
   the boards and the fidelity check.
+- Manrope is self-hosted the same way, from the board's pinned `latin` file
+  (`docs/boards/fonts/google.css`, weights 400 to 800) in `app/fonts/manrope/`
+  with its OFL licence. JetBrains Mono is not on the boards, which draw code in
+  a system monospace stack, so `app/fonts/jetbrains-mono/` holds the Latin
+  weight-400 file Google Fonts served for the site's declaration on 2026-11-26,
+  with the upstream OFL licence; the SHA-256 and source URL are in
+  `docs/tickets/PRV-26.md`. Nothing in `lib/fonts.ts` loads from
+  `next/font/google`, so a build needs no network to Google Fonts.
 - A fragment face applies only under its `[data-fragment]` root, and each is at
   most 40 KiB per route unless an owner-accepted deviation says otherwise (see
   Font fallback). It is fetched only on a page that renders its fragment.

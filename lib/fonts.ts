@@ -1,26 +1,25 @@
-import { JetBrains_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
 
 /*
   Every face the site uses, self-hosted by next/font as a Latin subset.
   docs/design-system.md ("Type") is the source for which face goes where.
 
-  Red Hat Display and Red Hat Text are variable fonts: one Latin file per
-  family, so the two families stay at two files on any route. They are the
-  boards' pinned files (docs/boards/fonts/, Google Fonts v21 and v19, the
-  `latin` unicode-range entries of google.css), copied byte for byte with the
-  OFL licence beside each, so the built type matches the references whatever
-  Google serves on a given day.
+  Red Hat Display, Red Hat Text and Manrope are variable fonts: one Latin file
+  per family, the boards' pinned files (docs/boards/fonts/, the `latin`
+  unicode-range entries of google.css), copied byte for byte with the OFL
+  licence beside each, so the built type matches the references whatever
+  Google serves on a given day. JetBrains Mono, which the boards do not pin, is
+  self-hosted too, and nothing here comes from next/font/google.
 */
 
 /*
   next/font/local names the face after the exported constant, and writes that
-  name into both the @font-face and the --font-red-hat-* variable. The boards,
-  and the fidelity check that reads them, know the families as "Red Hat
-  Display" and "Red Hat Text", the way next/font/google scoped them
+  name into both the @font-face and the --font-* variable. The boards, and the
+  fidelity check that reads them, know the families as "Red Hat Display", "Red
+  Hat Text" and "Manrope", the way next/font/google scoped them
   (`__Red_Hat_Display_<hash>`), so the constants carry those names, with the
-  first eight hex digits of the pinned file's sha256 as the hash. The names
-  the rest of the site imports are the two aliases below each one.
+  first eight hex digits of the file's sha256 as the hash. The names the rest
+  of the site imports are the aliases below each one.
 */
 
 /** Headings, tabs and the wordmark. Pinned Latin file, weights 400 to 800. */
@@ -47,15 +46,23 @@ export const redHatText = __Red_Hat_Text_59826f39;
 
 /**
   Code face, on `pre` and `code` only (see globals.css). Not preloaded, so it is
-  fetched only on a page that renders code.
+  fetched only on a page that renders code. The boards draw code in a system
+  monospace stack and do not pin this face, so the file is the Latin weight-400
+  woff2 Google Fonts served for this declaration on 2026-11-26 (source URL and
+  SHA-256 in docs/tickets/PRV-26.md), with the upstream OFL licence beside it.
+  No size-adjusted fallback face: one sized for Arial would put the first paint
+  of code in a proportional face ahead of the monospace stack.
 */
-export const jetbrainsMono = JetBrains_Mono({
+export const __JetBrains_Mono_14425ba9 = localFont({
+  src: "../app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
   variable: "--font-jetbrains-mono",
   weight: "400",
-  subsets: ["latin"],
+  style: "normal",
   display: "swap",
   preload: false,
+  adjustFontFallback: false,
 });
+export const jetbrainsMono = __JetBrains_Mono_14425ba9;
 
 /*
   Fragment faces: the faces the boards draw inside a product fragment. They are
@@ -82,11 +89,17 @@ export const ibmPlexSans = localFont({
   preload: false,
 });
 
-/** Central Command day feed and the habit tracker. */
-export const manrope = Manrope({
+/**
+  Central Command day feed and the habit tracker: the boards' pinned Latin file
+  (Manrope, weights 400 to 800 on one variable axis), byte for byte.
+*/
+export const __Manrope_8c2def02 = localFont({
+  src: "../app/fonts/manrope/manrope-latin.woff2",
   variable: "--font-manrope",
-  weight: ["400", "600", "700", "800"],
-  subsets: ["latin"],
+  weight: "400 800",
+  style: "normal",
   display: "swap",
   preload: false,
+  adjustFontFallback: "Arial",
 });
+export const manrope = __Manrope_8c2def02;
