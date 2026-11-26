@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import net from "node:net";
 import os from "node:os";
+import { isDeepStrictEqual } from "node:util";
 import path from "node:path";
 import {
   chromium,
@@ -2680,35 +2681,27 @@ test.describe("fidelity harness", () => {
     expect(accepted.D1).toBe("");
     for (let n = 2; n <= 14; n++)
       expect(accepted[`D${n}`], `D${n}`).toBe("owner, 2026-11-26");
-    // Every other field as at the base, but D9's (and D5's) board selector.
-    const reselected = ["D9", "D5"];
+    // Every other field as at the base, but D9's board selector (D5 is
+    // unchanged).
     const rest = (d: Deviation) => ({
       ...d,
       accepted: "",
-      board: reselected.includes(d.id) ? "" : d.board,
+      board: d.id === "D9" ? "" : d.board,
     });
     for (const [i, d] of after.entries())
       expect(rest(d), d.id).toEqual(rest(before[i]));
     const d9 = after.find((d) => d.id === "D9")!;
     const items = 'li:has(> a[href="/seth"]), li:has(> a[href="/christine"])';
     expect(d9.board).toBe(items);
-    // The mapped sections hide exactly the D9 and D5 board selectors.
-    const reset = structuredClone(head.sections);
-    for (const id of reselected) {
-      const d = after.find((x) => x.id === id)!;
-      for (const section of d.section) {
-        const row = head.sections.rows.find((r) => r.id === section)!;
-        const later = row.later!.find((l) => l.ticket === d.expires)!;
-        expect(laterSelector(later.hide), `${id} ${section}`).toBe(d.board);
-        const was = base.sections.rows.find((r) => r.id === section)!;
-        const prior = was.later!.find((l) => l.ticket === d.expires)!;
-        const mine = reset.rows.find((r) => r.id === section)!;
-        const at = mine.later!.findIndex((l) => l.ticket === d.expires);
-        mine.later![at] = prior;
-      }
-    }
-    // Every other value in sections.json as at the base.
-    expect(reset).toEqual(base.sections);
+    // The mapped sections hide exactly the D9 and D5 board selectors, and
+    // every other value in sections.json is as at the base.
+    expect(sectionProblems(base, head)).toEqual([]);
+    // A hide mode changed alongside D9's selector (the list items kept in
+    // the layout, invisible) is caught.
+    const mutated = structuredClone(head);
+    const header = mutated.sections.rows.find((r) => r.id === "chrome/header")!;
+    header.later!.find((l) => l.ticket === "PRV-10")!.hide[0].mode = "hide";
+    expect(sectionProblems(base, mutated).length).toBeGreaterThan(0);
     // The register's text: only the sentence on acceptance changed.
     const prose = (sha: string) =>
       git(["show", `${sha}:docs/boards/deviations.md`])
@@ -2881,6 +2874,43 @@ function changedCaptures(
       .sort();
   }
   return out;
+}
+
+/**
+ * What differs in sections.json beyond PRV-27's one permitted change: each
+ * section D9 and D5 list must hide exactly that deviation's board selector;
+ * D5's entries equal the base; and with only the selector values of D9's
+ * entries put back, the sections equal the base (a changed hide mode or an
+ * added hide is a difference).
+ */
+function sectionProblems(base: BoardInputs, head: BoardInputs): string[] {
+  const problems: string[] = [];
+  const entry = (inputs: BoardInputs, section: string, ticket: string) =>
+    inputs.sections.rows
+      .find((r) => r.id === section)
+      ?.later?.find((l) => l.ticket === ticket);
+  const reset = structuredClone(head);
+  for (const id of ["D9", "D5"]) {
+    const d = head.register.deviations.find((x) => x.id === id)!;
+    for (const section of d.section) {
+      const now = entry(head, section, d.expires!);
+      const was = entry(base, section, d.expires!);
+      if (!now || !was) {
+        problems.push(`${id} ${section}: no ${d.expires} entry`);
+        continue;
+      }
+      if (laterSelector(now.hide) !== d.board)
+        problems.push(`${id} ${section}: hides ${laterSelector(now.hide)}`);
+      if (id === "D5" && !isDeepStrictEqual(now, was))
+        problems.push(`D5 ${section}: its entry differs from the base`);
+      if (id !== "D9" || now.hide.length !== was.hide.length) continue;
+      const mine = entry(reset, section, d.expires!)!;
+      mine.hide.forEach((h, i) => (h.selector = was.hide[i].selector));
+    }
+  }
+  if (!isDeepStrictEqual(reset.sections, base.sections))
+    problems.push("sections.json differs from the base beyond D9's selector");
+  return problems;
 }
 
 /** The boards directory with one board's source replaced, for a control. */
