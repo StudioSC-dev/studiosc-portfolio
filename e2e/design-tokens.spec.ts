@@ -1,4 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
+import http from "node:http";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -13,6 +15,9 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import { checkSite } from "../scripts/boards/check";
+import { loadBoards } from "../scripts/boards/model";
+import * as ts from "typescript";
 import { scanText } from "./support/denylist";
 import { changedByPr } from "./support/git";
 import {
@@ -77,10 +82,123 @@ const DOC = "docs/design-system.md";
 const CSS = "app/globals.css";
 const FONTS = "lib/fonts.ts";
 const PERF = "docs/perf/prv-2.json";
+const PERF_26 = "docs/perf/prv-26.json";
 const DEVIATIONS = "docs/boards/deviations.md";
 /** The self-hosted IBM Plex Sans cut, and the name inside the file (see lib/fonts.ts). */
 const PLEX_FILE = "app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2";
 const PLEX_INTERNAL_NAME = "SSC Fragment Sans";
+/**
+ * The boards' pinned Latin files for the two Red Hat families (PRV-26): the
+ * `latin` entries of docs/boards/fonts/google.css, copied to `copy` with the
+ * licence in `licence` beside it.
+ */
+const BOARD_FONTS = "docs/boards/fonts";
+const PINNED_RED_HAT = {
+  "Red Hat Display": {
+    copy: "app/fonts/red-hat-display/red-hat-display-latin.woff2",
+    licence: "app/fonts/red-hat-display/OFL.txt",
+    original: `${BOARD_FONTS}/OFL-redhatdisplay.txt`,
+    range: "400 800",
+    exportName: "__Red_Hat_Display_f7a7830b",
+  },
+  "Red Hat Text": {
+    copy: "app/fonts/red-hat-text/red-hat-text-latin.woff2",
+    licence: "app/fonts/red-hat-text/OFL.txt",
+    original: `${BOARD_FONTS}/OFL-redhattext.txt`,
+    range: "400 700",
+    exportName: "__Red_Hat_Text_59826f39",
+  },
+} as const;
+type RedHatFamily = keyof typeof PINNED_RED_HAT;
+const RED_HAT_FAMILIES = Object.keys(PINNED_RED_HAT) as RedHatFamily[];
+
+/**
+ * Manrope: the board's pinned Latin file, copied the same way (PRV-26
+ * amendment). JetBrains Mono: not on the boards, so no board pin; the file is
+ * the Latin weight-400 woff2 Google Fonts served for the site's declaration on
+ * 2026-11-26, and its SHA-256 and source URL are recorded in the ticket.
+ */
+const MANROPE = {
+  copy: "app/fonts/manrope/manrope-latin.woff2",
+  licence: "app/fonts/manrope/OFL.txt",
+  original: `${BOARD_FONTS}/OFL-manrope.txt`,
+  exportName: "__Manrope_8c2def02",
+} as const;
+const JETBRAINS_MONO = {
+  copy: "app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
+  licence: "app/fonts/jetbrains-mono/OFL.txt",
+  exportName: "__JetBrains_Mono_14425ba9",
+  sha256: "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb",
+  source:
+    "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOV.woff2",
+} as const;
+type PinnedFamily = RedHatFamily | "Manrope";
+const PINNED_FAMILIES: PinnedFamily[] = [...RED_HAT_FAMILIES, "Manrope"];
+
+/**
+ * A family as the boards name it: next/font/local scopes the Red Hat faces as
+ * `__Red_Hat_Display_<hash>` (see lib/fonts.ts), which reads "Red Hat Display".
+ */
+const plainFamily = (raw: string) =>
+  raw.replace(
+    /^__(.+?)_[0-9a-f]{8}( Fallback)?$/,
+    (_m, name: string, fallback: string | undefined) =>
+      name.replace(/_/g, " ") + (fallback ?? "")
+  );
+
+const sha256Of = (buf: Buffer) =>
+  createHash("sha256").update(buf).digest("hex");
+
+/**
+ * The sha256 of each family's Latin file in docs/boards/fonts/google.css: the
+ * face whose unicode-range opens at U+0000-00FF. Read from the stylesheet,
+ * never from a file name.
+ */
+function latinPins(): Record<PinnedFamily, { file: string; sha256: string }> {
+  const css = read(`${BOARD_FONTS}/google.css`);
+  const out: Partial<Record<PinnedFamily, { file: string; sha256: string }>> =
+    {};
+  for (const block of css.match(/@font-face\s*{[^}]*}/g) ?? []) {
+    const family = /font-family:\s*['"]([^'"]+)['"]/.exec(block)?.[1];
+    const url = /url\(([^)]+)\)/.exec(block)?.[1];
+    const range = /unicode-range:\s*([^;]+);/.exec(block)?.[1] ?? "";
+    if (!family || !url || !range.startsWith("U+0000-00FF")) continue;
+    if (!PINNED_FAMILIES.includes(family as PinnedFamily)) continue;
+    const file = path.basename(url);
+    out[family as PinnedFamily] = {
+      file,
+      sha256: sha256Of(fs.readFileSync(path.join(ROOT, BOARD_FONTS, file))),
+    };
+  }
+  return out as Record<PinnedFamily, { file: string; sha256: string }>;
+}
+
+/**
+ * What is wrong with a page's Red Hat font responses: each family must be
+ * served by exactly one successful response whose bytes are its pin.
+ */
+function redHatPinProblems(
+  loads: readonly FontLoad[],
+  pins: Record<string, { sha256: string }>,
+  families: readonly string[] = RED_HAT_FAMILIES
+): string[] {
+  const problems: string[] = [];
+  for (const family of families) {
+    const own = loads.filter((l) => l.family === family);
+    const ok = own.filter((l) => l.status >= 200 && l.status < 300);
+    if (own.length !== 1 || ok.length !== 1) {
+      problems.push(
+        `${family}: ${own.length} responses, ${ok.length} successful, not 1`
+      );
+      continue;
+    }
+    if (ok[0].sha256 !== pins[family].sha256) {
+      problems.push(`${family}: sha256 ${ok[0].sha256} is not its pin`);
+    }
+  }
+  return problems;
+}
+
 const FRAGMENT_FAMILIES: readonly string[] = Object.values(FRAGMENT_FAMILY);
 
 type Theme = "light" | "dark";
@@ -221,6 +339,8 @@ interface FontLoad {
   family: string;
   url: string;
   bytes: number;
+  status: number;
+  sha256: string;
 }
 
 /** Records every font file a page downloads, with its family, from load to settle. */
@@ -270,9 +390,11 @@ function watchFonts(page: Page) {
     for (const r of responses) {
       const body = await r.body().catch(() => Buffer.alloc(0));
       loads.push({
-        family: families[r.url()] ?? "unknown",
+        family: plainFamily(families[r.url()] ?? "unknown"),
         url: r.url(),
         bytes: body.length,
+        status: r.status(),
+        sha256: createHash("sha256").update(body).digest("hex"),
       });
     }
     return loads;
@@ -383,6 +505,35 @@ function outsideScope(files: readonly string[]): string[] {
   );
 }
 
+/**
+ * Files under the production directories that differ between two commits:
+ * without rename detection, so a file moved out of one shows at its source,
+ * and a removal shows too, and with the directories as pathspecs.
+ */
+function productionChanges(from: string, to: string, cwd = ROOT): string[] {
+  return execFileSync(
+    "git",
+    [
+      "-c",
+      "core.quotePath=false",
+      "diff",
+      "--name-only",
+      "--no-renames",
+      from,
+      to,
+      "--",
+      "app",
+      "components",
+      "content",
+      "lib",
+      "public",
+    ],
+    { cwd, encoding: "utf8", env: gitEnv() }
+  )
+    .split("\n")
+    .filter(Boolean);
+}
+
 /** A push build: no PR, so the PR-only checks skip with this reason. */
 const NO_PR = "a CI build without PR_HEAD_SHA (a push) has no PR to judge";
 
@@ -416,9 +567,12 @@ function ownPr(env: Env = process.env): { range: PrRange } | { skip: string } {
  * the fork point, not the base), or null. A branch cut before the record
  * existed does not change it, though its head lacks it.
  */
-function perfBinding(env: Env = process.env): PrRange | null {
+function perfBinding(
+  env: Env = process.env,
+  file: string = PERF
+): PrRange | null {
   const range = prRange(env);
-  return range && changedByPr(range, PERF) ? range : null;
+  return range && changedByPr(range, file) ? range : null;
 }
 
 // ===========================================================================
@@ -781,45 +935,70 @@ test.describe("Range design system", () => {
 
     // The font declarations, read from lib/fonts.ts.
     const source = read(FONTS);
-    const display = fontOptions(source, "redHatDisplay");
-    const text = fontOptions(source, "redHatText");
+    expect(source).not.toMatch(
+      /import \{[^}]*Red_Hat[^}]*\} from "next\/font\/google"/
+    );
+    for (const family of RED_HAT_FAMILIES) {
+      expect(source, `${family} loader`).toMatch(
+        new RegExp(
+          `export const ${PINNED_RED_HAT[family].exportName} = localFont\\(\\{`
+        )
+      );
+    }
+    expect(source).toMatch(
+      /export const redHatDisplay = __Red_Hat_Display_[0-9a-f]{8};/
+    );
+    expect(source).toMatch(
+      /export const redHatText = __Red_Hat_Text_[0-9a-f]{8};/
+    );
+    const display = fontOptions(
+      source,
+      PINNED_RED_HAT["Red Hat Display"].exportName
+    );
+    const text = fontOptions(source, PINNED_RED_HAT["Red Hat Text"].exportName);
     for (const [name, opts] of [
       ["Red Hat Display", display],
       ["Red Hat Text", text],
     ] as const) {
-      expect(optionValue(opts, "subsets"), `${name} subsets`).toEqual([
-        "latin",
-      ]);
+      // Self-hosted pinned files (PRV-26): one Latin file each, so no subsets.
+      expect(optionValue(opts, "subsets"), `${name} subsets`).toBeUndefined();
       expect(
         optionValue(opts, "adjustFontFallback"),
         `${name} adjustFontFallback`
-      ).toBe(true);
-      const weights = optionValue(opts, "weight");
-      if (steps.includes(1)) {
-        expect(
-          Array.isArray(weights),
-          `step 1 trims ${name} to listed weights`
-        ).toBe(true);
-        for (const w of weights as string[])
-          expect(config.weights[name]).toContain(w);
-      }
+      ).toBe("Arial");
+      // The pinned file's whole weight axis, as one range.
+      expect(optionValue(opts, "weight"), `${name} weights`).toBe(
+        PINNED_RED_HAT[name].range
+      );
+      expect(optionValue(opts, "style"), `${name} style`).toBe("normal");
       expect(optionValue(opts, "display"), `${name} display`).toBe(
         config.display[name]
       );
+      expect(optionValue(opts, "src"), `${name} file`).toBe(
+        `../${PINNED_RED_HAT[name].copy}`
+      );
     }
 
-    const mono = fontOptions(source, "jetbrainsMono");
+    // Code and fragment faces: self-hosted too (PRV-26), with the options
+    // they had under next/font/google.
+    const mono = fontOptions(source, JETBRAINS_MONO.exportName);
     expect(optionValue(mono, "weight")).toBe("400");
     expect(optionValue(mono, "preload")).toBe(false);
-    expect(optionValue(mono, "subsets")).toEqual(["latin"]);
-    const manrope = fontOptions(source, "manrope");
-    expect(optionValue(manrope, "subsets"), "Manrope subsets").toEqual([
-      "latin",
-    ]);
+    expect(optionValue(mono, "src")).toBe(`../${JETBRAINS_MONO.copy}`);
+    const manrope = fontOptions(source, MANROPE.exportName);
     expect(optionValue(manrope, "preload"), "Manrope preload").toBe(false);
-    expect(optionValue(manrope, "weight"), "Manrope weights").toEqual([
-      ...BOARD_WEIGHTS.Manrope,
-    ]);
+    expect(optionValue(manrope, "src"), "Manrope file").toBe(
+      `../${MANROPE.copy}`
+    );
+    // One variable file: its range covers the board's Manrope weights.
+    const [lo, hi] = String(optionValue(manrope, "weight"))
+      .split(" ")
+      .map(Number);
+    for (const w of BOARD_WEIGHTS.Manrope) {
+      expect(Number(w) >= lo && Number(w) <= hi, `Manrope serves ${w}`).toBe(
+        true
+      );
+    }
 
     // IBM Plex Sans: the self-hosted cut, Latin plus the peso sign, at the
     // board's weights (400 to 600, one variable file), not preloaded.
@@ -903,7 +1082,7 @@ test.describe("Range design system", () => {
       90 * KIB
     );
 
-    const faces = await page.evaluate(() => {
+    const rawFaces = await page.evaluate(() => {
       const pick = (el: Element) => {
         const s = getComputedStyle(el);
         return {
@@ -914,12 +1093,20 @@ test.describe("Range design system", () => {
       };
       const fontDisplay: Record<string, string> = {};
       const fontWeights: Record<string, string[]> = {};
+      const fontStyles: Record<string, string[]> = {};
+      const sizeAdjusted: string[] = [];
       for (const sheet of Array.from(document.styleSheets)) {
         for (const rule of Array.from(sheet.cssRules)) {
           if (rule instanceof CSSFontFaceRule) {
             const fam = rule.style
               .getPropertyValue("font-family")
               .replace(/["']/g, "");
+            if (rule.style.getPropertyValue("size-adjust")) {
+              sizeAdjusted.push(fam);
+            }
+            (fontStyles[fam] ??= []).push(
+              rule.style.getPropertyValue("font-style")
+            );
             fontDisplay[fam] = rule.style.getPropertyValue("font-display");
             (fontWeights[fam] ??= []).push(
               rule.style.getPropertyValue("font-weight")
@@ -938,9 +1125,48 @@ test.describe("Range design system", () => {
         paragraphs: site("main p").slice(0, 5).map(pick),
         fontDisplay,
         fontWeights,
+        fontStyles,
+        sizeAdjusted,
       };
     });
+    const byFamily = <T>(map: Record<string, T>): Record<string, T> =>
+      Object.fromEntries(
+        Object.entries(map).map(([k, v]) => [plainFamily(k), v])
+      );
+    const faces = {
+      headings: rawFaces.headings.map((h) => ({
+        ...h,
+        family: plainFamily(firstFamily(h.family)),
+      })),
+      body: {
+        ...rawFaces.body,
+        family: plainFamily(firstFamily(rawFaces.body.family)),
+      },
+      paragraphs: rawFaces.paragraphs.map((p) => ({
+        ...p,
+        family: plainFamily(firstFamily(p.family)),
+      })),
+      fontDisplay: byFamily(rawFaces.fontDisplay),
+      fontWeights: byFamily(rawFaces.fontWeights),
+      fontStyles: byFamily(rawFaces.fontStyles),
+      sizeAdjusted: rawFaces.sizeAdjusted.map(plainFamily),
+    };
     expect(faces.headings.length).toBeGreaterThan(0);
+    // The production @font-face rules: normal style and the pinned file's
+    // whole weight range, and a size-adjusted fallback face for each family.
+    for (const face of ["Red Hat Display", "Red Hat Text"] as const) {
+      expect(faces.fontStyles[face], `${face} font-style`).toEqual(["normal"]);
+      expect(faces.fontWeights[face], `${face} font-weight`).toEqual([
+        PINNED_RED_HAT[face].range,
+      ]);
+    }
+    expect(
+      faces.sizeAdjusted
+        .filter((f) => /^Red Hat (Display|Text) Fallback$/.test(f))
+        .sort(),
+      "size-adjusted fallback faces"
+    ).toEqual(["Red Hat Display Fallback", "Red Hat Text Fallback"]);
+
     // The weight range each emitted Red Hat face covers ("400 900" or "600").
     const covers = (family: string, weight: number) =>
       (faces.fontWeights[family] ?? []).some((range) => {
@@ -1067,11 +1293,17 @@ test.describe("Range design system", () => {
       const texts = computed.filter((c) => c.fixture === fixture);
       expect(texts.length, `text in ${fixture}`).toBeGreaterThan(0);
       for (const c of texts) {
-        expect(firstFamily(c.family), `${fixture}: "${c.text}"`).toBe(face);
+        expect(
+          plainFamily(firstFamily(c.family)),
+          `${fixture}: "${c.text}"`
+        ).toBe(face);
       }
     }
     const withFragments = await fragmentWatch();
-    const recorded = perfRecord().fragment_font_bytes;
+    // The fragment faces are self-hosted from PRV-26 on, so their bytes are
+    // the ones PRV-26 recorded, not the Google files PRV-2 recorded.
+    const recorded = (JSON.parse(read(PERF_26)) as PerfRecord)
+      .fragment_font_bytes;
     for (const [face, family] of Object.entries(FRAGMENT_FAMILY)) {
       const bytes = bytesOf(withFragments, new RegExp(`^${family}$`));
       expect(recorded[face], `${PERF} records the ${face} bytes`).toBe(bytes);
@@ -1124,7 +1356,7 @@ test.describe("Range design system", () => {
           outside: all
             .filter((el) => !inCode(el) && !el.matches("svg, svg *"))
             .filter((el) =>
-              /JetBrains Mono/.test(
+              /JetBrains[ _]Mono/.test(
                 getComputedStyle(el).fontFamily.split(",")[0]
               )
             )
@@ -1133,7 +1365,7 @@ test.describe("Range design system", () => {
       });
       expect(mono.code.length, `code on ${route}`).toBeGreaterThan(0);
       for (const c of mono.code) {
-        expect(firstFamily(c.family)).toBe("JetBrains Mono");
+        expect(plainFamily(firstFamily(c.family))).toBe("JetBrains Mono");
         expect(c.weight).toBe("400");
       }
       expect(
@@ -1520,15 +1752,9 @@ test.describe("Range design system", () => {
   test("LCP within budget at the measured sha", async () => {
     const testInfo = test.info();
     chromiumOnly(testInfo);
-    const perf = perfRecord();
-    expect(perf.measured_sha).toMatch(/^[0-9a-f]{40}$/);
-    expect(perf.route).toBe("/");
-    expect(perf.lighthouse_version).toMatch(/^\d+\.\d+\.\d+/);
-    expect(perf.runs).toHaveLength(3);
-    expect(perfRunProblems(perf.runs)).toEqual([]);
     // Controls: an infinite LCP beside two finite ones would leave a
     // plausible median; it fails, as do a zero LCP and a missing value.
-    const [run] = perf.runs;
+    const [run] = perfRecord().runs;
     expect(
       perfRunProblems(
         JSON.parse(
@@ -1542,59 +1768,661 @@ test.describe("Range design system", () => {
     expect(perfRunProblems([{ ...run, cls: undefined }])).toEqual([
       "run 1 cls is not a finite number",
     ]);
-    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
-    for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
-      expect(perf.median[key], `median ${key}`).toBeCloseTo(
-        median(perf.runs.map((r) => r[key])),
-        6
-      );
-    }
-    expect(perf.median.lcp_ms, "median LCP on /").toBeLessThanOrEqual(3800);
 
-    // PRV-1's rule: the record binds only the PR that changes it. A later PR
+    // Controls for the measured-commit gate: a file moved out of `public/`
+    // into `docs/`, and a removed one, both show as production changes.
+    const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), "prv26-prod-"));
+    try {
+      const inRepo = (...args: string[]) =>
+        execFileSync(
+          "git",
+          [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            ...args,
+          ],
+          { cwd: tmpRepo, stdio: "ignore", env: gitEnv() }
+        );
+      inRepo("init", "-q");
+      fs.mkdirSync(path.join(tmpRepo, "public"));
+      fs.mkdirSync(path.join(tmpRepo, "docs"));
+      fs.writeFileSync(
+        path.join(tmpRepo, "public/a.txt"),
+        "moved\n".repeat(30)
+      );
+      fs.writeFileSync(
+        path.join(tmpRepo, "public/b.txt"),
+        "removed\n".repeat(30)
+      );
+      inRepo("add", "-A");
+      inRepo("commit", "-q", "--no-verify", "-m", "before");
+      inRepo("mv", "public/a.txt", "docs/a.txt");
+      inRepo("rm", "-q", "public/b.txt");
+      inRepo("commit", "-q", "--no-verify", "-m", "after");
+      expect(productionChanges("HEAD~1", "HEAD", tmpRepo).sort()).toEqual([
+        "public/a.txt",
+        "public/b.txt",
+      ]);
+    } finally {
+      fs.rmSync(tmpRepo, { recursive: true, force: true });
+    }
+
+    // Both records (PRV-2's and PRV-26's) are validated on every execution,
+    // and the 3.8 s gate applies to the median recomputed from the runs.
+    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
+    for (const file of [PERF, PERF_26]) {
+      const perf = JSON.parse(read(file)) as PerfRecord;
+      expect(perf.measured_sha, `${file} measured_sha`).toMatch(
+        /^[0-9a-f]{40}$/
+      );
+      expect(perf.route, `${file} route`).toBe("/");
+      expect(perf.lighthouse_version, `${file} lighthouse`).toMatch(
+        /^\d+\.\d+\.\d+$/
+      );
+      expect(perf.runs, `${file} runs`).toHaveLength(3);
+      expect(perfRunProblems(perf.runs), `${file} runs`).toEqual([]);
+      for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
+        expect(perf.median[key], `${file} median ${key}`).toBeCloseTo(
+          median(perf.runs.map((r) => r[key])),
+          6
+        );
+      }
+      expect(
+        median(perf.runs.map((r) => r.lcp_ms)),
+        `${file} median LCP on /`
+      ).toBeLessThanOrEqual(3800);
+    }
+
+    // PRV-1's rule: a record binds only the PR that changes it. A later PR
     // that leaves it alone is checked against the thresholds above, never
-    // against PRV-2's measured commit.
+    // against the record's measured commit.
     // Controls: a push build has no PR, and a PR whose base already holds
-    // this record does not bind it.
+    // these records does not bind them.
     const sha = prHead();
     expect(prRange({ CI: "true", PR_HEAD_SHA: "" })).toBeNull();
     expect(prRange({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })).toEqual(
       { base: sha, head: sha }
     );
-    expect(
-      perfBinding({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })
-    ).toBe(null);
-    const range = perfBinding();
-    if (!range) {
-      testInfo.annotations.push({
-        type: "not bound",
-        description: `${prRange() ? `this PR does not change ${PERF}` : NO_PR}, so only the thresholds are asserted.`,
-      });
-      return;
+    for (const file of [PERF, PERF_26]) {
+      expect(
+        perfBinding({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha }, file)
+      ).toBe(null);
     }
-    const { head } = range;
+    for (const file of [PERF, PERF_26]) {
+      const range = perfBinding(process.env, file);
+      if (!range) {
+        testInfo.annotations.push({
+          type: "not bound",
+          description: `${prRange() ? `this PR does not change ${file}` : NO_PR}, so only the thresholds are asserted.`,
+        });
+        continue;
+      }
+      const { head } = range;
+      const perf = JSON.parse(read(file)) as PerfRecord;
 
-    // This PR changes the record, so it binds: measured at an ancestor of the
-    // head, with no code change since. A rebase rewrites the measured commit;
-    // re-measure then, as below.
-    const remeasure = [
-      `Re-measure at ${head}:`,
-      "npm run build, then npx next start -p <port>;",
-      `run npx -y lighthouse@${perf.lighthouse_version} http://localhost:<port>/ --only-categories=performance,accessibility three times;`,
-      `write the three runs and their median to ${PERF} with measured_sha set to the commit measured;`,
-      "commit that file alone, on top.",
-    ].join(" ");
+      // This PR changes the record, so it binds: measured at an ancestor of
+      // the head, with no code change since. A rebase rewrites the measured
+      // commit; re-measure then, as below.
+      const remeasure = [
+        `Re-measure at ${head}:`,
+        "npm run build, then npx next start -p <port>;",
+        `run npx -y lighthouse@${perf.lighthouse_version} http://localhost:<port>/ --only-categories=performance,accessibility three times;`,
+        `write the three runs and their median to ${file} with measured_sha set to the commit measured;`,
+        "commit that file alone, on top.",
+      ].join(" ");
+      expect(
+        gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
+        `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
+      ).toBe(true);
+      const changed = productionChanges(perf.measured_sha, head);
+      expect(
+        changed,
+        `code changed since ${perf.measured_sha}. ${remeasure}`
+      ).toEqual([]);
+    }
+  });
+
+  test("red hat files match the boards' pins", async ({
+    page,
+    browser,
+    baseURL,
+  }, testInfo) => {
+    chromiumOnly(testInfo);
+    test.setTimeout(600_000);
+    const pins = latinPins();
+    const source = read(FONTS);
+
+    // The pins are the Latin faces of google.css, one per family.
+    for (const family of RED_HAT_FAMILIES) {
+      expect(pins[family], `${family} Latin pin in google.css`).toBeDefined();
+    }
+    expect(pins["Red Hat Display"].file).not.toBe(pins["Red Hat Text"].file);
+
+    // The declarations use next/font/local and the checked-in copies, which
+    // are the pinned bytes; the licences are the originals.
+    for (const family of RED_HAT_FAMILIES) {
+      const pinned = PINNED_RED_HAT[family];
+      const exportName = pinned.exportName;
+      expect(source, `${family} loader`).toMatch(
+        new RegExp(`export const ${exportName} = localFont\\(\\{`)
+      );
+      expect(optionValue(fontOptions(source, exportName), "src")).toBe(
+        `../${pinned.copy}`
+      );
+      expect(
+        sha256Of(fs.readFileSync(path.join(ROOT, pinned.copy))),
+        `${family} copy is its pin`
+      ).toBe(pins[family].sha256);
+      expect(
+        read(pinned.licence) === read(pinned.original),
+        `${family} licence is the original`
+      ).toBe(true);
+    }
+    expect(source).toMatch(/import localFont from "next\/font\/local";/);
+
+    // The Type section says where both fonts come from.
+    const type = doc().sections.get("Type") ?? "";
+    expect(type, "Type section").toMatch(/next\/font\/local/);
+    for (const family of RED_HAT_FAMILIES) {
+      expect(type, `Type names the ${family} copy`).toContain(
+        path.dirname(PINNED_RED_HAT[family].copy)
+      );
+    }
+    expect(type, "Type names the pinned source").toContain(
+      "docs/boards/fonts/google.css"
+    );
+
+    // A fresh load of the production build of `/`: one successful response
+    // per Red Hat family, and its bytes are the family's pin.
+    const settle = watchFonts(page);
+    await page.goto("/");
+    const loads = await settle();
+    expect(redHatPinProblems(loads, pins)).toEqual([]);
+    // Controls: other bytes, a second response and a failed response each fail.
+    const own = loads.filter((l) => l.family === "Red Hat Display");
     expect(
-      gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
-      `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
-    ).toBe(true);
-    const changed = git("diff", "--name-only", perf.measured_sha, head)
-      .split("\n")
-      .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+      redHatPinProblems(
+        loads.map((l) => (l === own[0] ? { ...l, sha256: "0".repeat(64) } : l)),
+        pins
+      )
+    ).toHaveLength(1);
+    expect(redHatPinProblems([...loads, own[0]], pins)).toHaveLength(1);
     expect(
-      changed,
-      `code changed since ${perf.measured_sha}. ${remeasure}`
+      redHatPinProblems(
+        loads.map((l) => (l === own[0] ? { ...l, status: 404 } : l)),
+        pins
+      )
+    ).toHaveLength(1);
+
+    // Manrope and JetBrains Mono (PRV-26 amendment): nothing comes from
+    // next/font/google; the Manrope copy is its board pin and the JetBrains
+    // Mono copy is the SHA-256 recorded in the ticket.
+    expect(source).not.toMatch(/from\s+["']next\/font\/google["']/);
+    expect(
+      sha256Of(fs.readFileSync(path.join(ROOT, MANROPE.copy))),
+      "Manrope copy is its pin"
+    ).toBe(pins.Manrope.sha256);
+    expect(read(MANROPE.licence) === read(MANROPE.original)).toBe(true);
+    expect(
+      sha256Of(fs.readFileSync(path.join(ROOT, JETBRAINS_MONO.copy))),
+      "JetBrains Mono copy is its recorded SHA-256"
+    ).toBe(JETBRAINS_MONO.sha256);
+    expect(read(JETBRAINS_MONO.licence)).toMatch(
+      /Copyright .*The JetBrains Mono Project Authors/
+    );
+    expect(read(JETBRAINS_MONO.licence)).toMatch(
+      /SIL OPEN FONT LICENSE Version 1\.1/
+    );
+    const ticket = read(TICKET_26);
+    expect(ticket, "ticket records the JetBrains Mono SHA-256").toContain(
+      JETBRAINS_MONO.sha256
+    );
+    expect(ticket, "ticket records the JetBrains Mono source").toContain(
+      JETBRAINS_MONO.source
+    );
+    // Served bytes, on every sampled route: each face is fetched once where
+    // its element renders (a Manrope fragment, a `pre` or `code`) and never
+    // elsewhere, and every response is the face's pin. What renders is read
+    // from the page itself, so a route that later renders a fragment on `/`
+    // stays green.
+    const shas = {
+      Manrope: pins.Manrope.sha256,
+      "JetBrains Mono": JETBRAINS_MONO.sha256,
+    };
+    // A home page that renders a Manrope fragment, as the Range homepage will
+    // (a proxy appends one to the home document).
+    const fragmentRow = "[data-prv26-manrope-row]";
+    const fragmentMarkup =
+      '<div data-fragment="central-command" data-prv26-manrope-row>' +
+      "<p>Day feed, 12 November</p></div>";
+    const scopeOf = async (target: string, markup?: string) => {
+      const sample = await page.context().newPage();
+      try {
+        const settle = watchFonts(sample);
+        await sample.goto(target);
+        if (markup) await inject(sample, markup);
+        const found = await settle();
+        const scope = await sample.evaluate<FontScope>(() => ({
+          manrope: Array.from(
+            document.querySelectorAll<HTMLElement>("[data-fragment]")
+          ).some((el) =>
+            ["central-command", "habit-tracker"].includes(
+              el.dataset.fragment ?? ""
+            )
+          ),
+          mono: document.querySelector("pre, code") !== null,
+        }));
+        return { loads: found, scope };
+      } finally {
+        await sample.close();
+      }
+    };
+    const sampled = [
+      ...new Set(["/", CODE_ROUTE, ...BUDGET_ROUTES, ...SCOPE_ROUTES]),
+    ];
+    for (const target of sampled) {
+      const { loads: found, scope } = await scopeOf(target);
+      expect(
+        fontScopeProblems(found, scope, shas),
+        `Manrope and JetBrains Mono on ${target}, which renders ${JSON.stringify(scope)}`
+      ).toEqual([]);
+    }
+    // Every font file the production build emits is a pinned file (the Red
+    // Hat and Manrope board pins, the recorded JetBrains Mono SHA-256) or the
+    // IBM Plex Sans cut: a wrong-byte face on a route no sample visits cannot
+    // be there.
+    const allowedFonts: Record<string, string> = {
+      "Red Hat Display": pins["Red Hat Display"].sha256,
+      "Red Hat Text": pins["Red Hat Text"].sha256,
+      Manrope: pins.Manrope.sha256,
+      "JetBrains Mono": JETBRAINS_MONO.sha256,
+      "IBM Plex Sans": sha256Of(fs.readFileSync(path.join(ROOT, PLEX_FILE))),
+    };
+    const emitted = emittedFonts();
+    expect(emitted.length, "font files in the build output").toBeGreaterThan(0);
+    expect(
+      emittedFontProblems(emitted, allowedFonts),
+      "emitted font files"
     ).toEqual([]);
+    // Controls: a file with other bytes, and a missing pinned file, each fail.
+    expect(
+      emittedFontProblems(
+        [...emitted, { file: "x.woff2", sha256: "0".repeat(64) }],
+        allowedFonts
+      )
+    ).toHaveLength(1);
+    expect(emittedFontProblems(emitted.slice(1), allowedFonts)).toHaveLength(1);
+    const injected = await scopeOf("/", FRAGMENT_FIXTURES);
+    expect(
+      injected.scope.manrope,
+      "the fixtures render a Manrope fragment"
+    ).toBe(true);
+    expect(
+      injected.loads.filter((l) => l.family === "Manrope"),
+      "Manrope beside the fixtures"
+    ).toHaveLength(1);
+    expect(fontScopeProblems(injected.loads, injected.scope, shas)).toEqual([]);
+    const fragmentHome = await swapFontProxy(baseURL!, null, fragmentMarkup);
+    try {
+      const native = await scopeOf(`${fragmentHome.url}/`);
+      expect(native.scope, "the proxied home renders a fragment").toEqual({
+        manrope: true,
+        mono: false,
+      });
+      expect(
+        fontScopeProblems(native.loads, native.scope, shas),
+        "Manrope where `/` itself renders a fragment"
+      ).toEqual([]);
+      expect(
+        native.loads.filter((l) => l.family === "Manrope"),
+        "Manrope on a home that renders a fragment"
+      ).toHaveLength(1);
+    } finally {
+      await fragmentHome.close();
+    }
+    const codePage = await scopeOf(CODE_ROUTE);
+    expect(codePage.scope.mono, "the code route renders code").toBe(true);
+    expect(
+      codePage.loads.filter((l) => l.family === "JetBrains Mono"),
+      "JetBrains Mono on the code route"
+    ).toHaveLength(1);
+    // Controls: a face where nothing renders it, a face with other bytes, a
+    // failed response and a missing face each fail.
+    const manropeLoad = injected.loads.find((l) => l.family === "Manrope")!;
+    const monoLoad = codePage.loads.find((l) => l.family === "JetBrains Mono")!;
+    const none: FontScope = { manrope: false, mono: false };
+    expect(fontScopeProblems([manropeLoad], none, shas)).toHaveLength(1);
+    expect(fontScopeProblems([monoLoad], none, shas)).toHaveLength(1);
+    expect(
+      fontScopeProblems(
+        [{ ...manropeLoad, sha256: "0".repeat(64) }],
+        { ...none, manrope: true },
+        shas
+      )
+    ).toHaveLength(1);
+    expect(
+      fontScopeProblems(
+        [{ ...monoLoad, status: 404 }],
+        { ...none, mono: true },
+        shas
+      )
+    ).toHaveLength(1);
+    expect(
+      fontScopeProblems([], { ...none, manrope: true }, shas)
+    ).toHaveLength(1);
+    // A Manrope response on a code page is caught, not filtered away.
+    expect(
+      fontScopeProblems(
+        [...codePage.loads, manropeLoad],
+        { ...none, mono: true },
+        shas
+      )
+    ).toHaveLength(1);
+
+    // The fidelity harness, on the production build of `/`: an in-memory
+    // `chrome/header` row marked built, with a selector that matches the
+    // rendered header, reports no font failure for either family.
+    const dir = path.resolve("docs/boards");
+    const loaded = loadBoards(dir).sections;
+    const row = loaded.rows.find((r) => r.id === "chrome/header");
+    expect(row, "chrome/header row in sections.json").toBeDefined();
+    const withRow = (site: string) => ({
+      ...loaded,
+      rows: loaded.rows.map((r) =>
+        r.id === "chrome/header" ? { ...r, built: true, site } : r
+      ),
+    });
+    const sections = withRow("header");
+    // The selector is checked on `/`, the route the row is measured on.
+    const homePage = await page.context().newPage();
+    await homePage.goto("/");
+    expect(
+      await homePage.locator("header").count(),
+      "headers on /"
+    ).toBeGreaterThan(0);
+    await homePage.close();
+    const only = {
+      rows: ["chrome/header"],
+      widths: ["1440" as const],
+      themes: ["light" as const],
+      states: ["default"],
+      rm: false,
+    };
+    const fontFailures = (
+      failures: Awaited<ReturnType<typeof checkSite>>["failures"],
+      family: string
+    ) =>
+      failures.filter((f) =>
+        f.property.toLowerCase().startsWith(`font ${family.toLowerCase()}`)
+      );
+    const notDrawn = (
+      failures: Awaited<ReturnType<typeof checkSite>>["failures"]
+    ) =>
+      failures.filter(
+        (f) => f.section === "chrome/header" && f.property === "drawn"
+      );
+    const clean = await checkSite({
+      dir,
+      baseURL: baseURL!,
+      browser,
+      only,
+      boards: { sections },
+    });
+    expect(
+      clean.checked.filter((c) => c.startsWith("chrome/header ")),
+      "comparisons made for chrome/header"
+    ).not.toHaveLength(0);
+    expect(notDrawn(clean.failures), "the header is drawn on /").toEqual([]);
+    for (const family of RED_HAT_FAMILIES) {
+      expect(
+        fontFailures(clean.failures, family),
+        `${family} failures`
+      ).toEqual([]);
+    }
+    // Control: a selector that matches nothing is reported as not drawn, so
+    // the assertion above does detect a row the harness could not capture.
+    const missing = await checkSite({
+      dir,
+      baseURL: baseURL!,
+      browser,
+      only,
+      boards: { sections: withRow("[data-prv26-no-such-element]") },
+    });
+    expect(notDrawn(missing.failures), "a missing header").not.toHaveLength(0);
+
+    // Control: the same run against a server that answers each family's
+    // request with other bytes (the other family's file, a valid font that is
+    // not that family's pin) fails for that family.
+    const bytesOfPin = (family: RedHatFamily) =>
+      fs.readFileSync(path.join(ROOT, PINNED_RED_HAT[family].copy));
+    for (const family of RED_HAT_FAMILIES) {
+      const other = RED_HAT_FAMILIES.find((f) => f !== family) as RedHatFamily;
+      const proxy = await swapFontProxy(baseURL!, {
+        sha256: pins[family].sha256,
+        body: bytesOfPin(other),
+      });
+      try {
+        const control = await checkSite({
+          dir,
+          baseURL: proxy.url,
+          browser,
+          only,
+          boards: { sections },
+        });
+        expect(proxy.swapped(), `${family} bytes were swapped`).toBeGreaterThan(
+          0
+        );
+        expect(
+          fontFailures(control.failures, family),
+          `${family} control failures`
+        ).not.toHaveLength(0);
+      } finally {
+        await proxy.close();
+      }
+    }
+
+    // Manrope through the same harness: no page renders a Manrope fragment
+    // yet, so a proxy appends one to the home document, and the in-memory row
+    // is that element. Served as is, the harness reports no Manrope failure;
+    // with the proxy swapping Manrope's bytes it reports one.
+    const manropeSections = withRow(fragmentRow);
+    const manropeRun = async (
+      swap: { sha256: string; body: Uint8Array } | null
+    ) => {
+      const proxy = await swapFontProxy(baseURL!, swap, fragmentMarkup);
+      try {
+        const result = await checkSite({
+          dir,
+          baseURL: proxy.url,
+          browser,
+          only,
+          boards: { sections: manropeSections },
+        });
+        return { result, swapped: proxy.swapped() };
+      } finally {
+        await proxy.close();
+      }
+    };
+    const manropeClean = await manropeRun(null);
+    expect(
+      manropeClean.result.checked.filter((c) => c.startsWith("chrome/header ")),
+      "comparisons made for the Manrope row"
+    ).not.toHaveLength(0);
+    expect(notDrawn(manropeClean.result.failures), "the Manrope row").toEqual(
+      []
+    );
+    expect(
+      fontFailures(manropeClean.result.failures, "Manrope"),
+      "Manrope failures"
+    ).toEqual([]);
+    const manropeSwapped = await manropeRun({
+      sha256: pins.Manrope.sha256,
+      body: bytesOfPin("Red Hat Text"),
+    });
+    expect(
+      manropeSwapped.swapped,
+      "Manrope bytes were swapped"
+    ).toBeGreaterThan(0);
+    expect(
+      fontFailures(manropeSwapped.result.failures, "Manrope"),
+      "Manrope control failures"
+    ).not.toHaveLength(0);
+  });
+
+  test("changes stay within PRV-26 scope", async () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    const range = prRange();
+    test.skip(!range, `${NO_PR}: PRV-26's scope is checked on its own PR.`);
+    const { base, head } = range as PrRange;
+    test.skip(
+      gitOk("cat-file", "-e", `${base}:${TICKET_26}`),
+      `${base} already holds ${TICKET_26}: PRV-26's scope is checked on its own PR.`
+    );
+    expect(
+      gitOk("cat-file", "-e", `${head}:${TICKET_26}`),
+      "the PR introduces its ticket"
+    ).toBe(true);
+
+    // Files: only Scope's, both paths of a rename.
+    expect(
+      changedFiles(base, head).filter(
+        (f) =>
+          !SCOPE_26.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
+      ),
+      "files changed outside PRV-26's Scope"
+    ).toEqual([]);
+    const moved = fs.mkdtempSync(path.join(os.tmpdir(), "prv26-rename-"));
+    try {
+      const inRepo = (...args: string[]) =>
+        execFileSync(
+          "git",
+          [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            ...args,
+          ],
+          { cwd: moved, stdio: "ignore", env: gitEnv() }
+        );
+      inRepo("init", "-q");
+      fs.writeFileSync(path.join(moved, "README.md"), "outside\n".repeat(20));
+      inRepo("add", "README.md");
+      inRepo("commit", "-q", "--no-verify", "-m", "before");
+      fs.mkdirSync(path.join(moved, "app/fonts/red-hat-text"), {
+        recursive: true,
+      });
+      inRepo("mv", "README.md", "app/fonts/red-hat-text/OFL.txt");
+      inRepo("commit", "-q", "--no-verify", "-m", "after");
+      expect(
+        changedFiles("HEAD~1", "HEAD", moved).sort(),
+        "both paths of a rename"
+      ).toEqual(["README.md", "app/fonts/red-hat-text/OFL.txt"]);
+    } finally {
+      fs.rmSync(moved, { recursive: true, force: true });
+    }
+
+    // The other faces. IBM Plex Sans is unchanged. Manrope and JetBrains Mono
+    // may change loader and source (PRV-26 amendment), but their options stay
+    // as at the base, and nothing imports next/font/google.
+    const before = git("show", `${base}:${FONTS}`);
+    const after = git("show", `${head}:${FONTS}`);
+    expect(
+      declaration(after, "ibmPlexSans"),
+      "ibmPlexSans at the head"
+    ).toBeDefined();
+    expect(declaration(after, "ibmPlexSans"), "ibmPlexSans unchanged").toBe(
+      declaration(before, "ibmPlexSans")
+    );
+    // The complete option lists, key by key. The documented differences are
+    // the loader, the source file, `subsets` (a local file has no subsets),
+    // `style: "normal"`, an explicit fallback setting, and Manrope's one
+    // variable range for its four listed weights; everything else is equal.
+    const optionMap = astOptions;
+    const normalised = (map: Record<string, string>, drop: readonly string[]) =>
+      Object.fromEntries(
+        Object.entries(map).filter(([k]) => !drop.includes(k))
+      );
+    const monoProblems = (headSource: string) => {
+      const head = optionMap(headSource, JETBRAINS_MONO.exportName);
+      const base = optionMap(before, "jetbrainsMono");
+      const problems: string[] = [];
+      if (head.adjustFontFallback !== "false")
+        problems.push("adjustFontFallback is not false");
+      if (head.style !== '"normal"') problems.push("style is not normal");
+      // By key and value, whatever the order the keys are written in.
+      const same = sameOptions(
+        normalised(head, ["src", "style", "adjustFontFallback"]),
+        normalised(base, ["subsets"])
+      );
+      if (!same) problems.push("options differ from the base");
+      return problems;
+    };
+    expect(monoProblems(after), "JetBrains Mono options").toEqual([]);
+    const manropeBase = optionMap(before, "manrope");
+    const manropeHead = optionMap(after, MANROPE.exportName);
+    expect(manropeHead.adjustFontFallback, "Manrope fallback").toBe('"Arial"');
+    expect(manropeHead.style).toBe('"normal"');
+    expect(
+      normalised(manropeHead, ["src", "style", "adjustFontFallback", "weight"]),
+      "Manrope options"
+    ).toEqual(normalised(manropeBase, ["subsets", "weight"]));
+    // The base listed four weights; the one variable file covers them all.
+    const listed = Array.from(manropeBase.weight.matchAll(/\d+/g), (m) =>
+      Number(m[0])
+    );
+    const [lo, hi] = manropeHead.weight
+      .replace(/"/g, "")
+      .split(" ")
+      .map(Number);
+    expect(listed).toHaveLength(4);
+    for (const w of listed) expect(w >= lo && w <= hi).toBe(true);
+    expect(after).not.toMatch(/from\s+["']next\/font\/google["']/);
+    // Controls: a fallback face for JetBrains Mono, another changed option, and
+    // a changed loader on IBM Plex Sans each fail.
+    expect(
+      monoProblems(
+        after.replace(
+          "adjustFontFallback: false",
+          'adjustFontFallback: "Arial"'
+        )
+      )
+    ).not.toEqual([]);
+    expect(
+      monoProblems(after.replace('weight: "400",', 'weight: "500",'))
+    ).not.toEqual([]);
+    // A quoted key is read like an unquoted one, so an extra `"fallback"`
+    // option fails; reordering unchanged options does not.
+    expect(
+      monoProblems(
+        after.replace(
+          "adjustFontFallback: false,",
+          'adjustFontFallback: false,\n  "fallback": ["Arial"],'
+        )
+      )
+    ).not.toEqual([]);
+    const reordered = after.replace(
+      '  display: "swap",\n  preload: false,\n  adjustFontFallback: false,',
+      '  preload: false,\n  adjustFontFallback: false,\n  display: "swap",'
+    );
+    expect(reordered, "the reorder control changes the source").not.toBe(after);
+    expect(monoProblems(reordered), "reordered options").toEqual([]);
+    expect(
+      declaration(
+        after.replace(
+          '= localFont({\n  src: "../app/fonts/ibm',
+          '= Manrope({\n  src: "../app/fonts/ibm'
+        ),
+        "ibmPlexSans"
+      )
+    ).not.toBe(declaration(after, "ibmPlexSans"));
   });
 
   test("board motion rules are present", async () => {
@@ -2216,6 +3044,226 @@ async function settledText(page: Page): Promise<string> {
     await page.waitForTimeout(300);
   }
   return last;
+}
+
+const TICKET_26 = "docs/tickets/PRV-26.md";
+const SCOPE_26 = [
+  "lib/fonts.ts",
+  "app/fonts/red-hat-display/red-hat-display-latin.woff2",
+  "app/fonts/red-hat-display/OFL.txt",
+  "app/fonts/red-hat-text/red-hat-text-latin.woff2",
+  "app/fonts/red-hat-text/OFL.txt",
+  "app/fonts/manrope/manrope-latin.woff2",
+  "app/fonts/manrope/OFL.txt",
+  "app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2",
+  "app/fonts/jetbrains-mono/OFL.txt",
+  "e2e/design-tokens.spec.ts",
+  "docs/design-system.md",
+  "docs/perf/prv-26.json",
+  TICKET_26,
+] as const;
+
+/** One whole `export const <name> = <loader>({ ... });` declaration, or undefined. */
+function declaration(source: string, name: string): string | undefined {
+  return new RegExp(
+    `export const ${name} = [A-Za-z_]+\\(\\{[\\s\\S]*?\\}\\);`
+  ).exec(source)?.[0];
+}
+
+/**
+ * The option object of `export const <name> = <loader>({ ... })`, read from the
+ * TypeScript syntax tree: each key (quoted or not) to its value, strings as
+ * JSON and anything else as its source with whitespace collapsed. A spread or
+ * a computed key becomes an entry of its own, so it can never match.
+ */
+function astOptions(source: string, name: string): Record<string, string> {
+  const file = ts.createSourceFile(
+    "fonts.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  let found: ts.ObjectLiteralExpression | undefined;
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === name &&
+      node.initializer &&
+      ts.isCallExpression(node.initializer)
+    ) {
+      const arg = node.initializer.arguments[0];
+      if (arg && ts.isObjectLiteralExpression(arg)) found = arg;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  if (!found) throw new Error(`lib/fonts.ts has no options for ${name}`);
+  const out: Record<string, string> = {};
+  found.properties.forEach((prop, i) => {
+    const key =
+      ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop)
+        ? ts.isIdentifier(prop.name) ||
+          ts.isStringLiteralLike(prop.name) ||
+          ts.isNumericLiteral(prop.name)
+          ? prop.name.text
+          : `<computed ${i}>`
+        : `<unsupported ${i}>`;
+    out[key] = ts.isPropertyAssignment(prop)
+      ? ts.isStringLiteralLike(prop.initializer)
+        ? JSON.stringify(prop.initializer.text)
+        : prop.initializer.getText(file).replace(/\s+/g, " ")
+      : prop.getText(file).replace(/\s+/g, " ");
+  });
+  return out;
+}
+
+/** Two option objects with the same keys and values, in any order. */
+function sameOptions(
+  a: Record<string, string>,
+  b: Record<string, string>
+): boolean {
+  const ka = Object.keys(a).sort();
+  const kb = Object.keys(b).sort();
+  return (
+    ka.length === kb.length && ka.every((k, i) => k === kb[i] && a[k] === b[k])
+  );
+}
+
+/**
+ * The font files a production build emits (everything under `.next/static`
+ * and `public/` with a font extension) that are not among the allowed hashes,
+ * and the allowed hashes no emitted file has.
+ */
+function emittedFontProblems(
+  files: ReadonlyArray<{ file: string; sha256: string }>,
+  allowed: Record<string, string>
+): string[] {
+  const names = new Map(Object.entries(allowed).map(([n, h]) => [h, n]));
+  const problems = files
+    .filter((f) => !names.has(f.sha256))
+    .map((f) => `${f.file} (${f.sha256}) is not a pinned or allowed font`);
+  const seen = new Set(files.map((f) => f.sha256));
+  for (const [name, hash] of Object.entries(allowed)) {
+    if (!seen.has(hash)) problems.push(`${name} is not emitted by the build`);
+  }
+  return problems;
+}
+
+function emittedFonts(): Array<{ file: string; sha256: string }> {
+  const out: Array<{ file: string; sha256: string }> = [];
+  const walk = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(woff2?|ttf|otf|eot)$/i.test(entry.name)) {
+        out.push({
+          file: path.relative(ROOT, full),
+          sha256: sha256Of(fs.readFileSync(full)),
+        });
+      }
+    }
+  };
+  walk(path.join(ROOT, ".next/static"));
+  walk(path.join(ROOT, "public"));
+  return out;
+}
+
+/** What a route renders that decides which of the two pinned faces it may load. */
+interface FontScope {
+  /** A Central Command or habit-tracker fragment: the Manrope fragments. */
+  manrope: boolean;
+  /** A `pre` or `code` element: JetBrains Mono's only use. */
+  mono: boolean;
+}
+
+/**
+ * What is wrong with the Manrope and JetBrains Mono responses of one page,
+ * given what the page renders: each face is fetched exactly once where its
+ * element renders and never elsewhere, and every response is a 2xx whose bytes
+ * are the face's pin (Manrope: the board's; JetBrains Mono: the ticket's).
+ */
+function fontScopeProblems(
+  loads: readonly FontLoad[],
+  scope: FontScope,
+  shas: { Manrope: string; "JetBrains Mono": string }
+): string[] {
+  const problems: string[] = [];
+  const wants = { Manrope: scope.manrope, "JetBrains Mono": scope.mono };
+  for (const family of ["Manrope", "JetBrains Mono"] as const) {
+    const own = loads.filter((l) => l.family === family);
+    if (own.length !== (wants[family] ? 1 : 0)) {
+      problems.push(
+        `${family}: ${own.length} responses where ${wants[family] ? "one is" : "none are"} expected`
+      );
+    }
+    for (const l of own) {
+      if (l.status < 200 || l.status >= 300) {
+        problems.push(`${family}: status ${l.status}`);
+      } else if (l.sha256 !== shas[family]) {
+        problems.push(`${family}: sha256 ${l.sha256} is not its pin`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * A proxy in front of the site that answers a request for the font file with
+ * the given sha256 with other bytes: how the control run serves unpinned bytes.
+ */
+async function swapFontProxy(
+  target: string,
+  swap: { sha256: string; body: Uint8Array } | null,
+  appendToHome?: string
+): Promise<{ url: string; swapped: () => number; close: () => Promise<void> }> {
+  let swapped = 0;
+  const server = http.createServer((req, res) => {
+    void (async () => {
+      const upstream = await fetch(new URL(req.url ?? "/", target), {
+        headers: { accept: String(req.headers.accept ?? "*/*") },
+        redirect: "manual",
+      });
+      let body: Uint8Array = Buffer.from(await upstream.arrayBuffer());
+      if (swap && sha256Of(Buffer.from(body)) === swap.sha256) {
+        body = swap.body;
+        swapped += 1;
+      }
+      // The home document with markup appended: a page that renders a fragment.
+      if (
+        appendToHome &&
+        req.url === "/" &&
+        /text\/html/.test(upstream.headers.get("content-type") ?? "")
+      ) {
+        body = Buffer.from(
+          Buffer.from(body)
+            .toString("utf8")
+            .replace("</body>", `${appendToHome}</body>`)
+        );
+      }
+      const headers: Record<string, string> = {};
+      upstream.headers.forEach((value, key) => {
+        if (!/^(content-encoding|content-length|transfer-encoding)$/i.test(key))
+          headers[key] = value;
+      });
+      headers["content-length"] = String(body.length);
+      res.writeHead(upstream.status, headers);
+      res.end(body);
+    })().catch(() => {
+      res.writeHead(502);
+      res.end();
+    });
+  });
+  const port = await freePort();
+  await new Promise<void>((resolve) =>
+    server.listen(port, "127.0.0.1", resolve)
+  );
+  return {
+    url: `http://127.0.0.1:${port}`,
+    swapped: () => swapped,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
 }
 
 function freePort(): Promise<number> {
