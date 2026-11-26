@@ -735,7 +735,7 @@
       "section": "opener",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "[aria-labelledby=\"range-title\"]",
       "site": "[data-board-section=\"home/opener\"]",
       "sources": {
@@ -779,7 +779,7 @@
       "section": "range",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet",
       "site": "[data-board-section=\"home/range\"]",
       "sources": {
@@ -853,7 +853,7 @@
       "section": "plate-dashboards",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Dashboards,\"]",
       "site": "[data-board-section=\"home/plate-dashboards\"]",
       "sources": {
@@ -888,7 +888,7 @@
       "section": "plate-finance",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]",
       "site": "[data-board-section=\"home/plate-finance\"]",
       "sources": {
@@ -971,7 +971,7 @@
       "section": "plate-mobile",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]",
       "site": "[data-board-section=\"home/plate-mobile\"]",
       "sources": {
@@ -1052,7 +1052,7 @@
       "section": "plate-ai",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]",
       "site": "[data-board-section=\"home/plate-ai\"]",
       "sources": {
@@ -1133,7 +1133,7 @@
       "section": "plate-3d",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]",
       "site": "[data-board-section=\"home/plate-3d\"]",
       "sources": {
@@ -1214,7 +1214,7 @@
       "section": "plate-sites",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]",
       "site": "[data-board-section=\"home/plate-sites\"]",
       "sources": {
@@ -1295,7 +1295,7 @@
       "section": "plate-testing",
       "route": "/preview/home",
       "ticket": "PRV-5",
-      "built": false,
+      "built": true,
       "board": "#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]",
       "site": "[data-board-section=\"home/plate-testing\"]",
       "sources": {
