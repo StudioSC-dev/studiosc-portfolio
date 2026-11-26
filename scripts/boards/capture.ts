@@ -290,17 +290,26 @@ export async function load(page: Page, url: string, clock: string) {
   await frames(page, 3);
 }
 
-/** Lets the motions a step started begin, then takes them. */
+/**
+ * Lets the motions a step started begin, then takes them. A view transition
+ * the step started is waited for until it is ready, however long that takes.
+ */
 async function takeMotion(page: Page, rows: RowQuery[], sections: Sections) {
   await frames(page, 3);
   await page.waitForTimeout(60);
   return page.evaluate(
-    (spec) =>
-      (
+    async (spec) => {
+      const f = (
         window as unknown as {
-          __fidelity: { motionTake(s: unknown): unknown };
+          __fidelity: {
+            transitionReady(): Promise<void>;
+            motionTake(s: unknown): unknown;
+          };
         }
-      ).__fidelity.motionTake(spec),
+      ).__fidelity;
+      await f.transitionReady();
+      return f.motionTake(spec);
+    },
     { rows, keys: sections.keys }
   ) as Promise<Motion[]>;
 }
@@ -308,6 +317,7 @@ async function takeMotion(page: Page, rows: RowQuery[], sections: Sections) {
 type Fid = {
   __fidelity: {
     motionStart(): void;
+    holdArm(at: number): void;
     settle(): Promise<void>;
     hold(at: number): Promise<[number, number, number, number] | null>;
     hide(e: { selector: string; mode?: string }[]): void;
@@ -322,6 +332,8 @@ const fid = (page: Page) => ({
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hold(x), at),
   motionStart: () =>
     page.evaluate(() => (window as unknown as Fid).__fidelity.motionStart()),
+  holdArm: (at: number) =>
+    page.evaluate((x) => (window as unknown as Fid).__fidelity.holdArm(x), at),
   hide: (e: { selector: string; mode?: string }[]) =>
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hide(x), e),
 });
@@ -368,6 +380,9 @@ export async function captureState(
   const def = sections.states[req.state];
   if (req.state !== "default") {
     await fid(page).motionStart();
+    // An in-flight state's transition is held the moment it is ready, so it
+    // cannot finish before hold() below, however slow the host.
+    if (def?.inFlight) await fid(page).holdArm(IN_FLIGHT_AT);
     await runSteps(
       page,
       def?.toggleTheme ? sections.theme[req.theme] : stepsFor(def, side)
