@@ -87,7 +87,9 @@
       `app/blog/page.tsx`, `app/about/page.tsx`, `app/contact/page.tsx`,
       `app/privacy/hermes-personal-assistant/page.tsx`, `components/home/Hero.tsx`,
       `components/home/ProjectCard.tsx` and `app/page.tsx` (these three also for outer content wrappers, solely to
-      apply the shared alignment). Any other path fails. Existing route paths and redirects, page-specific
+      apply the shared alignment), and in `app/work/page.tsx` also its one outer content wrapper (the element
+      directly inside `return (`), changing only its alignment classes, which AC1's shared left edge needs. Any
+      other path fails. Existing route paths and redirects, page-specific
       content, and contact-form validation and submission behaviour match the PR base outside the listed
       changes. T: `chrome.spec.ts › changes stay within scope`.
   13. Remeasure first-load JavaScript on the audited production build for all six PRV-1 budget routes using
@@ -103,4 +105,4 @@
 ## Known gaps
 
 - AC12 allows any edit inside its permitted paths: the PR diff auditor should check allowed paths change only scoped behaviour (no root metadata, analytics or unrelated shared component edits), `sections.json` changes only PRV-4's built flags and `merged.json` only adds PRV-4.
-- AC12 allows outer-wrapper edits only in the three home files, but AC1's single left edge on `/work` needs that page's own outer wrapper to move as well. The scope test therefore also allows exactly one line in `app/work/page.tsx`: the wrapper directly inside `return (`, changing only its alignment classes (`px-*`, `max-w-*`, `mx-auto`, `box-content`).
+- AC12 originally allowed outer-wrapper edits only in the three home files, but AC1's single left edge on `/work` needs that page's own outer wrapper to move as well. AC12 now also allows that one wrapper line in `app/work/page.tsx`, and only its alignment classes (`px-*`, `max-w-*`, `mx-auto`, `box-content`); the scope test enforces exactly that.
