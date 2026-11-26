@@ -15,6 +15,7 @@ import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import * as links from "../lib/links";
 import { THEME_STORAGE_KEY } from "../lib/theme";
+import { getProjects } from "../lib/mdx";
 import { STATUS_KEYS, STATUSES } from "../lib/statuses";
 import { checkSite } from "../scripts/boards/check";
 import { describe as describeFailure } from "../scripts/boards/compare";
@@ -678,37 +679,104 @@ test.describe("chrome", () => {
       )
     );
 
-    const routes = ["/", "/work", ...CASE_SLUGS.map((s) => `/work/${s}`)];
-    for (const route of routes) {
+    // Every project each page shows, found by its case link and title, has
+    // exactly one visible status: the word its content record assigns, plain.
+    const projects = (await getProjects()).map((p) => ({
+      slug: p.slug,
+      title: p.title,
+      status: p.status as string,
+      label: STATUSES[p.status].label,
+    }));
+    const labels = STATUS_KEYS.map((k) => STATUSES[k].label);
+    const pages: [string, typeof projects | "shown"][] = [
+      ["/", "shown"],
+      ["/work", projects],
+      ...projects.map((p): [string, typeof projects] => [
+        `/work/${p.slug}`,
+        [p],
+      ]),
+    ];
+    for (const [route, expected] of pages) {
       await open(page, route);
-      const shown = await page.locator("[data-status]").evaluateAll((els) =>
-        els.map((el) => {
-          const own = getComputedStyle(el);
-          const parent = getComputedStyle(el.parentElement!);
-          const pseudo = (p: string) => getComputedStyle(el, p).content;
-          return {
-            status: el.getAttribute("data-status"),
-            text: el.textContent,
-            children: el.childElementCount,
-            before: pseudo("::before"),
-            after: pseudo("::after"),
-            colourOwn: own.color === parent.color,
-            background: own.backgroundColor,
+      const found = await page.evaluate(
+        ({ projects, labels, route }) => {
+          const visible = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            const css = getComputedStyle(el);
+            return r.width > 0 && r.height > 0 && css.visibility !== "hidden";
           };
-        })
+          const text = (el: Element) => (el.textContent ?? "").trim();
+          // The innermost visible elements whose whole text is a status word,
+          // marked or not.
+          const words = (root: Element) =>
+            [...root.querySelectorAll("*")].filter(
+              (el) =>
+                labels.includes(text(el)) &&
+                ![...el.children].some((c) => text(c) === text(el)) &&
+                visible(el)
+            );
+          const heading = (root: Element, title: string) =>
+            [...root.querySelectorAll("h1, h2, h3, h4")].some(
+              (h) => text(h) === title
+            );
+          const main = document.querySelector("main")!;
+          return projects.flatMap((p) => {
+            let card: Element | null = null;
+            if (route === `/work/${p.slug}`) {
+              card = heading(main, p.title) ? main : null;
+            } else {
+              // The smallest block holding both the case link and the title.
+              for (const link of main.querySelectorAll(
+                `a[href="/work/${p.slug}"]`
+              )) {
+                let at: Element | null = link;
+                while (at && at !== main && !heading(at, p.title))
+                  at = at.parentElement;
+                if (at && at !== main && (!card || card.contains(at)))
+                  card = at;
+              }
+            }
+            if (!card) return [{ slug: p.slug, shown: false, statuses: [] }];
+            const statuses = words(card).map((el) => {
+              const own = getComputedStyle(el);
+              const parent = getComputedStyle(el.parentElement!);
+              const pseudo = (at: string) => getComputedStyle(el, at).content;
+              return {
+                status: el.getAttribute("data-status"),
+                text: text(el),
+                children: el.childElementCount,
+                before: pseudo("::before"),
+                after: pseudo("::after"),
+                colourOwn: own.color === parent.color,
+                background: own.backgroundColor,
+              };
+            });
+            return [{ slug: p.slug, shown: true, statuses }];
+          });
+        },
+        {
+          projects: expected === "shown" ? projects : expected,
+          labels,
+          route,
+        }
       );
-      expect(shown.length, route).toBeGreaterThan(0);
-      for (const s of shown) {
-        const label = STATUSES[s.status as keyof typeof STATUSES]?.label;
-        expect(s, route).toEqual({
-          status: s.status,
-          text: label,
-          children: 0,
-          before: "none",
-          after: "none",
-          colourOwn: true,
-          background: "rgba(0, 0, 0, 0)",
-        });
+      const shown = expected === "shown" ? found.filter((f) => f.shown) : found;
+      expect(shown.length, `${route}: projects shown`).toBeGreaterThan(0);
+      for (const f of shown) {
+        const p = projects.find((x) => x.slug === f.slug)!;
+        const at = `${route}: ${p.title}`;
+        expect(f.shown, at).toBe(true);
+        expect(f.statuses, at).toEqual([
+          {
+            status: p.status,
+            text: p.label,
+            children: 0,
+            before: "none",
+            after: "none",
+            colourOwn: true,
+            background: "rgba(0, 0, 0, 0)",
+          },
+        ]);
       }
     }
   });
