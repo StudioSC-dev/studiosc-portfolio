@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
@@ -23,10 +24,12 @@ import {
 } from "../components/range/fragments/central-command/fixture";
 import { checkSite } from "../scripts/boards/check";
 import type { Sections } from "../scripts/boards/model";
+import { rowStates } from "../scripts/boards/plan";
 import { perfRunProblems } from "./fixtures/design-tokens/checks";
 import {
   changedByPr,
   git,
+  gitBuffer,
   gitOk,
   prRange,
   ROOT,
@@ -86,6 +89,10 @@ const MERGED = "docs/boards/merged.json";
 const URLS = "e2e/fixtures/urls.json";
 const PERF = "docs/perf/prv-5.json";
 const SPEC_FILE = "e2e/range.spec.ts";
+const TICKET = "docs/tickets/PRV-5.md";
+/** SHA-256 of the audited ticket as committed, without its id line. */
+const TICKET_SHA256 =
+  "5f3dd261302880bc157fe7191ca87805613eec4cb38b02ebfc60426e56e831d5";
 const PRV5_ROWS = [
   "home/opener",
   "home/range",
@@ -110,8 +117,9 @@ const SCOPE = [
   "docs/boards/sections.json",
   "docs/boards/merged.json",
   "docs/perf/prv-5.json",
-  // The ticket itself, committed without its id line (orchestrator, wave 2).
-  "docs/tickets/PRV-5.md",
+  // The ticket itself, without its id line (orchestrator, wave 2), and
+  // pinned below: the PR may make exactly that change and nothing else.
+  TICKET,
 ];
 
 const read = (file: string) => readFileSync(path.join(ROOT, file), "utf8");
@@ -139,6 +147,12 @@ const counter = (page: Page) =>
 const peek = (page: Page, side: "left" | "right") =>
   page.locator(`[data-board-key="peek-${side}"]`);
 const word = (page: Page) => page.locator("h1 [data-range-word]");
+const opener = (page: Page) =>
+  page.locator('[data-board-section="home/opener"]');
+
+/** PRV-8 links the credit's names; before it merges they are plain text. */
+const prv8Merged = () =>
+  (JSON.parse(read(MERGED)) as string[]).includes("PRV-8");
 
 /** The counter's visible text, without the words only a screen reader reads. */
 const counterText = (page: Page) =>
@@ -536,7 +550,7 @@ test("peeks are drawings", async ({ page }, testInfo) => {
   }
 
   const order = async (count: number) => {
-    await page.getByRole("link", { name: "Every project" }).focus();
+    await opener(page).getByRole("link", { name: "Every project" }).focus();
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
       await page.keyboard.press("Tab");
@@ -552,18 +566,22 @@ test("peeks are drawings", async ({ page }, testInfo) => {
     }
     return names;
   };
-  expect(await order(11)).toEqual([
+  // PRV-8 links the credit's two names, which then join the plate's links.
+  const credit = prv8Merged() ? ["Seth", "Christine"] : [];
+  expect(await order(11 + credit.length)).toEqual([
     ...TABS,
+    ...credit,
     "Read the case study",
     "Open the demo",
     "Previous plate",
     "Next plate",
   ]);
   await open(page, 390);
-  expect(await order(13)).toEqual([
+  expect(await order(13 + credit.length)).toEqual([
     "Scroll the categories back",
     ...TABS,
     "Scroll the categories forward",
+    ...credit,
     "Read the case study",
     "Open the demo",
     "Previous plate",
@@ -623,7 +641,7 @@ test("phone chip row", async ({ page }, testInfo) => {
   expect(sideways).toBeLessThanOrEqual(0);
 });
 
-test("day feed", async ({ page, request }, testInfo) => {
+test("day feed", async ({ page, browser }, testInfo) => {
   chromiumOnly(testInfo);
   // Server modules only.
   for (const file of ["Feed.tsx", "Peek.tsx", "fixture.ts", "index.ts"]) {
@@ -675,16 +693,31 @@ test("day feed", async ({ page, request }, testInfo) => {
     }
   }
 
-  // The production HTML carries the feed, with no JavaScript at all.
-  const html = await (await request.get(HOME_ROUTE)).text();
-  for (const entry of FEED) expect(html).toContain(entry.text);
-  for (const entry of PHONE_FEED) expect(html).toContain(entry.phone);
+  // With JavaScript disabled, the server HTML alone shows the feed rows, in
+  // order, at both widths.
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    baseURL: String(testInfo.project.use.baseURL),
+  });
+  const noJs = await context.newPage();
+  for (const [width, shown] of [
+    [1440, FEED.map((e) => `${e.time} ${e.name} ${e.text}`)],
+    [390, PHONE_FEED.map((e) => `${e.time} ${e.name} ${e.phone}`)],
+  ] as const) {
+    await noJs.setViewportSize(SIZES[width]);
+    await noJs.goto(HOME_ROUTE);
+    const rows = slides(noJs).locator("li[data-source]:visible");
+    await expect(rows).toHaveCount(shown.length);
+    expect((await rows.allInnerTexts()).map(norm)).toEqual([...shown]);
+  }
+  await context.close();
 });
 
 test("credit and Christine lines", async ({ page, request }, testInfo) => {
   chromiumOnly(testInfo);
   const html = await (await request.get(HOME_ROUTE)).text();
   expect(html).not.toContain("Illustrative wording");
+  const linked = prv8Merged();
   for (const width of [1440, 390] as const) {
     await open(page, width);
     const credit = slides(page).locator("p:visible", {
@@ -692,45 +725,76 @@ test("credit and Christine lines", async ({ page, request }, testInfo) => {
     });
     await expect(credit).toHaveCount(1);
     await expect(credit).toHaveText("Built by Seth · Tested by Christine");
-    await expect(credit.locator("a")).toHaveCount(0);
+    // Plain text until PRV-8 merges (D15); then its two person anchors.
+    if (linked) {
+      await expect(credit.locator("a")).toHaveCount(2);
+      await expect(credit.locator("a").nth(0)).toHaveText("Seth");
+      await expect(credit.locator("a").nth(0)).toHaveAttribute("href", "#seth");
+      await expect(credit.locator("a").nth(1)).toHaveText("Christine");
+      await expect(credit.locator("a").nth(1)).toHaveAttribute(
+        "href",
+        "#christine"
+      );
+    } else {
+      await expect(credit.locator("a")).toHaveCount(0);
+    }
     // No pinned check ships for Central Command, so no Christine line.
     await expect(slides(page).locator("[data-christine-line]")).toHaveCount(0);
     await expect(slides(page)).not.toContainText("Checked by Christine");
   }
 
-  // With a valid, audit-pinned check, the plate renders its text, at both
-  // widths; without it, the whole line is absent and the credit stays.
+  // With a valid, audit-pinned check, the plate renders the supplied text in
+  // the Christine line's own element, once per layout; without it, the whole
+  // line is absent and the credit stays.
   const cc = RANGE_CATEGORIES[0];
   expect(cc.plate.kind).toBe("real");
-  const text =
-    "The day feed stays in time order, and each entry keeps its source's colour.";
-  const checked: RangeCategory = {
-    ...cc,
-    plate: {
-      ...(cc.plate as Extract<RangeCategory["plate"], { kind: "real" }>),
-      christineCheck: {
-        repo: "StudioSC-dev/studiosc-centralcommand",
-        path: "e2e/feed.spec.ts",
-        test: "day feed order",
-        sha: "0123456789abcdef0123456789abcdef01234567",
-        text,
-      },
+  const real = cc.plate as Extract<RangeCategory["plate"], { kind: "real" }>;
+  const supplied = (text: string): RangeCategory["plate"] => ({
+    ...real,
+    christineCheck: {
+      repo: "StudioSC-dev/studiosc-centralcommand",
+      path: "e2e/feed.spec.ts",
+      test: "day feed order",
+      sha: "0123456789abcdef0123456789abcdef01234567",
+      text,
     },
-  };
+  });
+  const DISTINCT = "Fixture check q7x: zebra feed rows stay in order.";
+  const OTHER = "Fixture check k2w: walrus entries keep one colour.";
+  const BOARD =
+    "The day feed stays in time order, and each entry keeps its source's colour.";
   const projects = await getProjects();
+  const slugs = projects.map((p) => p.slug);
   expect(() =>
-    validateRange(
-      [checked],
-      projects.map((p) => p.slug)
-    )
+    validateRange([{ ...cc, plate: supplied(DISTINCT) }], slugs)
   ).not.toThrow();
-  const render = (category: RangeCategory) => renderPlate(category.plate);
-  const withCheck = render(checked);
-  expect(withCheck.match(/data-christine-line/g)).toHaveLength(2);
-  expect(withCheck).toContain(text.replace(/'/g, "&#x27;"));
-  expect(withCheck).toContain("Checked by Christine.");
+
+  /** The Christine lines in rendered plate HTML: desktop, then phone. */
+  const linesIn = async (html: string) => {
+    await page.setContent(html);
+    return {
+      desktop: (
+        await page.locator(".md\\:grid [data-christine-line]").allInnerTexts()
+      ).map(norm),
+      phone: (
+        await page.locator(".md\\:hidden [data-christine-line]").allInnerTexts()
+      ).map(norm),
+    };
+  };
+  const expected = (text: string) => ({
+    desktop: [`Checked by Christine. ${text}`],
+    phone: [`Checked by Christine. ${text}`],
+  });
+  const withCheck = renderPlate(supplied(DISTINCT));
+  expect(await linesIn(withCheck)).toEqual(expected(DISTINCT));
+  expect(await linesIn(renderPlate(supplied(OTHER)))).toEqual(expected(OTHER));
   expect(withCheck).not.toContain("Illustrative wording");
-  const without = render(cc);
+  // Control: a plate that printed fixed copy instead of the supplied text
+  // fails the same assertion.
+  const hardCoded = withCheck.split(DISTINCT).join(BOARD);
+  expect(await linesIn(hardCoded)).not.toEqual(expected(DISTINCT));
+
+  const without = renderPlate(real);
   expect(without).not.toContain("data-christine-line");
   expect(without).not.toContain("Checked by Christine");
   expect(without).toContain("Built by Seth · Tested by Christine");
@@ -851,18 +915,31 @@ test("home behind the flag", async ({ page, request }, testInfo) => {
   if (sitemap.ok()) expect(await sitemap.text()).not.toContain("/preview");
   else expect(sitemap.status()).toBe(404);
 
-  const links: Record<string, string> = {
+  const OPENER_LINKS: Record<string, string> = {
     "Start a project": "/contact",
     "Every project": "#work",
+  };
+  const links: Record<string, string> = {
+    ...OPENER_LINKS,
     "Read the case study": "/work/central-command",
     "Open the demo": "https://centralcommand.studiosc.dev",
   };
   for (const width of [1440, 390] as const) {
     await open(page, width);
-    for (const [name, href] of Object.entries(links))
+    // Control: another link of the same name elsewhere on the page (PRV-4's
+    // header CTA) neither breaks nor satisfies these checks.
+    await page.evaluate(() => {
+      const decoy = document.createElement("a");
+      decoy.href = "/elsewhere";
+      decoy.textContent = "Start a project";
+      document.body.prepend(decoy);
+    });
+    for (const [name, href] of Object.entries(links)) {
+      const scope = name in OPENER_LINKS ? opener(page) : slides(page);
       await expect(
-        page.getByRole("link", { name, exact: true })
+        scope.getByRole("link", { name, exact: true })
       ).toHaveAttribute("href", href);
+    }
   }
 });
 
@@ -889,19 +966,30 @@ test("PRV-5 fidelity rows", async ({ browser }, testInfo) => {
     expect(later).toHaveLength(6);
     for (const row of later) expect(row.built).toBe(false);
   }
-  // fidelity.spec.ts judges every built row; this pass, narrowed to the
-  // load state, shows the harness compares each PRV-5 row at both widths and
-  // in both themes.
+  // fidelity.spec.ts judges every built row in every state. This pass shows
+  // the harness compares each PRV-5 row in the first state the boards draw
+  // for it, at both widths and in both themes; a row is only ever compared
+  // in a state of its own.
+  const wanted: string[] = [];
+  for (const row of mine)
+    for (const width of ["1440", "390"] as const) {
+      const states = rowStates(sections, row, width);
+      expect(states.length).toBeGreaterThan(0);
+      for (const theme of ["light", "dark"])
+        wanted.push(`${row.id} ${states[0]} ${width} ${theme}`);
+    }
+  const states = [...new Set(wanted.map((w) => w.split(" ")[1]))];
   const result = await checkSite({
     dir: path.join(ROOT, "docs/boards"),
     baseURL: String(testInfo.project.use.baseURL),
     browser,
-    only: { rows: PRV5_ROWS, states: ["default"], rm: false },
+    only: { rows: PRV5_ROWS, states, rm: false },
   });
-  for (const id of PRV5_ROWS)
-    for (const width of ["1440", "390"])
-      for (const theme of ["light", "dark"])
-        expect(result.checked).toContain(`${id} default ${width} ${theme}`);
+  for (const comparison of wanted) expect(result.checked).toContain(comparison);
+  for (const comparison of result.checked) {
+    const [id, state] = comparison.split(" ");
+    expect(mine.find((r) => r.id === id)?.states).toContain(state);
+  }
 });
 
 test("changes stay within scope", async ({}, testInfo) => {
@@ -915,10 +1003,29 @@ test("changes stay within scope", async ({}, testInfo) => {
   const files = changedFiles(base, head);
   expect(outsideScope(files)).toEqual([]);
   expect(files).not.toContain("e2e/homepage.spec.ts");
-  // Control: a file outside Scope is caught.
+  // Control: a file outside Scope is caught, and so is any other ticket.
   expect(
-    outsideScope(["e2e/homepage.spec.ts", "components/range/x.tsx"])
-  ).toEqual(["e2e/homepage.spec.ts"]);
+    outsideScope([
+      "e2e/homepage.spec.ts",
+      "components/range/x.tsx",
+      "docs/tickets/PRV-4.md",
+      TICKET,
+    ])
+  ).toEqual(["e2e/homepage.spec.ts", "docs/tickets/PRV-4.md"]);
+
+  // The ticket: the only docs/tickets change is dropping its "PRV-5" id
+  // line, and the result is the audited text.
+  const ticketDocs = files.filter((f) => f.startsWith("docs/tickets/"));
+  expect(ticketDocs).toEqual([TICKET]);
+  const ticketAt = (sha: string) => gitBuffer(["show", `${sha}:${TICKET}`]);
+  const ticketBefore = ticketAt(base).toString("utf8");
+  expect(ticketBefore.startsWith("PRV-5\n")).toBe(true);
+  expect(ticketAt(head).toString("utf8")).toBe(
+    ticketBefore.slice("PRV-5\n".length)
+  );
+  expect(createHash("sha256").update(ticketAt(head)).digest("hex")).toBe(
+    TICKET_SHA256
+  );
 
   // urls.json gains only /preview/home.
   const urlsBefore = showJson<{ sha: string; note: string; urls: string[] }>(
