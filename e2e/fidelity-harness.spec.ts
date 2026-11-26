@@ -20,6 +20,7 @@ import {
   expect,
   test,
   type Browser,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { checkSite, pairName, type Only } from "../scripts/boards/check";
@@ -3071,6 +3072,443 @@ test.describe("fidelity harness", () => {
     }
   });
 });
+
+/**
+ * PRV-29: regenerating the real boards gives the same output however fast
+ * the host is. These need the pinned canvas runtime in .cache/boards/, which
+ * CI does not have; the root-cause record and the scope check run anywhere.
+ */
+test.describe("real-board regeneration across host speeds", () => {
+  /** The pinned runtime, or null when .cache/boards/ lacks it. */
+  const pinnedRuntime = (): Buffer | null => {
+    const file = path.join(ROOT, ".cache/boards/support.js");
+    if (!existsSync(file)) return null;
+    const bytes = readFileSync(file);
+    const pin = readJson<Manifest>(path.join(BOARDS, "manifest.json")).runtime
+      .sha256;
+    return sha256(bytes) === pin ? bytes : null;
+  };
+  const NO_RUNTIME = "the pinned canvas runtime is not in .cache/boards/";
+
+  test("real-board regeneration does not depend on host speed", async () => {
+    chromiumOnly();
+    test.setTimeout(30 * 60_000);
+
+    // AC1: one root-cause record per capture PRV-27 saw change, and every
+    // case cited by a record that names the case's row.
+    const doc = readFileSync(path.join(ROOT, TICKET_29), "utf8");
+    const at = doc.indexOf("\n## Root cause\n");
+    expect(at, "a Root cause section").toBeGreaterThan(0);
+    const records = doc
+      .slice(at)
+      .split(/\n## (?!Root cause)/)[0]
+      .split("\n### ")
+      .slice(1);
+    for (const row of ["home/holly", "home/opener"])
+      expect(
+        records.some((r) => r.startsWith(`\`${row}\``)),
+        `a root-cause record for ${row}`
+      ).toBe(true);
+    for (const c of HOST_SPEED_CASES) {
+      const record = records.find((r) => r.includes(`\`${c.id}\``));
+      expect(record, `a root-cause record cites ${c.id}`).toBeDefined();
+      expect(record, `${c.id}'s record names ${c.row}`).toContain(
+        `\`${c.row}\``
+      );
+    }
+
+    // AC2: the same two conditions, at the base and at the head.
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    const manifest = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
+    const sections = readJson<Sections>(path.join(BOARDS, "sections.json"));
+    const register = {
+      deviations: parseDeviations(
+        readFileSync(path.join(BOARDS, "deviations.md"), "utf8")
+      ),
+      merged: readJson<string[]>(path.join(BOARDS, "merged.json")),
+    };
+    const old = tmp("fidelity-pre-prv29-");
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    try {
+      const archive = spawnSync(
+        "git",
+        ["archive", "--format=tar", PRE_PRV29, "scripts/boards"],
+        { cwd: ROOT, env: cleanEnv(), maxBuffer: 1 << 28 }
+      );
+      expect(archive.status).toBe(0);
+      const untar = spawnSync("tar", ["-x", "-C", old], {
+        input: archive.stdout,
+      });
+      expect(untar.status).toBe(0);
+      const base = createRequire(__filename)(
+        path.join(old, "scripts/boards/capture.ts")
+      ) as CaptureCode;
+      const head: CaptureCode = {
+        boardContext,
+        load,
+        captureState,
+        rowQueries,
+        shoot,
+      };
+
+      /** What one case records under one condition, at one revision. */
+      const observe = async (
+        code: CaptureCode,
+        c: HostSpeedCase,
+        condition: "normal" | "reproduced"
+      ) => {
+        const width = manifest.boards[c.board].width;
+        const bt = boardThemes(sections, c.board, width).find(
+          (t) => t.theme === c.theme
+        )!;
+        const plan = plannedCaptures(sections, bt, register).find(
+          (p) => p.key === c.key
+        )!;
+        const row = sections.rows.find((r) => r.id === c.row)!;
+        const ctx = await code.boardContext(
+          browser,
+          sections,
+          BOARDS,
+          manifest,
+          runtime!,
+          { width, reducedMotion: false }
+        );
+        const page = await ctx.newPage();
+        const locator = Object.getPrototypeOf(page.locator("html")) as {
+          click: Locator["click"];
+        };
+        const click = locator.click;
+        try {
+          if (c.kind === "steps" && condition === "normal") {
+            // A host that is never behind: the deck has not moved when the
+            // next click lands.
+            const cdp = await ctx.newCDPSession(page);
+            await cdp.send("Animation.enable");
+            await cdp.send("Animation.setPlaybackRate", {
+              playbackRate: 0.01,
+            });
+          }
+          if (c.kind === "steps" && condition === "reproduced")
+            // A slow driver: each click lands after the last slide ended.
+            locator.click = async function (this: Locator, ...args) {
+              await new Promise((r) => setTimeout(r, SLOW_CLICK_MS));
+              return click.apply(this, args);
+            };
+          if (c.kind === "shot" && condition === "reproduced")
+            // A loaded host: the page keeps drawing frames before the shot.
+            await ctx.addInitScript(() => {
+              const loop = () => requestAnimationFrame(loop);
+              loop();
+            });
+          await code.load(page, `${BOARD_ORIGIN}/${c.board}`, sections.clock);
+          const capture = await code.captureState(
+            page,
+            sections,
+            code.rowQueries([row], sections.rows, "board"),
+            { state: plan.state, theme: bt.theme, toggle: bt.toggle },
+            "board",
+            { hide: plan.hide }
+          );
+          if (c.kind === "steps")
+            return JSON.stringify(
+              capture.motion.filter((m) => m.row === c.row)
+            );
+          if (condition === "normal")
+            // A fast host: a frame is drawn the moment the capture ends.
+            await page.screenshot({ animations: "allow", caret: "hide" });
+          else await page.waitForTimeout(SLOW_SHOT_MS);
+          return sha256(
+            await code.shoot(page, capture.rows[c.row]!.box, capture.frame)
+          );
+        } finally {
+          locator.click = click;
+          await ctx.close();
+        }
+      };
+
+      for (const c of HOST_SPEED_CASES)
+        await test.step(c.id, async () => {
+          const baseNormal = await observe(base, c, "normal");
+          const baseReproduced = await observe(base, c, "reproduced");
+          const headNormal = await observe(head, c, "normal");
+          const headReproduced = await observe(head, c, "reproduced");
+          expect(baseReproduced, `${c.id} at the base`).not.toBe(baseNormal);
+          expect(headReproduced, `${c.id} at the head`).toBe(headNormal);
+        });
+    } finally {
+      await browser.close();
+      rmSync(old, { recursive: true, force: true });
+    }
+  });
+
+  test("pinned-runtime regeneration matches committed outputs across host speeds", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    const manifest = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
+    const boards = Object.keys(manifest.boards).sort();
+    // One board per run, twice each: one regen can take minutes.
+    test.setTimeout(boards.length * 2 * 15 * 60_000);
+    const committed = readSpec(path.join(BOARDS, "spec.json"));
+    const dir = tmp("fidelity-host-speed-");
+    const preload = path.join(dir, "slow-host.cjs");
+    writeFileSync(preload, SLOW_HOST);
+    const conditions: [string, Record<string, string>][] = [
+      ["normal", {}],
+      [
+        "slow host",
+        { NODE_OPTIONS: `--require ${preload}`, SLOW_HOST_ROOT: ROOT },
+      ],
+    ];
+    try {
+      for (const board of boards) {
+        const stem = board.replace(/\.dc\.html$/, "");
+        const refs = snapshot(path.join(BOARDS, "ref", stem));
+        const entry = JSON.stringify(committed.boards[board]);
+        for (const [label, extra] of conditions) {
+          const work = path.join(dir, "boards");
+          rmSync(work, { recursive: true, force: true });
+          cpSync(BOARDS, work, {
+            recursive: true,
+            filter: (f) =>
+              !["ref", "spec.json"].includes(path.relative(BOARDS, f)),
+          });
+          const run = await regen(
+            work,
+            { BOARDS_CACHE: path.join(ROOT, ".cache/boards"), ...extra },
+            ["--board", board]
+          );
+          expect(run.status, `${board}, ${label}: ${run.stderr}`).toBe(0);
+          expect(
+            snapshot(path.join(work, "ref", stem)),
+            `${board}, ${label}: references`
+          ).toEqual(refs);
+          expect(
+            JSON.stringify(
+              readSpec(path.join(work, "spec.json")).boards[board]
+            ),
+            `${board}, ${label}: spec.json`
+          ).toBe(entry);
+        }
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("PRV-29 changes only scoped paths", () => {
+    chromiumOnly();
+    const range = prRange();
+    test.skip(!range, "a build without PR_HEAD_SHA has no PR to judge");
+    const { base, head } = range!;
+    test.skip(
+      existsAt(base, TICKET_29),
+      `${base} already holds ${TICKET_29}: PRV-29's scope is checked on its own PR`
+    );
+    expect(existsAt(head, TICKET_29), "the PR adds its ticket").toBe(true);
+    const changed = git([
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${base}...${head}`,
+    ])
+      .split("\n")
+      .filter(Boolean);
+    const scope =
+      /^(scripts\/boards\/|e2e\/fidelity-harness\.spec\.ts$|docs\/boards\/spec\.json$|docs\/boards\/ref\/|docs\/tickets\/PRV-29\.md$)/;
+    expect(
+      changed.filter((f) => !scope.test(f)),
+      "outside Scope"
+    ).toEqual([]);
+
+    // Tolerances (compare.ts), row definitions (sections.json), the
+    // deviations register and the manifest equal the base.
+    for (const f of [
+      "scripts/boards/compare.ts",
+      "docs/boards/sections.json",
+      "docs/boards/deviations.md",
+      "docs/boards/manifest.json",
+    ])
+      expect(git(["rev-parse", `${head}:${f}`]), f).toBe(
+        git(["rev-parse", `${base}:${f}`])
+      );
+
+    // No reference file changes. A spec.json entry changes only in the
+    // recorded motion of a state of two or more steps, on a row that has
+    // the state: what running each step from rest changes (the holly root
+    // cause). Everything else in every capture equals the base.
+    expect(
+      changed.filter((f) => f.startsWith("docs/boards/ref/")),
+      "reference files"
+    ).toEqual([]);
+    const defs = readJson<Sections>(path.join(BOARDS, "sections.json"));
+    const unstable = (row: string | null, key: string) => {
+      const state = key
+        .slice(key.indexOf("/") + 1)
+        .replace(/-rm$/, "")
+        .split("+")[0];
+      return (
+        (defs.states[state]?.steps?.length ?? 0) > 1 &&
+        defs.rows.some((r) => r.id === row && r.states.includes(state))
+      );
+    };
+    const scratch = tmp("fidelity-prv29-spec-");
+    const specAt = (sha: string) => {
+      const file = path.join(scratch, `${sha}.json`);
+      writeFileSync(file, git(["show", `${sha}:docs/boards/spec.json`]));
+      return readSpec(file);
+    };
+    try {
+      const was = specAt(base);
+      const now = specAt(head);
+      expect(Object.keys(now.boards)).toEqual(Object.keys(was.boards));
+      const stray: string[] = [];
+      for (const [board, b] of Object.entries(now.boards)) {
+        const a = was.boards[board];
+        const { captures: ca, ...restA } = a;
+        const { captures: cb, ...restB } = b;
+        if (JSON.stringify(restA) !== JSON.stringify(restB)) stray.push(board);
+        expect(Object.keys(cb), board).toEqual(Object.keys(ca));
+        for (const [key, capture] of Object.entries(cb)) {
+          const prior = ca[key];
+          if (JSON.stringify(capture.tokens) !== JSON.stringify(prior.tokens))
+            stray.push(`${board} ${key} tokens`);
+          const rows = new Set([
+            ...Object.keys(capture.rows),
+            ...capture.motion.map((m) => m.row),
+            ...prior.motion.map((m) => m.row),
+          ]);
+          for (const row of rows) {
+            if (
+              JSON.stringify(row === null ? null : capture.rows[row]) !==
+              JSON.stringify(row === null ? null : prior.rows[row])
+            )
+              stray.push(`${board} ${key} ${row}`);
+            if (
+              !unstable(row, key) &&
+              JSON.stringify(capture.motion.filter((m) => m.row === row)) !==
+                JSON.stringify(prior.motion.filter((m) => m.row === row))
+            )
+              stray.push(`${board} ${key} ${row} motion`);
+          }
+        }
+      }
+      expect(stray, "spec.json changes outside multi-step motion").toEqual([]);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+});
+
+/** PRV-29's ticket, with the root-cause records. */
+const TICKET_29 = "docs/tickets/PRV-29.md";
+
+/** The capture code PRV-29 starts from: its PR base on main (PRV-4). */
+const PRE_PRV29 = "2473f216fb51a6598b5492e6dd0fdc07bc0254e8";
+
+/** The capture code one revision exports: what the host-speed cases run. */
+type CaptureCode = {
+  boardContext: typeof boardContext;
+  load: typeof load;
+  captureState: typeof captureState;
+  rowQueries: typeof rowQueries;
+  shoot: typeof shoot;
+};
+
+/**
+ * The two captures PRV-27 saw change between runs, each with the case that
+ * reproduces it: the holly deck's recorded start direction after three
+ * "Next photo" clicks, and the opener's shot once "Sites" is chosen. A
+ * gallery's two-click state records its fades the way the holly deck
+ * records its slides, so the holly fix changes it too: it has a case of its
+ * own. A "steps" case compares the row's recorded motion, a "shot" case the
+ * row's shot.
+ */
+const HOST_SPEED_CASES = [
+  {
+    id: "holly-start-direction",
+    kind: "steps",
+    row: "home/holly",
+    board: "range-light-desktop.dc.html",
+    theme: "light",
+    key: "light/holly-4",
+  },
+  {
+    id: "gallery-click-mid-fade",
+    kind: "steps",
+    row: "seth/photos",
+    board: "range-profile-seth-desktop.dc.html",
+    theme: "light",
+    key: "light/gallery-3",
+  },
+  {
+    id: "opener-tab-sites-shot",
+    kind: "shot",
+    row: "home/opener",
+    board: "range-dark-desktop.dc.html",
+    theme: "dark",
+    key: "dark/tab-sites",
+  },
+] as const;
+type HostSpeedCase = (typeof HOST_SPEED_CASES)[number];
+
+/** Longer than the holly deck's 220 ms slide and 300 ms tuck, and a
+ * gallery's 200 ms fade. */
+const SLOW_CLICK_MS = 600;
+/** Long enough for the page's own late rendering to land first. */
+const SLOW_SHOT_MS = 800;
+
+/**
+ * The slow host for boards:regen, preloaded into the child with
+ * NODE_OPTIONS: the page draws frames all the time, every click waits
+ * SLOW_CLICK_MS, and the first shot after the capture's in-page work waits
+ * SLOW_SHOT_MS. Each is one of the two reproductions above, applied to the
+ * whole run.
+ */
+const SLOW_HOST = `"use strict";
+const { createRequire } = require("node:module");
+const pw = createRequire(process.env.SLOW_HOST_ROOT + "/package.json")("@playwright/test");
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const wrap = (obj, name, make) => {
+  const proto = Object.getPrototypeOf(obj);
+  const mark = "__slowHost_" + name;
+  if (proto[mark]) return;
+  proto[mark] = true;
+  proto[name] = make(proto[name]);
+};
+wrap(pw.chromium, "launch", (launch) => async function (...a) {
+  const browser = await launch.apply(this, a);
+  wrap(browser, "newContext", (newContext) => async function (...b) {
+    const ctx = await newContext.apply(this, b);
+    wrap(ctx, "newPage", (newPage) => async function (...c) {
+      const page = await newPage.apply(this, c);
+      await page.addInitScript(() => {
+        const loop = () => requestAnimationFrame(loop);
+        loop();
+      });
+      wrap(page, "evaluate", (evaluate) => function (fn, ...d) {
+        if (String(fn).includes("__fidelity")) this.__slowHostShot = true;
+        return evaluate.call(this, fn, ...d);
+      });
+      wrap(page, "screenshot", (screenshot) => async function (...d) {
+        if (this.__slowHostShot) {
+          this.__slowHostShot = false;
+          await sleep(${SLOW_SHOT_MS});
+        }
+        return screenshot.apply(this, d);
+      });
+      wrap(page.locator("html"), "click", (click) => async function (...d) {
+        await sleep(${SLOW_CLICK_MS});
+        return click.apply(this, d);
+      });
+      return page;
+    });
+    return ctx;
+  });
+  return browser;
+});
+`;
 
 /** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
 const PRE_FIX = "f0f08ab405cad5a5acf45f9a8e8e8f63b7485f56";
