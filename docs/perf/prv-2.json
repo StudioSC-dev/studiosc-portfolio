@@ -1,5 +1,5 @@
 {
-  "measured_sha": "1dec993013a2bd2da4f002627676dae6c2ecfe27",
+  "measured_sha": "71ea28014abfd0d59c841c9793e5402a15f4ee65",
   "route": "/",
   "lighthouse_version": "13.6.0",
   "font_fallback_steps": [],
@@ -11,7 +11,7 @@
     {
       "perf": 100,
       "a11y": 98,
-      "lcp_ms": 761.5,
+      "lcp_ms": 761.0,
       "cls": 0
     },
     {
@@ -23,14 +23,14 @@
     {
       "perf": 100,
       "a11y": 98,
-      "lcp_ms": 757.1,
+      "lcp_ms": 756.9,
       "cls": 0
     }
   ],
   "median": {
     "perf": 100,
     "a11y": 98,
-    "lcp_ms": 757.1,
+    "lcp_ms": 756.9,
     "cls": 0
   }
 }
