@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
+import * as links from "../lib/links";
 import { THEME_STORAGE_KEY } from "../lib/theme";
 import { STATUS_KEYS, STATUSES } from "../lib/statuses";
 import { checkSite } from "../scripts/boards/check";
@@ -261,6 +262,19 @@ async function leftEdges(page: Page, phone: boolean) {
       footer: footer?.getBoundingClientRect().left ?? NaN,
     };
   }, phone);
+}
+
+/** Every file under `dir`, repo-relative. */
+function filesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(path.join(ROOT, dir), {
+    withFileTypes: true,
+  })) {
+    const rel = path.posix.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesUnder(rel));
+    else out.push(rel);
+  }
+  return out;
 }
 
 test.describe("chrome", () => {
@@ -906,5 +920,46 @@ test.describe("chrome", () => {
       }
     expect([...result.checked].sort()).toEqual(expected.sort());
     expect(result.failures.map(describeFailure)).toEqual([]);
+  });
+});
+
+test.describe("chrome", () => {
+  test("no Instagram links", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    expect(Object.keys(links)).not.toContain("INSTAGRAM");
+
+    for (const file of [
+      "components/layout/Footer.tsx",
+      "components/contact/ContactForm.tsx",
+    ]) {
+      expect(readFileSync(path.join(ROOT, file), "utf8"), file).not.toMatch(
+        /instagram/i
+      );
+    }
+    await open(page, "/");
+    await expect(
+      page.locator(
+        '[data-board-section="chrome/footer"] a[href*="instagram" i]'
+      )
+    ).toHaveCount(0);
+
+    // Every instagram.com URL in authored source, and where it sits. A script
+    // source is not a hyperlink; the one post URL is PRV-16's.
+    const url = /https?:\/\/(?:[a-z0-9-]+\.)*instagram\.com[^\s"'`)]*/gi;
+    const found: string[] = [];
+    for (const dir of ["app", "components", "content", "lib"]) {
+      for (const file of filesUnder(dir)) {
+        if (!/\.(tsx?|jsx?|mdx?|json)$/.test(file)) continue;
+        const text = readFileSync(path.join(ROOT, file), "utf8");
+        for (const m of text.matchAll(url)) {
+          const before = text.slice(Math.max(0, m.index - 6), m.index);
+          if (/src=["']$/.test(before) && /\.js$/.test(m[0])) continue;
+          found.push(`${file} ${m[0]}`);
+        }
+      }
+    }
+    expect(found).toEqual([
+      "content/blog/first-marathon.mdx https://www.instagram.com/p/DUxtiRsARJw/",
+    ]);
   });
 });

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { LinkedInIcon } from "@/components/ui/LinkedInIcon";
-import { INSTAGRAM, LINKEDIN } from "@/lib/links";
+import { LINKEDIN } from "@/lib/links";
 
 const contactFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -98,16 +98,7 @@ export default function ContactForm() {
             className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink"
           >
             latest project
-          </Link>{" "}
-          or{" "}
-          <a
-            href={INSTAGRAM}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink"
-          >
-            follow our cafe-hopping journey on Instagram
-          </a>
+          </Link>
           .
         </p>
       </motion.div>
