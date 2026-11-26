@@ -803,6 +803,14 @@
     },
 
     /**
+     * Notes every animation still running, so one a later settle() finishes
+     * early is in the record all the same.
+     */
+    motionSweep() {
+      sweep();
+    },
+
+    /**
      * Holds every running animation, a view transition's included, at the
      * same fraction `at` of its active duration, so an in-flight state is one
      * fixed frame whenever the capture reaches it. Returns the viewport when

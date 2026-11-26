@@ -319,6 +319,7 @@ type Fid = {
     motionStart(): void;
     holdArm(at: number): void;
     settle(): Promise<void>;
+    motionSweep(): void;
     hold(at: number): Promise<[number, number, number, number] | null>;
     hide(e: { selector: string; mode?: string }[]): void;
     measure(spec: unknown): Capture;
@@ -337,6 +338,33 @@ const fid = (page: Page) => ({
   hide: (e: { selector: string; mode?: string }[]) =>
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hide(x), e),
 });
+
+/**
+ * Runs a state's steps, each one from rest: the motions a step starts are
+ * noted, then settled, before the next step. A step that lands while the
+ * last one's transition is still moving would start its own from wherever
+ * that transition had got to, which depends on how fast the host is (the
+ * holly deck's "Next photo" clicks recorded a different start direction
+ * run to run).
+ */
+export async function runStepsAtRest(page: Page, steps: Step[]) {
+  for (const [i, step] of steps.entries()) {
+    await runSteps(page, [step]);
+    if (i === steps.length - 1) break;
+    await frames(page, 3);
+    await page.waitForTimeout(60);
+    await page.evaluate(async () => {
+      const f = (
+        window as unknown as {
+          __fidelity: { transitionReady(): Promise<void>; motionSweep(): void };
+        }
+      ).__fidelity;
+      await f.transitionReady();
+      f.motionSweep();
+    });
+    await fid(page).settle();
+  }
+}
 
 /**
  * Reaches one state on a loaded page and measures it. The page is left in
@@ -383,10 +411,12 @@ export async function captureState(
     // An in-flight state's transition is held the moment it is ready, so it
     // cannot finish before hold() below, however slow the host.
     if (def?.inFlight) await fid(page).holdArm(IN_FLIGHT_AT);
-    await runSteps(
-      page,
-      def?.toggleTheme ? sections.theme[req.theme] : stepsFor(def, side)
-    );
+    const steps = def?.toggleTheme
+      ? sections.theme[req.theme]
+      : stepsFor(def, side);
+    // An in-flight state holds the transition its steps start: they run as
+    // they always have.
+    await (def?.inFlight ? runSteps : runStepsAtRest)(page, steps);
     motion = await takeMotion(page, rows, sections);
     everything.push(...motion);
   }

@@ -1808,6 +1808,74 @@ test.describe("fidelity harness", () => {
           else expectFailure(here, { ...w, ...c }, label);
         }
       }
+
+      // PRV-29: a holly-style deck whose transition really changes direction
+      // still regenerates to a different spec.json. Each photo slides in on
+      // a CSS transition from its resting offset; the second click of the
+      // two-click state comes back to the first photo, as "Next photo of
+      // Holly" does on the real boards. Only the offset's direction differs.
+      const deck = tmp("fidelity-deck-");
+      try {
+        const cache = path.join(deck, "cache");
+        const env = { BOARDS_CACHE: cache, BOARDS_RUNTIME_BASE: server.url };
+        const board = "fx-desktop.dc.html";
+        const regenDeck = async (offset: string) => {
+          const work = path.join(deck, offset.replace(/\W+/g, "_"));
+          cpSync(CANVAS, work, {
+            recursive: true,
+            filter: (f) => path.relative(CANVAS, f) !== "ref",
+          });
+          const file = path.join(work, board);
+          const html = readFileSync(file, "utf8");
+          const slid = html.replace(
+            "</style>",
+            `.frame.holly img { transform: ${offset}; transition: transform 220ms ease; }\n.frame.holly img.on { transform: none; }\n</style>`
+          );
+          expect(slid, "the deck edit applied").not.toBe(html);
+          writeFileSync(file, slid);
+          const manifest = readJson<Manifest>(path.join(work, "manifest.json"));
+          manifest.boards[board].sha256 = sha256(readFileSync(file));
+          writeFileSync(
+            path.join(work, "manifest.json"),
+            `${JSON.stringify(manifest, null, 2)}\n`
+          );
+          const sections = readJson<Sections>(path.join(work, "sections.json"));
+          const next = { role: "button", name: "Next photo of Holly" };
+          sections.states["holly-3"] = {
+            steps: [{ click: next }, { click: next }],
+            from: "holly-2",
+          };
+          for (const row of sections.rows)
+            if (row.id === "fx/holly") row.states = [...row.states, "holly-3"];
+          writeFileSync(
+            path.join(work, "sections.json"),
+            `${JSON.stringify(sections, null, 2)}\n`
+          );
+          const run = await regen(work, env, ["--board", board]);
+          expect(run.status, run.stderr).toBe(0);
+          const spec = readSpec(path.join(work, "spec.json"));
+          return {
+            json: JSON.stringify(spec.boards[board]),
+            slides: spec.boards[board].captures["light/holly-3"].motion
+              .filter((m) => m.name === "transition:transform")
+              .map((m) => `${m.key} ${m.direction}`),
+          };
+        };
+        const right = await regenDeck("translate(12px, -4px)");
+        const left = await regenDeck("translate(-12px, 4px)");
+        expect(right.slides).toEqual([
+          "image:0 enter x+y-",
+          "image:0 exit x+y-",
+          "row enter x+y-",
+          "row exit x+y-",
+        ]);
+        expect(left.slides).toEqual(
+          right.slides.map((m) => m.replace("x+y-", "x-y+"))
+        );
+        expect(left.json).not.toBe(right.json);
+      } finally {
+        rmSync(deck, { recursive: true, force: true });
+      }
     });
 
     test("deviations are exact, accepted and expire", async ({ browser }) => {
