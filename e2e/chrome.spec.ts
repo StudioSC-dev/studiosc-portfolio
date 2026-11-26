@@ -435,6 +435,30 @@ test.describe("chrome", () => {
     expect(errors).toEqual([]);
   });
 
+  test("theme follows, stores, no flash: a change while hydrating", async ({
+    page,
+  }) => {
+    await stubVercelInsights(page);
+    // Hold every Next.js script until the system setting has changed.
+    let release = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/_next\/static\/.*\.js(\?|$)/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    expect(await theme(page)).toBe("light");
+    await page.emulateMedia({ colorScheme: "dark" });
+    // The head script ran before the change; only hydration can catch it.
+    expect(await theme(page)).toBe("light");
+    release();
+    await expect.poll(() => theme(page)).toBe("dark");
+    await expect(toggle(page)).toHaveAccessibleName(
+      "Switch to the light theme"
+    );
+  });
+
   test("theme reveal and its fallbacks", async ({ page }, testInfo) => {
     chromiumOnly(testInfo.project.name);
     await page.setViewportSize(DESKTOP);

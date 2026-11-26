@@ -119,6 +119,9 @@ export function subscribeToTheme(onChange: () => void) {
     if (getThemeSnapshot() !== theme) applyTheme(theme);
   };
   query.addEventListener("change", onSystemChange);
+  // The setting may have changed between the head script and this
+  // subscription (while the page hydrated); catch up with it now.
+  onSystemChange();
 
   return () => {
     window.removeEventListener(THEME_EVENT, onChange);
