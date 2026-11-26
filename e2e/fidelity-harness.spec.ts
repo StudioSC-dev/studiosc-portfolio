@@ -38,6 +38,7 @@ import {
   readSpec,
   runtimeCopies,
   sha256,
+  stableJson,
   stateName,
   unpackSpec,
   walk,
@@ -2574,6 +2575,13 @@ test.describe("fidelity harness", () => {
     const affected = affectedBoards(base, head);
     expect(affected.length).toBeGreaterThan(0);
     const changed = changedCaptures(base, head);
+    // A field the unpacking would drop, on a changed D9 capture, is caught.
+    const headText = git(["show", `${range!.head}:docs/boards/spec.json`]);
+    const [first] = affected;
+    const extra = repacked(headText, first, (b) => {
+      b.captures[changed[first][0]].extra = true;
+    });
+    expect(() => specOf(extra, "mutation")).toThrow(/canonical/);
     // Committed: every capture whose plan is unchanged, and its reference
     // files, as at the base; only changed captures' references differ.
     const blobs = (sha: string) =>
@@ -2648,7 +2656,10 @@ test.describe("fidelity harness", () => {
         ]);
         expect(run.status, `${board}: ${run.stderr}`).toBe(0);
       }
-      const made = readSpec(path.join(work, "spec.json"));
+      const made = specOf(
+        readFileSync(path.join(work, "spec.json"), "utf8"),
+        "the regenerated tree"
+      );
       const fresh = snapshot(work);
       for (const board of affected)
         for (const k of changed[board]) {
@@ -2755,6 +2766,13 @@ test.describe("fidelity harness", () => {
       git(["ls-tree", "-r", sha, "--", refDir(board)]);
     const boards = Object.keys(head.manifest.boards).sort();
     expect(boards).toEqual(Object.keys(base.manifest.boards).sort());
+    // An unused table entry on an unaffected board is caught.
+    const unaffected = boards.find((b) => !affected.includes(b))!;
+    const headText = git(["show", `${range!.head}:docs/boards/spec.json`]);
+    const padded = repacked(headText, unaffected, (b) => {
+      b.table["0000000000000000"] = { unused: true };
+    });
+    expect(() => specOf(padded, "mutation")).toThrow(/canonical/);
     for (const board of boards.filter((b) => !affected.includes(b))) {
       const entry = JSON.stringify(head.spec.boards[board]);
       expect(entry, board).toBe(JSON.stringify(base.spec.boards[board]));
@@ -2813,7 +2831,7 @@ function inputsAt(sha: string | null): BoardInputs {
       deviations: parseDeviations(read("deviations.md")),
       merged: JSON.parse(read("merged.json")) as string[],
     },
-    spec: unpackSpec(read("spec.json")),
+    spec: specOf(read("spec.json"), sha ?? "the working tree"),
   };
 }
 
@@ -2911,6 +2929,36 @@ function sectionProblems(base: BoardInputs, head: BoardInputs): string[] {
   if (!isDeepStrictEqual(reset.sections, base.sections))
     problems.push("sections.json differs from the base beyond D9's selector");
   return problems;
+}
+
+/**
+ * A committed spec.json, unpacked for comparison once it is exactly its own
+ * canonical pack: an unknown field or an unused table entry, which unpacking
+ * would drop, fails here instead.
+ */
+function specOf(text: string, where: string): SpecFile {
+  const spec = unpackSpec(text);
+  if (packSpec(spec) !== text)
+    throw new Error(
+      `${where}: spec.json is not its canonical pack (a field or table entry unpacking would drop)`
+    );
+  return spec;
+}
+
+/** A spec.json text with one packed board changed in memory. */
+function repacked(
+  text: string,
+  board: string,
+  change: (packed: {
+    table: Record<string, unknown>;
+    captures: Record<string, Record<string, unknown>>;
+  }) => void
+): string {
+  const raw = JSON.parse(text) as {
+    boards: Record<string, Parameters<typeof change>[0]>;
+  };
+  change(raw.boards[board]);
+  return stableJson(raw, 4);
 }
 
 /** The boards directory with one board's source replaced, for a control. */
