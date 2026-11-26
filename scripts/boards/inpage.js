@@ -267,6 +267,15 @@
   // The view transition the page started last, while it runs: its
   // pseudo-elements and their animations exist only once it is ready.
   let transition = null;
+  /** The animations of a view transition's pseudo-elements, as it is ready. */
+  const noteTransition = () => {
+    for (const anim of document.getAnimations()) {
+      const effect = anim.effect;
+      const pseudo = (effect && effect.pseudoElement) || "";
+      if (!pseudo.startsWith("::view-transition")) continue;
+      record(anim, document.documentElement, pseudo, nameOf(anim));
+    }
+  };
   const startViewTransition = Document.prototype.startViewTransition;
   if (startViewTransition)
     Document.prototype.startViewTransition = function (...args) {
@@ -276,6 +285,9 @@
         if (transition === t) transition = null;
       };
       t.finished.then(done, done);
+      // Noted the moment they exist, so none (the UA's short group animation
+      // most of all) can finish before a sweep sees it.
+      t.ready.then(noteTransition, () => {});
       return t;
     };
 
@@ -614,6 +626,16 @@
     motionStart() {
       records.length = 0;
       recording = true;
+    },
+
+    /**
+     * Waits until a view transition the page has started is ready (or
+     * skipped): until then its animations do not exist, and the page keeps
+     * drawing frames, so no fixed wait covers it on a slow host.
+     */
+    async transitionReady() {
+      const t = transition;
+      if (t) await t.ready.catch(() => {});
     },
 
     /**

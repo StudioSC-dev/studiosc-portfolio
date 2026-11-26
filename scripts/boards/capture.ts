@@ -290,17 +290,26 @@ export async function load(page: Page, url: string, clock: string) {
   await frames(page, 3);
 }
 
-/** Lets the motions a step started begin, then takes them. */
+/**
+ * Lets the motions a step started begin, then takes them. A view transition
+ * the step started is waited for until it is ready, however long that takes.
+ */
 async function takeMotion(page: Page, rows: RowQuery[], sections: Sections) {
   await frames(page, 3);
   await page.waitForTimeout(60);
   return page.evaluate(
-    (spec) =>
-      (
+    async (spec) => {
+      const f = (
         window as unknown as {
-          __fidelity: { motionTake(s: unknown): unknown };
+          __fidelity: {
+            transitionReady(): Promise<void>;
+            motionTake(s: unknown): unknown;
+          };
         }
-      ).__fidelity.motionTake(spec),
+      ).__fidelity;
+      await f.transitionReady();
+      return f.motionTake(spec);
+    },
     { rows, keys: sections.keys }
   ) as Promise<Motion[]>;
 }

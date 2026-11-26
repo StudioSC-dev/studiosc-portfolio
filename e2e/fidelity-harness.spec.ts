@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -53,7 +54,9 @@ import {
   load,
   pickShot,
   rowQueries,
+  runSteps,
   shoot,
+  siteContext,
 } from "../scripts/boards/capture";
 import { runtimeBytes, runtimeSource } from "../scripts/boards-regen";
 import {
@@ -2274,8 +2277,181 @@ test.describe("fidelity harness", () => {
       expect(changed.length).toBeGreaterThan(0);
       expect(changed.filter((f) => !allowed.test(f))).toEqual([]);
     });
+
+    test("records theme-reveal motion under the reproduced timing condition", async ({
+      browser,
+    }) => {
+      chromiumOnly();
+      test.setTimeout(5 * 60_000);
+      const fx = fixture();
+      const only: Only = {
+        rows: ["fx/header"],
+        widths: ["1440"],
+        themes: ["dark"],
+        states: ["theme-reveal"],
+        rm: false,
+      };
+      const missed = [
+        "fx/header [theme-reveal, 1440, dark] motion page theme-reveal: expected grow@button[Switch to the dark theme] 560ms, got does not run",
+        "fx/header [theme-reveal, 1440, dark] motion page -ua-view-transition-group-anim-root: expected none 250ms, got does not run",
+      ];
+      const failures = async (site: typeof checkSite, js: string) => {
+        server.setDrift({ js });
+        try {
+          const result = await site({
+            dir: CANVAS,
+            baseURL: server.url,
+            browser,
+            only,
+          });
+          return result.failures.map(describeFailure);
+        } finally {
+          server.setDrift(null);
+        }
+      };
+
+      // The harness as PRV-22 merged it, before PRV-25's fix.
+      const old = tmp("fidelity-pre-fix-");
+      try {
+        const archive = spawnSync(
+          "git",
+          ["archive", "--format=tar", PRE_FIX, "scripts/boards"],
+          { cwd: ROOT, env: cleanEnv(), maxBuffer: 1 << 28 }
+        );
+        expect(archive.status).toBe(0);
+        const untar = spawnSync("tar", ["-x", "-C", old], {
+          input: archive.stdout,
+        });
+        expect(untar.status).toBe(0);
+        const preFix = createRequire(__filename)(
+          path.join(old, "scripts/boards/check.ts")
+        ) as { checkSite: typeof checkSite };
+        // The reveal is ready only after the fixed wait has run out: the
+        // pre-fix harness takes its record first and sees neither motion.
+        expect(await failures(preFix.checkSite, LATE_REVEAL)).toEqual(missed);
+      } finally {
+        rmSync(old, { recursive: true, force: true });
+      }
+
+      // The fixed harness, under the same condition: both motions, within
+      // the duration tolerance.
+      expect(await failures(checkSite, LATE_REVEAL)).toEqual([]);
+
+      // The fixed capture itself: the board's motions, and the reveal held
+      // at the in-flight point the verifier's shot is taken at.
+      const motion =
+        fx.spec.boards["fx-dark-desktop.dc.html"].captures["dark/theme-reveal"]
+          .motion;
+      const site = async (js: string) => {
+        const ctx = await siteContext(browser, fx.sections, server.url, {
+          width: "1440",
+          reducedMotion: false,
+        });
+        const page = await ctx.newPage();
+        server.setDrift({ js });
+        try {
+          await load(page, "/", fx.sections.clock);
+        } finally {
+          server.setDrift(null);
+        }
+        return { ctx, page };
+      };
+      const late = await site(LATE_REVEAL);
+      try {
+        const capture = await captureState(
+          late.page,
+          fx.sections,
+          rowQueries(
+            fx.sections.rows.filter((r) => r.built),
+            fx.sections.rows,
+            "site"
+          ),
+          { state: "theme-reveal", theme: "dark", toggle: true },
+          "site"
+        );
+        expect(capture.motion).toEqual(motion);
+        expect(capture.frame).toEqual({
+          at: IN_FLIGHT_AT,
+          viewport: [0, 0, 1440, 900],
+        });
+        const held = await late.page.evaluate(() =>
+          document
+            .getAnimations()
+            .filter((a) => a.playState !== "finished")
+            .map((a) => {
+              const t = a.effect!.getComputedTiming();
+              return {
+                name: (a as CSSAnimation).animationName,
+                state: a.playState,
+                at: Number(t.localTime) / Number(t.activeDuration),
+              };
+            })
+        );
+        expect(held).toEqual([
+          {
+            name: "-ua-view-transition-group-anim-root",
+            state: "paused",
+            at: IN_FLIGHT_AT,
+          },
+          { name: "theme-reveal", state: "paused", at: IN_FLIGHT_AT },
+        ]);
+      } finally {
+        await late.ctx.close();
+      }
+
+      // A page whose reveal really does not run still fails: no view
+      // transition, the theme toggle still switching the theme.
+      const still = await site(NO_VIEW_TRANSITION);
+      try {
+        await runSteps(still.page, fx.sections.theme.light);
+        const theme = await still.page.evaluate(
+          () => document.documentElement.dataset.theme
+        );
+        expect(theme).toBe("dark");
+      } finally {
+        await still.ctx.close();
+      }
+      const none = await failures(checkSite, NO_VIEW_TRANSITION);
+      expect(none).toEqual(expect.arrayContaining(missed));
+    });
   });
 });
+
+/** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
+const PRE_FIX = "f0f08ab405cad5a5acf45f9a8e8e8f63b7485f56";
+
+/**
+ * PRV-25's timing condition, injected into the fixture site: the page's
+ * second view transition (the dark row's reveal, after the toggle into dark)
+ * holds its DOM update until the harness next calls its recorder, so the
+ * reveal is ready only after the harness's fixed wait has run out, however
+ * fast the host is. Chromium keeps running frames while a transition's
+ * update is pending, so the wait of three frames and 60 ms runs out just as
+ * it does when a loaded host makes the reveal late.
+ */
+const LATE_REVEAL = `(() => {
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  Document.prototype.startViewTransition = function (update) {
+    if (++n !== 2) return start.call(this, update);
+    const f = window.__fidelity;
+    const calls = ["transitionReady", "motionTake"].filter((k) => k in f);
+    const own = Object.fromEntries(calls.map((k) => [k, f[k]]));
+    let release;
+    const held = new Promise((r) => (release = r));
+    for (const k of calls)
+      f[k] = function (...args) {
+        Object.assign(f, own);
+        release();
+        return own[k].apply(this, args);
+      };
+    return start.call(this, () => held.then(update));
+  };
+})();`;
+
+/** No view transition at all: the toggle switches the theme in one step. */
+const NO_VIEW_TRANSITION =
+  'Object.defineProperty(document, "startViewTransition", { value: undefined });';
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
