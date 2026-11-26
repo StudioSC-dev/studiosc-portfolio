@@ -1,5 +1,8 @@
 import type { FragmentId } from "@/content/range";
 import { centralCommand } from "./central-command";
+import { portfolioSite } from "./portfolio-site";
+import { routeChecks } from "./route-checks";
+import { tallyandtrace } from "./tallyandtrace";
 import type { Fragment } from "./types";
 
 /**
@@ -8,4 +11,7 @@ import type { Fragment } from "./types";
  */
 export const FRAGMENTS: Partial<Record<FragmentId, Fragment>> = {
   "central-command": centralCommand,
+  tallyandtrace,
+  "portfolio-site": portfolioSite,
+  "route-checks": routeChecks,
 };

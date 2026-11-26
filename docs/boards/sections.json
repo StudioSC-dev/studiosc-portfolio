@@ -935,7 +935,7 @@
       "section": "plate-finance-interior",
       "route": "/preview/home",
       "ticket": "PRV-6",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Finance,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-finance-interior\"]",
       "sources": {
@@ -1260,7 +1260,7 @@
       "section": "plate-sites-interior",
       "route": "/preview/home",
       "ticket": "PRV-6",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Sites,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-sites-interior\"]",
       "sources": {
@@ -1342,7 +1342,7 @@
       "section": "plate-testing-interior",
       "route": "/preview/home",
       "ticket": "PRV-6",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Testing,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-testing-interior\"]",
       "sources": {

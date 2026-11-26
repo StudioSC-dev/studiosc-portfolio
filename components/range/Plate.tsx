@@ -15,9 +15,11 @@ export function LabTag() {
 export function ChristineLine({
   check,
   phone,
+  section,
 }: {
   check: ChristineCheck;
   phone?: boolean;
+  section?: string;
 }) {
   const mark = (
     <svg
@@ -45,12 +47,18 @@ export function ChristineLine({
     </p>
   );
   return phone ? (
-    <div className="mt-4 flex flex-col items-center gap-2 border-t border-rule pt-4 text-[0.8125rem] leading-5">
+    <div
+      data-board-section={section}
+      className="mt-4 flex flex-col items-center gap-2 border-t border-rule pt-4 text-[0.8125rem] leading-5"
+    >
       {mark}
       {text}
     </div>
   ) : (
-    <div className="col-span-full flex items-center gap-3 border-t border-rule pt-4 text-[0.875rem] leading-[1.375rem]">
+    <div
+      data-board-section={section}
+      className="col-span-full flex items-center gap-3 border-t border-rule pt-4 text-[0.875rem] leading-[1.375rem]"
+    >
       {mark}
       {text}
     </div>
@@ -58,8 +66,18 @@ export function ChristineLine({
 }
 
 /** The credit line. The names are plain text until PRV-8 links them. */
-function Credit({ className }: { className: string }) {
-  return <p className={className}>Built by Seth · Tested by Christine</p>;
+function Credit({
+  className,
+  section,
+}: {
+  className: string;
+  section?: string;
+}) {
+  return (
+    <p data-board-section={section} className={className}>
+      Built by Seth · Tested by Christine
+    </p>
+  );
 }
 
 const LINK =
@@ -69,13 +87,18 @@ function Facts({
   facts,
   className,
   first,
+  section,
 }: {
   facts: { label: string; value: string }[];
   className: string;
   first: string;
+  section?: string;
 }) {
   return (
-    <dl className={`grid text-[0.9375rem] leading-6 ${first} ${className}`}>
+    <dl
+      data-board-section={section}
+      className={`grid text-[0.9375rem] leading-6 ${first} ${className}`}
+    >
       {facts.map((fact, i) => {
         const last = i === facts.length - 1 ? "border-b" : "";
         return (
@@ -98,12 +121,15 @@ function Facts({
 function Links({
   links,
   className,
+  section,
 }: {
   links: { label: string; href: string }[];
   className: string;
+  section?: string;
 }) {
   return (
     <p
+      data-board-section={section}
       className={`flex flex-wrap gap-x-6 gap-y-2 text-[0.9375rem] leading-6 font-semibold ${className}`}
     >
       {links.map((link) => (
@@ -151,49 +177,74 @@ export function Plate({
     );
   }
 
+  // The interior is every part but the title: the fidelity suite compares it
+  // as its own row, once the category's fragment is built.
+  const section = ["finance", "sites", "testing"].includes(category.id)
+    ? `home/plate-${category.id}-interior`
+    : undefined;
   const phoneFacts = plate.facts.filter((fact) => fact.label !== "Started");
   return (
     <>
       <div className="hidden md:grid md:grid-cols-[19rem_minmax(0,1fr)] md:gap-x-12 md:gap-y-8">
         <div className="flex flex-col">
           {title}
-          <p className="mt-3">{plate.desktopDescription}</p>
+          <p data-board-section={section} className="mt-3">
+            {plate.desktopDescription}
+          </p>
           <Facts
             facts={plate.facts}
             first="grid-cols-[6.5rem_minmax(0,1fr)]"
             className="mt-6"
+            section={section}
           />
-          <Credit className="mt-5 text-[0.9375rem] leading-6" />
-          <Links links={plate.links} className="mt-5" />
+          <Credit
+            className="mt-5 text-[0.9375rem] leading-6"
+            section={section}
+          />
+          <Links links={plate.links} className="mt-5" section={section} />
         </div>
-        <figure className="min-w-0">
+        <figure data-board-section={section} className="min-w-0">
           <fragment.Desktop />
           <figcaption className="mt-3 text-[0.8125rem] leading-5 text-muted">
             {fragment.caption}
           </figcaption>
         </figure>
-        {plate.christineCheck && <ChristineLine check={plate.christineCheck} />}
+        {plate.christineCheck && (
+          <ChristineLine check={plate.christineCheck} section={section} />
+        )}
       </div>
       <div className="md:hidden">
         {title}
-        <p className="mt-2 text-[0.9375rem] leading-6">
+        <p
+          data-board-section={section}
+          className="mt-2 text-[0.9375rem] leading-6"
+        >
           {plate.phoneDescription}
         </p>
-        <figure className="mt-4">
+        <figure data-board-section={section} className="mt-4">
           <fragment.Phone />
-          <figcaption className="mt-2.5 text-[0.8125rem] leading-5 text-muted">
+          <figcaption
+            className={`${fragment.phoneCaptionGap ?? "mt-2.5"} text-[0.8125rem] leading-5 text-muted`}
+          >
             {fragment.phoneCaption}
           </figcaption>
         </figure>
-        <Facts
-          facts={phoneFacts}
-          first="grid-cols-[5.5rem_minmax(0,1fr)]"
-          className="mt-4 text-left"
+        {fragment.phoneFacts !== false && (
+          <Facts
+            facts={phoneFacts}
+            first="grid-cols-[5.5rem_minmax(0,1fr)]"
+            className="mt-4 text-left"
+            section={section}
+          />
+        )}
+        <Credit className="mt-4 text-[0.9375rem] leading-6" section={section} />
+        <Links
+          links={plate.links}
+          className="mt-4 justify-center"
+          section={section}
         />
-        <Credit className="mt-4 text-[0.9375rem] leading-6" />
-        <Links links={plate.links} className="mt-4 justify-center" />
         {plate.christineCheck && (
-          <ChristineLine check={plate.christineCheck} phone />
+          <ChristineLine check={plate.christineCheck} phone section={section} />
         )}
       </div>
     </>

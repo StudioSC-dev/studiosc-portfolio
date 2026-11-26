@@ -123,6 +123,13 @@ export const RANGE_CATEGORIES: RangeCategory[] = [
         { label: "Read the case study", href: "/work/tallyandtrace" },
         { label: "Open the app", href: "https://tallyandtrace.studiosc.dev" },
       ],
+      christineCheck: {
+        repo: "StudioSC-dev/tally-and-trace",
+        path: "frontend/e2e/amounts.spec.ts",
+        test: "amount styling preserves transaction layout",
+        sha: "8d6a4d45c405d13926192ca3aa6828dcbd9b4ab2",
+        text: "Amounts keep one right edge on desktop and phone.",
+      },
     },
   },
   {
@@ -214,6 +221,13 @@ export const RANGE_CATEGORIES: RangeCategory[] = [
           href: "https://github.com/StudioSC-dev/studiosc-portfolio",
         },
       ],
+      christineCheck: {
+        repo: "StudioSC-dev/studiosc-portfolio",
+        path: "e2e/guards.spec.ts",
+        test: "every route renders without a console error",
+        sha: "2473f216fb51a6598b5492e6dd0fdc07bc0254e8",
+        text: "Every route renders without a console error at both widths it is tested at.",
+      },
     },
   },
 ];

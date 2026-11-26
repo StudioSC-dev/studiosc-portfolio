@@ -79,11 +79,11 @@ function PeekContent({ shown }: { shown: Shown }) {
           <LabTag />
         </p>
       ) : (
-        status &&
+        (fragment?.peekStatus ?? status) &&
         fragment && (
           <>
             <p className="mt-1 text-[0.8125rem] leading-5 text-muted">
-              {status}
+              {fragment.peekStatus ?? status}
             </p>
             <div className="mt-5 opacity-75">
               <fragment.Peek />

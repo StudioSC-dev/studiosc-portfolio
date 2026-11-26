@@ -12,4 +12,10 @@ export interface Fragment {
   caption: string;
   /** The figure caption at 390. */
   phoneCaption: string;
+  /** The peek's status line where it differs from the project's status. */
+  peekStatus?: string;
+  /** Whether the 390 plate lists the facts under the figure (default true). */
+  phoneFacts?: boolean;
+  /** The gap above the 390 caption, as a Tailwind class (default mt-2.5). */
+  phoneCaptionGap?: string;
 }
