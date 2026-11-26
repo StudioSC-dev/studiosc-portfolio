@@ -1,4 +1,3 @@
-PRV-6
 # Tally & Trace, Sites and Testing plates
 
 **Planned:** Sonnet, M, wave 3
