@@ -1648,10 +1648,14 @@ test.describe("chrome", () => {
     // not a hyperlink. The one post URL is PRV-16's: allowed while it exists,
     // and gone once PRV-16 has merged.
     const url = /(?:\bhttps?:)?\/\/[^\s"'`<>(){}\\]+/gi;
+    // A fully qualified name ("instagram.com.") is the same host.
+    const instagramHost = (hostname: string) => {
+      const host = hostname.toLowerCase().replace(/\.+$/, "");
+      return host === "instagram.com" || host.endsWith(".instagram.com");
+    };
     const instagram = (href: string) => {
       try {
-        const host = new URL(href, "https://example.invalid").hostname;
-        return host === "instagram.com" || host.endsWith(".instagram.com");
+        return instagramHost(new URL(href, "https://example.invalid").hostname);
       } catch {
         return false;
       }
@@ -1681,6 +1685,7 @@ test.describe("chrome", () => {
       '<a href="https://instagram.com/x">',
       '<a href="//www.instagram.com/studiosc">',
       '<a href="https://cdn.instagram.com/y">',
+      '<a href="https://www.instagram.com./p/x/">',
       '<a href="https://notinstagram.com/z">',
       '<a href="https://example.com/?u=instagram.com">',
       "// a comment, not a link",
@@ -1691,9 +1696,18 @@ test.describe("chrome", () => {
       "https://instagram.com/x",
       "//www.instagram.com/studiosc",
       "https://cdn.instagram.com/y",
+      "https://www.instagram.com./p/x/",
     ]);
 
-    // And on the pages the chrome appears on, no rendered link goes there.
+    // And on the pages the chrome appears on, no rendered link goes there,
+    // judged by the browser's own reading of the host, dot and all.
+    await open(page, "/");
+    expect(
+      await page.evaluate(
+        () => new URL("https://www.instagram.com./p/x/").hostname
+      )
+    ).toBe("www.instagram.com.");
+    expect(instagramHost("www.instagram.com.")).toBe(true);
     for (const route of ["/", "/work", "/blog", "/about", "/contact"]) {
       await open(page, route);
       const hosts = await page
@@ -1703,12 +1717,7 @@ test.describe("chrome", () => {
             (a) => new URL(a.getAttribute("href")!, location.href).hostname
           )
         );
-      expect(
-        hosts.filter(
-          (h) => h === "instagram.com" || h.endsWith(".instagram.com")
-        ),
-        route
-      ).toEqual([]);
+      expect(hosts.filter(instagramHost), route).toEqual([]);
     }
   });
 });
