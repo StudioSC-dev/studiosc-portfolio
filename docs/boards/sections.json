@@ -689,7 +689,7 @@
           "ticket": "PRV-10",
           "hide": [
             {
-              "selector": "a[href=\"/seth\"], a[href=\"/christine\"]",
+              "selector": "li:has(> a[href=\"/seth\"]), li:has(> a[href=\"/christine\"])",
               "mode": "remove"
             }
           ]

@@ -22,6 +22,7 @@ import {
 } from "@playwright/test";
 import { checkSite, pairName, type Only } from "../scripts/boards/check";
 import {
+  TOLERANCE,
   describe as describeFailure,
   type Failure,
 } from "../scripts/boards/compare";
@@ -36,11 +37,20 @@ import {
   readSpec,
   runtimeCopies,
   sha256,
+  stateName,
+  unpackSpec,
   walk,
   type BoardsDir,
+  type Capture,
   type Deviation,
+  type KeyMeasure,
   type Manifest,
+  type Row,
+  type RowMeasure,
   type Sections,
+  type SpecFile,
+  type Theme,
+  type Width,
 } from "../scripts/boards/model";
 import { checkImage, isImageCandidate } from "../scripts/image-metadata";
 import {
@@ -63,7 +73,15 @@ import {
   type FixtureServer,
 } from "./fixtures/fidelity/server";
 import { DRIFTS } from "./fixtures/fidelity/drifts";
-import { boardThemes, plannedCaptures } from "../scripts/boards/plan";
+import {
+  boardThemes,
+  hiddenFor,
+  plannedCaptures,
+  type BoardTheme,
+  type Hide,
+  type PlannedCapture,
+  type Register,
+} from "../scripts/boards/plan";
 import { scanText, isBinary } from "./support/denylist";
 import { exifGpsSegment, jpegWithSegment } from "./support/dirty-images";
 import {
@@ -73,6 +91,7 @@ import {
   git,
   prRange,
   treeFiles,
+  type PrRange,
 } from "./support/git";
 import { throwawayRepo } from "./support/throwaway";
 
@@ -2275,7 +2294,336 @@ test.describe("fidelity harness", () => {
       expect(changed.filter((f) => !allowed.test(f))).toEqual([]);
     });
   });
+
+  test("hidden header links leave no gap", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    test.setTimeout(40 * 60_000);
+    const inputs = inputsAt(null);
+    const d9 = inputs.register.deviations.find((d) => d.id === "D9")!;
+    test.skip(inputs.register.merged.includes(d9.expires!), "D9 has expired");
+    expect(d9.section).toEqual(["chrome/header"]);
+    const row = inputs.sections.rows.find((r) => r.id === "chrome/header")!;
+    /** The header's rendered nav links and its rendered empty list items. */
+    const nav = (page: Page) =>
+      page.evaluate((scope) => {
+        const shown = (el: Element) => el.getClientRects().length > 0;
+        const items = [...document.querySelectorAll(`:is(${scope}) li`)].filter(
+          shown
+        );
+        return {
+          links: [...document.querySelectorAll(`:is(${scope}) nav a`)]
+            .filter(shown)
+            .map((a) => (a.textContent ?? "").trim()),
+          empty: items.filter(
+            (li) => ![...li.querySelectorAll("*")].some(shown)
+          ).length,
+        };
+      }, row.board);
+    const browser = await chromium.launch({ args: RASTER_ARGS });
+    const dirs: string[] = [];
+    try {
+      let checked = 0;
+      for (const width of d9.width as Width[])
+        for (const theme of d9.theme as Theme[]) {
+          const board = row.sources[width]![theme].board;
+          const bt = boardThemes(inputs.sections, board, width).find(
+            (b) => b.theme === theme
+          )!;
+          const plans = plannedCaptures(inputs.sections, bt, inputs.register);
+          const partial = plans.filter((p) => p.pending.includes("D9"));
+          const states = partial.map((p) => stateName(p.state, { rm: p.rm }));
+          const listed = [...d9.state].sort();
+          expect(states.sort(), `${board} ${theme}`).toEqual(listed);
+          // The control: the same board with the Seth and Christine list
+          // items left out of its source. The phone header draws neither.
+          const html = readFileSync(path.join(BOARDS, board), "utf8");
+          const items =
+            /\s*<li><a href="\/(?:seth|christine)"[^>]*>[^<]*<\/a><\/li>/g;
+          const found = html.match(items)?.length ?? 0;
+          expect(found, board).toBe(width === "1440" ? 2 : 0);
+          const control = boardsWith(board, html.replace(items, ""));
+          dirs.push(control);
+          for (const plan of partial) {
+            const at = `${board} ${plan.key}`;
+            const d9Hides = hidesOf(inputs, [row], plan, bt, "D9");
+            expect(d9Hides.length, at).toBe(1);
+            const rendered = await renderPlan(
+              browser,
+              BOARDS,
+              inputs,
+              runtime!,
+              board,
+              bt,
+              plan,
+              plan.hide,
+              nav
+            );
+            const ref =
+              inputs.spec.boards[board].captures[plan.key].rows[row.id]!;
+            const made = rendered.capture.rows[row.id]!;
+            // The rendered header is the one the partial reference holds.
+            expect(keyBoxes(made), at).toEqual(keyBoxes(ref));
+            expect(rendered.seen.empty, at).toBe(0);
+            const others = plan.hide.filter(
+              (h) => !d9Hides.includes(h.selector)
+            );
+            const ctl = await renderPlan(
+              browser,
+              control,
+              inputs,
+              runtime!,
+              board,
+              bt,
+              plan,
+              others,
+              nav
+            );
+            const clean = ctl.capture.rows[row.id]!;
+            expect(ctl.seen.empty, at).toBe(0);
+            if (width === "1440") {
+              const want = ["Work", "Writing", "Start a project"];
+              expect(rendered.seen.links, at).toEqual(want);
+              expect(ctl.seen.links, at).toEqual(want);
+              const work = ref.keys.find((k) => k.label === "Work")!;
+              const cleanWork = clean.keys.find((k) => k.label === "Work")!;
+              const dx = Math.abs(work.box[0] - cleanWork.box[0]);
+              expect(dx, at).toBeLessThanOrEqual(TOLERANCE.key);
+            } else {
+              // Theme toggle, wordmark and Menu button, as the unmodified header.
+              const labels = ref.keys.map((k) => k.label);
+              expect(labels.slice(1), at).toEqual(["StudioSC, home", "Menu"]);
+              const toggle = /^Switch to the (light|dark) theme$/;
+              expect(labels[0], at).toMatch(toggle);
+              const cleanLabels = clean.keys.map((k) => k.label);
+              expect(cleanLabels, at).toEqual(labels);
+              for (const [i, k] of ref.keys.entries()) {
+                const drift = keyDrift(k, clean.keys[i]);
+                expect(drift, `${at} ${k.label}`).toEqual([]);
+              }
+            }
+            checked++;
+          }
+        }
+      const cases = d9.width.length * d9.theme.length * d9.state.length;
+      expect(checked).toBe(cases);
+    } finally {
+      await browser.close();
+      for (const d of dirs) rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  test("regenerates the affected board references exactly", async () => {
+    chromiumOnly();
+    const runtime = pinnedRuntime();
+    test.skip(!runtime, NO_RUNTIME);
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    test.setTimeout(60 * 60_000);
+    const base = inputsAt(forkOf(range!));
+    const affected = affectedBoards(base, inputsAt(range!.head));
+    expect(affected.length).toBeGreaterThan(0);
+    // The committed tree's boards, regenerated for the affected boards from
+    // scratch with the pinned runtime, equal the committed outputs.
+    const dir = tmp("fidelity-prv27-");
+    try {
+      const archive = spawnSync(
+        "git",
+        ["archive", "--format=tar", range!.head, "docs/boards"],
+        { cwd: ROOT, env: cleanEnv(), maxBuffer: 1 << 30 }
+      );
+      expect(archive.status).toBe(0);
+      const untar = spawnSync("tar", ["-x", "-C", dir], {
+        input: archive.stdout,
+      });
+      expect(untar.status).toBe(0);
+      const work = path.join(dir, "docs/boards");
+      const committed = snapshot(work);
+      for (const board of affected)
+        rmSync(path.join(work, "ref", board.replace(/\.dc\.html$/, "")), {
+          recursive: true,
+          force: true,
+        });
+      const cache = runtimeCache();
+      const args = affected.flatMap((b) => ["--board", b]);
+      const run = await regen(work, { BOARDS_CACHE: cache }, args);
+      expect(run.status, run.stderr).toBe(0);
+      expect(snapshot(work)).toEqual(committed);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
+
+/** PRV-27's ticket: its PR-boundary checks run on the PR that adds it. */
+const PRV27_TICKET = "docs/tickets/PRV-27.md";
+const PRV27_ONLY = "PRV-27's checks run on the PR that adds its ticket";
+const NO_RUNTIME =
+  "needs the pinned canvas runtime in .cache/boards/ (run locally; CI has none)";
+
+/** Where a PR forked from its base: what it changed is judged from here. */
+const forkOf = (range: PrRange) =>
+  git(["merge-base", range.base, range.head]).trim();
+
+/** The gitignored runtime cache regen reads. */
+const runtimeCache = () =>
+  path.resolve(ROOT, process.env.BOARDS_CACHE || ".cache/boards");
+
+/**
+ * The pinned canvas runtime from the gitignored cache, or null when the
+ * cache has none. A cached runtime that is not the pinned bytes fails.
+ */
+function pinnedRuntime(): Buffer | null {
+  const file = path.join(runtimeCache(), "support.js");
+  if (!existsSync(file)) return null;
+  const bytes = readFileSync(file);
+  const pinned = readJson<Manifest>(path.join(BOARDS, "manifest.json"));
+  expect(sha256(bytes), file).toBe(pinned.runtime.sha256);
+  return bytes;
+}
+
+interface BoardInputs {
+  manifest: Manifest;
+  sections: Sections;
+  register: Register;
+  spec: SpecFile;
+}
+
+/** The board inputs in the working tree (sha null) or at a commit. */
+function inputsAt(sha: string | null): BoardInputs {
+  const read = (f: string) =>
+    sha
+      ? git(["show", `${sha}:docs/boards/${f}`])
+      : readFileSync(path.join(BOARDS, f), "utf8");
+  return {
+    manifest: JSON.parse(read("manifest.json")) as Manifest,
+    sections: JSON.parse(read("sections.json")) as Sections,
+    register: {
+      deviations: parseDeviations(read("deviations.md")),
+      merged: JSON.parse(read("merged.json")) as string[],
+    },
+    spec: unpackSpec(read("spec.json")),
+  };
+}
+
+/**
+ * Every board's capture plan (its rows, themes, states, partial builds and
+ * hide selectors, and the rows it is the undrawn evidence for), as text.
+ */
+function capturePlans(inputs: BoardInputs): Record<string, string> {
+  const { manifest, sections, register } = inputs;
+  const out: Record<string, string> = {};
+  for (const [board, pin] of Object.entries(manifest.boards)) {
+    const evidence = sections.rows
+      .filter((r) => r.undrawn?.[pin.width] === board)
+      .map((r) => r.id);
+    const themes = boardThemes(sections, board, pin.width).map((bt) => ({
+      theme: bt.theme,
+      toggle: bt.toggle,
+      rows: bt.rows.map((r) => r.id),
+      captures: plannedCaptures(sections, bt, register),
+    }));
+    out[board] = JSON.stringify({ evidence, themes });
+  }
+  return out;
+}
+
+/** The boards whose capture plans differ between two sets of inputs. */
+function affectedBoards(base: BoardInputs, head: BoardInputs): string[] {
+  const a = capturePlans(base);
+  const b = capturePlans(head);
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .filter((board) => a[board] !== b[board])
+    .sort();
+}
+
+/** The boards directory with one board's source replaced, for a control. */
+function boardsWith(board: string, source: string): string {
+  const dir = tmp("fidelity-control-");
+  for (const f of readdirSync(BOARDS))
+    if (f !== "ref" && f !== board)
+      symlinkSync(path.join(BOARDS, f), path.join(dir, f));
+  writeFileSync(path.join(dir, board), source);
+  return dir;
+}
+
+/**
+ * One planned capture rendered as regen renders it, from `dir`, with the
+ * given hides; `inspect` reads the page once the state is measured.
+ */
+async function renderPlan<T>(
+  browser: Browser,
+  dir: string,
+  inputs: BoardInputs,
+  runtime: Buffer,
+  board: string,
+  bt: BoardTheme,
+  plan: PlannedCapture,
+  hide: Hide[],
+  inspect: (page: Page) => Promise<T>
+): Promise<{ capture: Capture; seen: T }> {
+  const { manifest, sections } = inputs;
+  const evidence = sections.rows.filter(
+    (r) => r.undrawn?.[bt.width] === board && !bt.rows.includes(r)
+  );
+  const queries = rowQueries([...bt.rows, ...evidence], sections.rows, "board");
+  const refused: string[] = [];
+  const ctx = await boardContext(
+    browser,
+    sections,
+    dir,
+    manifest,
+    runtime,
+    { width: bt.width, reducedMotion: plan.rm },
+    refused
+  );
+  try {
+    const page = await ctx.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await load(page, `${BOARD_ORIGIN}/${board}`, sections.clock);
+    const capture = await captureState(
+      page,
+      sections,
+      queries,
+      { state: plan.state, theme: bt.theme, toggle: bt.toggle },
+      "board",
+      { hide, allMotion: plan.rm }
+    );
+    const seen = await inspect(page);
+    expect(errors, `${board} ${plan.key}`).toEqual([]);
+    expect(refused, `${board} ${plan.key}`).toEqual([]);
+    return { capture, seen };
+  } finally {
+    await ctx.close();
+  }
+}
+
+/** The hides a plan applies for one deviation's entries, on these rows. */
+function hidesOf(
+  inputs: BoardInputs,
+  rows: Row[],
+  plan: PlannedCapture,
+  where: { width: string; theme: string },
+  id: string
+): string[] {
+  const { deviations, merged } = inputs.register;
+  const state = stateName(plan.state, { rm: plan.rm });
+  return hiddenFor(deviations, merged, rows, { ...where, state }, [id]).map(
+    (h) => h.selector
+  );
+}
+
+/** The key boxes of a row measure, by label, one line per key. */
+const keyBoxes = (row: RowMeasure) =>
+  row.keys.map((k) => `${k.key} ${k.label} ${k.box.join(",")}`);
+
+/** The axes on which two key boxes differ by more than the key tolerance. */
+const keyDrift = (a: KeyMeasure, b: KeyMeasure) =>
+  (["x", "y", "width", "height"] as const).filter(
+    (_, i) => Math.abs(a.box[i] - b.box[i]) > TOLERANCE.key
+  );
