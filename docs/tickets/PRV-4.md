@@ -103,3 +103,4 @@
 ## Known gaps
 
 - AC12 allows any edit inside its permitted paths: the PR diff auditor should check allowed paths change only scoped behaviour (no root metadata, analytics or unrelated shared component edits), `sections.json` changes only PRV-4's built flags and `merged.json` only adds PRV-4.
+- AC12 allows outer-wrapper edits only in the three home files, but AC1's single left edge on `/work` needs that page's own outer wrapper to move as well. The scope test therefore also allows exactly one line in `app/work/page.tsx`: the wrapper directly inside `return (`, changing only its alignment classes (`px-*`, `max-w-*`, `mx-auto`, `box-content`).

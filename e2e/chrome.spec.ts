@@ -448,34 +448,195 @@ const CALLERS = [
   "app/page.tsx",
 ];
 
-/**
- * What a change in a caller may be about: a changed primitive (its import,
- * its call, the removed `label` eyebrow and `size`), or the removed export.
- */
-const CALLER_HUNK =
-  /StatusBadge|StatusText|CtaLink|PageHeader|^\s*label="|INSTAGRAM|Sized `sm`/m;
+/** The primitives PRV-4 changed, and the export it removed. */
+const NAMES_PRIMITIVE =
+  /\b(?:StatusBadge|StatusText|CtaLink|PageHeader|INSTAGRAM)\b/;
+const PRIMITIVE_TAG = /<(StatusBadge|StatusText|CtaLink|PageHeader)\b/g;
 
-/** An outer content wrapper, moved onto the shared left edge. */
-const WRAPPER_LINE = /^\s*<(?:section|div) className="[^"]*">\s*$/;
+/** Text a caller line may lose and otherwise stay the same: CtaLink's size. */
+const DROPPED = [/ size="sm"/g, / Sized `sm` to fit a three-column card\./g];
+
+/** A bare wrapper that only held a replaced primitive. */
+const PRIMITIVE_WRAPPER = /^\s*(?:<span\b[^>]*>|<\/span>|\{\w+ && \(|\)\})\s*$/;
+
+/** An outer content wrapper: one element with only a class list. */
+const WRAPPER_LINE = /^\s*<(section|div) className="([^"]*)">\s*$/;
+
+/** The classes that set the shared left edge (AC1). */
+const ALIGNMENT_CLASS = /^(?:md:)?(?:px-\S+|max-w-\S+|mx-auto|box-content)$/;
 
 /** The callers whose outer content wrappers may move to the shared edge. */
 const WRAPPER_FILES = [
   "components/home/Hero.tsx",
   "components/home/ProjectCard.tsx",
   "app/page.tsx",
-  // The /work wrapper carries the shared left edge AC1 asks for.
-  "app/work/page.tsx",
 ];
 
-/** A file's changed hunks, each as its removed and added lines. */
-function hunks(fork: string, head: string, file: string): string[][] {
-  const out: string[][] = [];
-  for (const line of git(["diff", "-U0", fork, head, "--", file]).split("\n")) {
-    if (line.startsWith("@@")) out.push([]);
-    else if (out.length && /^[+-](?![+-]{2} )/.test(line))
-      out[out.length - 1].push(line.slice(1));
+/**
+ * Outside AC12's list, a Known gap: AC1's one left edge needs the /work
+ * page's own outer wrapper too, so that one line, and only its alignment
+ * classes, may change.
+ */
+const WORK_PAGE = "app/work/page.tsx";
+
+/**
+ * The primitive element a line sits in, if any: from its opening `<Tag` to
+ * its `/>` or `</Tag>`.
+ */
+function enclosingPrimitive(lines: string[], at: number): string | null {
+  for (let j = at; j >= 0; j--) {
+    for (const m of [...lines[j].matchAll(PRIMITIVE_TAG)].reverse()) {
+      const end = elementEnd(lines, j, m.index, m[1]);
+      if (end >= at) return m[1];
+    }
+  }
+  return null;
+}
+
+/** The last line of the element whose `<Tag` starts at lines[line][col]. */
+function elementEnd(
+  lines: string[],
+  line: number,
+  col: number,
+  tag: string
+): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let l = line; l < lines.length; l++) {
+    const text = lines[l];
+    for (let c = l === line ? col + 1 : 0; c < text.length; c++) {
+      const ch = text[c];
+      if (quote) {
+        if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+      else if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+      else if (depth === 0 && ch === "/" && text[c + 1] === ">") return l;
+      else if (depth === 0 && ch === ">") {
+        const close = `</${tag}>`;
+        for (let m = l; m < lines.length; m++) {
+          const from = m === l ? c : 0;
+          if (lines[m].indexOf(close, from) >= 0) return m;
+        }
+        return lines.length - 1;
+      }
+    }
+  }
+  return lines.length - 1;
+}
+
+interface Hunk {
+  removed: { at: number; text: string }[];
+  added: { at: number; text: string }[];
+}
+
+/** A -U0 diff's hunks, with 0-based line numbers in each version. */
+function parseHunks(diff: string): Hunk[] {
+  const out: Hunk[] = [];
+  let r = 0;
+  let a = 0;
+  for (const line of diff.split("\n")) {
+    const head = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+    if (head) {
+      out.push({ removed: [], added: [] });
+      r = Number(head[1]) - 1;
+      a = Number(head[2]) - 1;
+    } else if (!out.length || /^(?:---|\+\+\+) /.test(line)) continue;
+    else if (line.startsWith("-"))
+      out[out.length - 1].removed.push({ at: r++, text: line.slice(1) });
+    else if (line.startsWith("+"))
+      out[out.length - 1].added.push({ at: a++, text: line.slice(1) });
   }
   return out;
+}
+
+/**
+ * The changed lines of a caller that no permitted edit explains (AC12): a
+ * line naming a changed primitive or the removed export; a line inside a
+ * replaced StatusBadge, StatusText or CtaLink call, or a bare wrapper that
+ * held one; a removed PageHeader `label` (the eyebrow); a line that only
+ * loses CtaLink's `size`; and, in the files allowed it, an outer wrapper that
+ * changes only its alignment classes.
+ */
+function strayCallerLines(
+  file: string,
+  fork: string,
+  head: string,
+  diff: string
+): string[] {
+  const before = fork.split("\n");
+  const after = head.split("\n");
+  const inCall = (lines: string[], at: number) => {
+    const tag = enclosingPrimitive(lines, at);
+    return tag !== null && tag !== "PageHeader";
+  };
+  const heldPrimitive = (lines: string[], at: number) =>
+    PRIMITIVE_WRAPPER.test(lines[at]) &&
+    [at - 1, at + 1].some(
+      (n) =>
+        n >= 0 &&
+        n < lines.length &&
+        (NAMES_PRIMITIVE.test(lines[n]) || inCall(lines, n))
+    );
+  const drop = (text: string) =>
+    DROPPED.reduce((t, pattern) => t.replace(pattern, ""), text);
+  const stray: string[] = [];
+  let workWrappers = 0;
+  for (const hunk of parseHunks(diff)) {
+    // Outer wrappers pair up in order: same element, alignment classes only.
+    const wrappers = (side: Hunk["removed"]) =>
+      side.filter((l) => WRAPPER_LINE.test(l.text));
+    const oldWrappers = wrappers(hunk.removed);
+    const newWrappers = wrappers(hunk.added);
+    const moved = new Set<string>();
+    oldWrappers.forEach((old, k) => {
+      const next = newWrappers[k];
+      if (!next || oldWrappers.length !== newWrappers.length) return;
+      const [, oldTag, oldClass] = WRAPPER_LINE.exec(old.text)!;
+      const [, newTag, newClass] = WRAPPER_LINE.exec(next.text)!;
+      const oldSet = new Set(oldClass.split(/\s+/));
+      const newSet = new Set(newClass.split(/\s+/));
+      const changed = [
+        ...[...oldSet].filter((c) => !newSet.has(c)),
+        ...[...newSet].filter((c) => !oldSet.has(c)),
+      ];
+      const allowed =
+        WRAPPER_FILES.includes(file) ||
+        (file === WORK_PAGE &&
+          /^\s*return \($/.test(after[next.at - 1] ?? "") &&
+          ++workWrappers === 1);
+      if (
+        allowed &&
+        oldTag === newTag &&
+        changed.every((c) => ALIGNMENT_CLASS.test(c))
+      ) {
+        moved.add(`-${old.at}`);
+        moved.add(`+${next.at}`);
+      }
+    });
+    for (const { at, text } of hunk.removed) {
+      const ok =
+        moved.has(`-${at}`) ||
+        NAMES_PRIMITIVE.test(text) ||
+        inCall(before, at) ||
+        heldPrimitive(before, at) ||
+        (enclosingPrimitive(before, at) === "PageHeader" &&
+          /^\s*label="[^"]*"\s*$/.test(text)) ||
+        hunk.added.some((l) => drop(text) === l.text && drop(text) !== text);
+      if (!ok) stray.push(`${file}: -${text.trim()}`);
+    }
+    for (const { at, text } of hunk.added) {
+      const ok =
+        moved.has(`+${at}`) ||
+        NAMES_PRIMITIVE.test(text) ||
+        inCall(after, at) ||
+        hunk.removed.some(
+          (l) => drop(l.text) === text && drop(l.text) !== l.text
+        );
+      if (!ok) stray.push(`${file}: +${text.trim()}`);
+    }
+  }
+  return stray;
 }
 
 const SPEC_FILE = "e2e/chrome.spec.ts";
@@ -1512,6 +1673,83 @@ test.describe("chrome", () => {
 test.describe("chrome", () => {
   test("changes stay within scope", async ({}, testInfo) => {
     chromiumOnly(testInfo.project.name);
+
+    // The caller check itself, on edits it must and must not allow.
+    const check = (
+      file: string,
+      fork: string[],
+      head: string[],
+      diff: string[]
+    ) =>
+      strayCallerLines(file, fork.join("\n"), head.join("\n"), diff.join("\n"));
+    const header = (title: string, label: boolean) => [
+      "      <PageHeader",
+      `        title="${title}"`,
+      ...(label ? ['        label="Writing"'] : []),
+      '        lead="A lead."',
+      "      />",
+    ];
+    // The eyebrow alone may go; a title edit beside it may not.
+    expect(
+      check("app/blog/page.tsx", header("Blog", true), header("Blog", false), [
+        "@@ -3 +2,0 @@",
+        '-        label="Writing"',
+      ])
+    ).toEqual([]);
+    expect(
+      check("app/blog/page.tsx", header("Blog", true), header("Notes", false), [
+        "@@ -2,2 +2 @@",
+        '-        title="Blog"',
+        '-        label="Writing"',
+        '+        title="Notes"',
+      ])
+    ).toEqual([
+      'app/blog/page.tsx: -title="Blog"',
+      'app/blog/page.tsx: +title="Notes"',
+    ]);
+    // /work may move its one outer wrapper's alignment, nothing else.
+    expect(
+      check(
+        WORK_PAGE,
+        [
+          "  return (",
+          '    <div className="mx-auto max-w-5xl px-6 py-16">',
+          '      <section className="mb-16">',
+        ],
+        [
+          "  return (",
+          '    <div className="mx-auto box-content max-w-page px-gutter-phone py-16 md:px-gutter">',
+          '      <section className="mb-16 px-gutter">',
+        ],
+        [
+          "@@ -2,2 +2,2 @@",
+          '-    <div className="mx-auto max-w-5xl px-6 py-16">',
+          '-      <section className="mb-16">',
+          '+    <div className="mx-auto box-content max-w-page px-gutter-phone py-16 md:px-gutter">',
+          '+      <section className="mb-16 px-gutter">',
+        ]
+      )
+    ).toEqual([
+      `${WORK_PAGE}: -<section className="mb-16">`,
+      `${WORK_PAGE}: +<section className="mb-16 px-gutter">`,
+    ]);
+    // A home wrapper may change alignment classes only.
+    expect(
+      check(
+        "components/home/Hero.tsx",
+        ['    <section className="px-6 py-24">'],
+        ['    <section className="px-gutter-phone py-10">'],
+        [
+          "@@ -1 +1 @@",
+          '-    <section className="px-6 py-24">',
+          '+    <section className="px-gutter-phone py-10">',
+        ]
+      )
+    ).toEqual([
+      'components/home/Hero.tsx: -<section className="px-6 py-24">',
+      'components/home/Hero.tsx: +<section className="px-gutter-phone py-10">',
+    ]);
+
     const own = ownPr();
     test.skip("skip" in own, "skip" in own ? own.skip : "");
     if (!("range" in own)) return;
@@ -1528,15 +1766,17 @@ test.describe("chrome", () => {
       )
     ).toEqual([]);
 
-    // Each hunk in a caller is about a changed primitive or the removed
-    // export, or (in the files allowed it) only moves an outer wrapper.
-    for (const file of changed.filter((f) => CALLERS.includes(f))) {
-      const stray = hunks(fork, head, file).filter((lines) => {
-        if (CALLER_HUNK.test(lines.join("\n"))) return false;
-        const wrapper = lines.every((l) => WRAPPER_LINE.test(l));
-        return !(wrapper && WRAPPER_FILES.includes(file));
-      });
-      expect(stray, file).toEqual([]);
-    }
+    // Each changed line in a caller is one of the permitted edits.
+    const stray = changed
+      .filter((f) => CALLERS.includes(f))
+      .flatMap((file) =>
+        strayCallerLines(
+          file,
+          git(["show", `${fork}:${file}`]),
+          git(["show", `${head}:${file}`]),
+          git(["diff", "-U0", fork, head, "--", file])
+        )
+      );
+    expect(stray).toEqual([]);
   });
 });
