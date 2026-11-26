@@ -9,6 +9,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
@@ -187,6 +188,65 @@ function renderMarkup(renders: Render[]): string[] {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** The esbuild that tsx (a dev dependency) runs on, for browser fixtures. */
+interface Bundler {
+  buildSync(options: Record<string, unknown>): {
+    outputFiles: { text: string }[];
+  };
+}
+const esbuild = (() => {
+  const fromRepo = createRequire(path.join(ROOT, "package.json"));
+  return createRequire(fromRepo.resolve("tsx/package.json"))(
+    "esbuild"
+  ) as Bundler;
+})();
+
+/**
+ * A live React fixture for FilterGroup, bundled for the browser: a caller
+ * that keeps the selection in state, as PRV-11 and PRV-14 will, and records
+ * every value the group reports in `window.__picks`.
+ */
+function filterFixture(): string {
+  const entry = [
+    'import { createElement, useState } from "react";',
+    'import { createRoot } from "react-dom/client";',
+    `import FilterGroup from ${JSON.stringify(path.join(ROOT, "components/ui/FilterGroup.tsx"))};`,
+    "const options = [",
+    '  { value: "all", label: "All" },',
+    '  { value: "live", label: "Live" },',
+    '  { value: "in-qa", label: "In QA" },',
+    "];",
+    "window.__picks = [];",
+    "function Caller() {",
+    '  const [selected, setSelected] = useState("all");',
+    "  return createElement(FilterGroup, {",
+    '    label: "Filter by status",',
+    "    options,",
+    "    selected,",
+    "    onSelect: (value) => {",
+    "      window.__picks.push(value);",
+    "      setSelected(value);",
+    "    },",
+    "  });",
+    "}",
+    'const host = document.createElement("div");',
+    'host.id = "filter-fixture";',
+    "document.body.appendChild(host);",
+    "createRoot(host).render(createElement(Caller));",
+  ].join("\n");
+  return esbuild.buildSync({
+    stdin: { contents: entry, resolveDir: ROOT, loader: "js" },
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    jsx: "automatic",
+    tsconfig: path.join(ROOT, "tsconfig.json"),
+    define: { "process.env.NODE_ENV": '"production"' },
+    logLevel: "silent",
+  }).outputFiles[0].text;
 }
 
 const PHONE = { width: 390, height: 844 };
@@ -739,6 +799,38 @@ test.describe("chrome", () => {
       );
       expect(radius).toBeGreaterThanOrEqual(b.height / 2);
     }
+
+    // Operable: in a live caller, a click or the keyboard reports the value,
+    // and the caller's new selection is the one pressed.
+    await open(page, "/no-such-page");
+    await page.addScriptTag({ content: filterFixture() });
+    const live = page
+      .locator("#filter-fixture")
+      .getByRole("group", { name: "Filter by status" });
+    const buttons = live.getByRole("button");
+    const pressed = () =>
+      buttons.evaluateAll((bs) =>
+        bs.map((b) => b.getAttribute("aria-pressed"))
+      );
+    const picks = () =>
+      page.evaluate(() => (window as unknown as { __picks: string[] }).__picks);
+    await expect.poll(pressed).toEqual(["true", "false", "false"]);
+    await live.getByRole("button", { name: "Live" }).click();
+    await expect.poll(pressed).toEqual(["false", "true", "false"]);
+    await expect(live.getByRole("button", { name: "Live" })).toHaveCSS(
+      "background-color",
+      ink
+    );
+    await live.getByRole("button", { name: "In QA" }).click();
+    await expect.poll(pressed).toEqual(["false", "false", "true"]);
+    await expect(live.getByRole("button", { name: "Live" })).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)"
+    );
+    await live.getByRole("button", { name: "All" }).focus();
+    await page.keyboard.press("Space");
+    await expect.poll(pressed).toEqual(["true", "false", "false"]);
+    expect(await picks()).toEqual(["live", "in-qa", "all"]);
 
     // The pages that use PageHeader show no eyebrow either.
     for (const route of ["/work", "/blog", "/about", "/contact"]) {
