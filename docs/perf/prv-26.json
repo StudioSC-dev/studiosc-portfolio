@@ -1,0 +1,35 @@
+{
+  "measured_sha": "7b6d53e047969908e4db9222dc9eaf3e208b3612",
+  "route": "/",
+  "lighthouse_version": "13.6.0",
+  "fragment_font_bytes": {
+    "IBM Plex Sans": 31644,
+    "Manrope": 24532
+  },
+  "runs": [
+    {
+      "perf": 86,
+      "a11y": 98,
+      "lcp_ms": 767.1,
+      "cls": 0
+    },
+    {
+      "perf": 100,
+      "a11y": 98,
+      "lcp_ms": 758.3,
+      "cls": 0
+    },
+    {
+      "perf": 100,
+      "a11y": 98,
+      "lcp_ms": 763.2,
+      "cls": 0
+    }
+  ],
+  "median": {
+    "perf": 100,
+    "a11y": 98,
+    "lcp_ms": 763.2,
+    "cls": 0
+  }
+}
