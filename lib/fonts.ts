@@ -1,35 +1,49 @@
-import {
-  JetBrains_Mono,
-  Manrope,
-  Red_Hat_Display,
-  Red_Hat_Text,
-} from "next/font/google";
+import { JetBrains_Mono, Manrope } from "next/font/google";
 import localFont from "next/font/local";
 
 /*
   Every face the site uses, self-hosted by next/font as a Latin subset.
   docs/design-system.md ("Type") is the source for which face goes where.
 
-  Red Hat Display and Red Hat Text are variable fonts: Google serves one Latin
-  file per family whatever weights are asked for, so the two families stay at
-  two files on any route.
+  Red Hat Display and Red Hat Text are variable fonts: one Latin file per
+  family, so the two families stay at two files on any route. They are the
+  boards' pinned files (docs/boards/fonts/, Google Fonts v21 and v19, the
+  `latin` unicode-range entries of google.css), copied byte for byte with the
+  OFL licence beside each, so the built type matches the references whatever
+  Google serves on a given day.
 */
 
-/** Headings, tabs and the wordmark. */
-export const redHatDisplay = Red_Hat_Display({
-  variable: "--font-red-hat-display",
-  subsets: ["latin"],
-  display: "swap",
-  adjustFontFallback: true,
-});
+/*
+  next/font/local names the face after the exported constant, and writes that
+  name into both the @font-face and the --font-red-hat-* variable. The boards,
+  and the fidelity check that reads them, know the families as "Red Hat
+  Display" and "Red Hat Text", the way next/font/google scoped them
+  (`__Red_Hat_Display_<hash>`), so the constants carry those names, with the
+  first eight hex digits of the pinned file's sha256 as the hash. The names
+  the rest of the site imports are the two aliases below each one.
+*/
 
-/** Body text. */
-export const redHatText = Red_Hat_Text({
-  variable: "--font-red-hat-text",
-  subsets: ["latin"],
+/** Headings, tabs and the wordmark. Pinned Latin file, weights 400 to 800. */
+export const __Red_Hat_Display_f7a7830b = localFont({
+  src: "../app/fonts/red-hat-display/red-hat-display-latin.woff2",
+  weight: "400 800",
+  style: "normal",
+  variable: "--font-red-hat-display",
   display: "swap",
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
 });
+export const redHatDisplay = __Red_Hat_Display_f7a7830b;
+
+/** Body text. Pinned Latin file, weights 400 to 700. */
+export const __Red_Hat_Text_59826f39 = localFont({
+  src: "../app/fonts/red-hat-text/red-hat-text-latin.woff2",
+  weight: "400 700",
+  style: "normal",
+  variable: "--font-red-hat-text",
+  display: "swap",
+  adjustFontFallback: "Arial",
+});
+export const redHatText = __Red_Hat_Text_59826f39;
 
 /**
   Code face, on `pre` and `code` only (see globals.css). Not preloaded, so it is

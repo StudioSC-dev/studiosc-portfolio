@@ -1,4 +1,6 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
+import http from "node:http";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -13,6 +15,8 @@ import {
   type TestInfo,
 } from "@playwright/test";
 
+import { checkSite } from "../scripts/boards/check";
+import { loadBoards } from "../scripts/boards/model";
 import { scanText } from "./support/denylist";
 import { changedByPr } from "./support/git";
 import {
@@ -77,10 +81,99 @@ const DOC = "docs/design-system.md";
 const CSS = "app/globals.css";
 const FONTS = "lib/fonts.ts";
 const PERF = "docs/perf/prv-2.json";
+const PERF_26 = "docs/perf/prv-26.json";
 const DEVIATIONS = "docs/boards/deviations.md";
 /** The self-hosted IBM Plex Sans cut, and the name inside the file (see lib/fonts.ts). */
 const PLEX_FILE = "app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2";
 const PLEX_INTERNAL_NAME = "SSC Fragment Sans";
+/**
+ * The boards' pinned Latin files for the two Red Hat families (PRV-26): the
+ * `latin` entries of docs/boards/fonts/google.css, copied to `copy` with the
+ * licence in `licence` beside it.
+ */
+const BOARD_FONTS = "docs/boards/fonts";
+const PINNED_RED_HAT = {
+  "Red Hat Display": {
+    copy: "app/fonts/red-hat-display/red-hat-display-latin.woff2",
+    licence: "app/fonts/red-hat-display/OFL.txt",
+    original: `${BOARD_FONTS}/OFL-redhatdisplay.txt`,
+    range: "400 800",
+    exportName: "__Red_Hat_Display_f7a7830b",
+  },
+  "Red Hat Text": {
+    copy: "app/fonts/red-hat-text/red-hat-text-latin.woff2",
+    licence: "app/fonts/red-hat-text/OFL.txt",
+    original: `${BOARD_FONTS}/OFL-redhattext.txt`,
+    range: "400 700",
+    exportName: "__Red_Hat_Text_59826f39",
+  },
+} as const;
+type RedHatFamily = keyof typeof PINNED_RED_HAT;
+const RED_HAT_FAMILIES = Object.keys(PINNED_RED_HAT) as RedHatFamily[];
+
+/**
+ * A family as the boards name it: next/font/local scopes the Red Hat faces as
+ * `__Red_Hat_Display_<hash>` (see lib/fonts.ts), which reads "Red Hat Display".
+ */
+const plainFamily = (raw: string) =>
+  raw.replace(
+    /^__(.+?)_[0-9a-f]{8}( Fallback)?$/,
+    (_m, name: string, fallback: string | undefined) =>
+      name.replace(/_/g, " ") + (fallback ?? "")
+  );
+
+const sha256Of = (buf: Buffer) =>
+  createHash("sha256").update(buf).digest("hex");
+
+/**
+ * The sha256 of each family's Latin file in docs/boards/fonts/google.css: the
+ * face whose unicode-range opens at U+0000-00FF. Read from the stylesheet,
+ * never from a file name.
+ */
+function latinPins(): Record<RedHatFamily, { file: string; sha256: string }> {
+  const css = read(`${BOARD_FONTS}/google.css`);
+  const out: Partial<Record<RedHatFamily, { file: string; sha256: string }>> =
+    {};
+  for (const block of css.match(/@font-face\s*{[^}]*}/g) ?? []) {
+    const family = /font-family:\s*['"]([^'"]+)['"]/.exec(block)?.[1];
+    const url = /url\(([^)]+)\)/.exec(block)?.[1];
+    const range = /unicode-range:\s*([^;]+);/.exec(block)?.[1] ?? "";
+    if (!family || !url || !range.startsWith("U+0000-00FF")) continue;
+    if (!RED_HAT_FAMILIES.includes(family as RedHatFamily)) continue;
+    const file = path.basename(url);
+    out[family as RedHatFamily] = {
+      file,
+      sha256: sha256Of(fs.readFileSync(path.join(ROOT, BOARD_FONTS, file))),
+    };
+  }
+  return out as Record<RedHatFamily, { file: string; sha256: string }>;
+}
+
+/**
+ * What is wrong with a page's Red Hat font responses: each family must be
+ * served by exactly one successful response whose bytes are its pin.
+ */
+function redHatPinProblems(
+  loads: readonly FontLoad[],
+  pins: Record<RedHatFamily, { sha256: string }>
+): string[] {
+  const problems: string[] = [];
+  for (const family of RED_HAT_FAMILIES) {
+    const own = loads.filter((l) => l.family === family);
+    const ok = own.filter((l) => l.status >= 200 && l.status < 300);
+    if (own.length !== 1 || ok.length !== 1) {
+      problems.push(
+        `${family}: ${own.length} responses, ${ok.length} successful, not 1`
+      );
+      continue;
+    }
+    if (ok[0].sha256 !== pins[family].sha256) {
+      problems.push(`${family}: sha256 ${ok[0].sha256} is not its pin`);
+    }
+  }
+  return problems;
+}
+
 const FRAGMENT_FAMILIES: readonly string[] = Object.values(FRAGMENT_FAMILY);
 
 type Theme = "light" | "dark";
@@ -221,6 +314,8 @@ interface FontLoad {
   family: string;
   url: string;
   bytes: number;
+  status: number;
+  sha256: string;
 }
 
 /** Records every font file a page downloads, with its family, from load to settle. */
@@ -270,9 +365,11 @@ function watchFonts(page: Page) {
     for (const r of responses) {
       const body = await r.body().catch(() => Buffer.alloc(0));
       loads.push({
-        family: families[r.url()] ?? "unknown",
+        family: plainFamily(families[r.url()] ?? "unknown"),
         url: r.url(),
         bytes: body.length,
+        status: r.status(),
+        sha256: createHash("sha256").update(body).digest("hex"),
       });
     }
     return loads;
@@ -416,9 +513,12 @@ function ownPr(env: Env = process.env): { range: PrRange } | { skip: string } {
  * the fork point, not the base), or null. A branch cut before the record
  * existed does not change it, though its head lacks it.
  */
-function perfBinding(env: Env = process.env): PrRange | null {
+function perfBinding(
+  env: Env = process.env,
+  file: string = PERF
+): PrRange | null {
   const range = prRange(env);
-  return range && changedByPr(range, PERF) ? range : null;
+  return range && changedByPr(range, file) ? range : null;
 }
 
 // ===========================================================================
@@ -781,30 +881,47 @@ test.describe("Range design system", () => {
 
     // The font declarations, read from lib/fonts.ts.
     const source = read(FONTS);
-    const display = fontOptions(source, "redHatDisplay");
-    const text = fontOptions(source, "redHatText");
+    expect(source).not.toMatch(
+      /import \{[^}]*Red_Hat[^}]*\} from "next\/font\/google"/
+    );
+    for (const family of RED_HAT_FAMILIES) {
+      expect(source, `${family} loader`).toMatch(
+        new RegExp(
+          `export const ${PINNED_RED_HAT[family].exportName} = localFont\\(\\{`
+        )
+      );
+    }
+    expect(source).toMatch(
+      /export const redHatDisplay = __Red_Hat_Display_[0-9a-f]{8};/
+    );
+    expect(source).toMatch(
+      /export const redHatText = __Red_Hat_Text_[0-9a-f]{8};/
+    );
+    const display = fontOptions(
+      source,
+      PINNED_RED_HAT["Red Hat Display"].exportName
+    );
+    const text = fontOptions(source, PINNED_RED_HAT["Red Hat Text"].exportName);
     for (const [name, opts] of [
       ["Red Hat Display", display],
       ["Red Hat Text", text],
     ] as const) {
-      expect(optionValue(opts, "subsets"), `${name} subsets`).toEqual([
-        "latin",
-      ]);
+      // Self-hosted pinned files (PRV-26): one Latin file each, so no subsets.
+      expect(optionValue(opts, "subsets"), `${name} subsets`).toBeUndefined();
       expect(
         optionValue(opts, "adjustFontFallback"),
         `${name} adjustFontFallback`
-      ).toBe(true);
-      const weights = optionValue(opts, "weight");
-      if (steps.includes(1)) {
-        expect(
-          Array.isArray(weights),
-          `step 1 trims ${name} to listed weights`
-        ).toBe(true);
-        for (const w of weights as string[])
-          expect(config.weights[name]).toContain(w);
-      }
+      ).toBe("Arial");
+      // The pinned file's whole weight axis, as one range.
+      expect(optionValue(opts, "weight"), `${name} weights`).toBe(
+        PINNED_RED_HAT[name].range
+      );
+      expect(optionValue(opts, "style"), `${name} style`).toBe("normal");
       expect(optionValue(opts, "display"), `${name} display`).toBe(
         config.display[name]
+      );
+      expect(optionValue(opts, "src"), `${name} file`).toBe(
+        `../${PINNED_RED_HAT[name].copy}`
       );
     }
 
@@ -903,7 +1020,7 @@ test.describe("Range design system", () => {
       90 * KIB
     );
 
-    const faces = await page.evaluate(() => {
+    const rawFaces = await page.evaluate(() => {
       const pick = (el: Element) => {
         const s = getComputedStyle(el);
         return {
@@ -914,12 +1031,20 @@ test.describe("Range design system", () => {
       };
       const fontDisplay: Record<string, string> = {};
       const fontWeights: Record<string, string[]> = {};
+      const fontStyles: Record<string, string[]> = {};
+      const sizeAdjusted: string[] = [];
       for (const sheet of Array.from(document.styleSheets)) {
         for (const rule of Array.from(sheet.cssRules)) {
           if (rule instanceof CSSFontFaceRule) {
             const fam = rule.style
               .getPropertyValue("font-family")
               .replace(/["']/g, "");
+            if (rule.style.getPropertyValue("size-adjust")) {
+              sizeAdjusted.push(fam);
+            }
+            (fontStyles[fam] ??= []).push(
+              rule.style.getPropertyValue("font-style")
+            );
             fontDisplay[fam] = rule.style.getPropertyValue("font-display");
             (fontWeights[fam] ??= []).push(
               rule.style.getPropertyValue("font-weight")
@@ -938,9 +1063,48 @@ test.describe("Range design system", () => {
         paragraphs: site("main p").slice(0, 5).map(pick),
         fontDisplay,
         fontWeights,
+        fontStyles,
+        sizeAdjusted,
       };
     });
+    const byFamily = <T>(map: Record<string, T>): Record<string, T> =>
+      Object.fromEntries(
+        Object.entries(map).map(([k, v]) => [plainFamily(k), v])
+      );
+    const faces = {
+      headings: rawFaces.headings.map((h) => ({
+        ...h,
+        family: plainFamily(firstFamily(h.family)),
+      })),
+      body: {
+        ...rawFaces.body,
+        family: plainFamily(firstFamily(rawFaces.body.family)),
+      },
+      paragraphs: rawFaces.paragraphs.map((p) => ({
+        ...p,
+        family: plainFamily(firstFamily(p.family)),
+      })),
+      fontDisplay: byFamily(rawFaces.fontDisplay),
+      fontWeights: byFamily(rawFaces.fontWeights),
+      fontStyles: byFamily(rawFaces.fontStyles),
+      sizeAdjusted: rawFaces.sizeAdjusted.map(plainFamily),
+    };
     expect(faces.headings.length).toBeGreaterThan(0);
+    // The production @font-face rules: normal style and the pinned file's
+    // whole weight range, and a size-adjusted fallback face for each family.
+    for (const face of ["Red Hat Display", "Red Hat Text"] as const) {
+      expect(faces.fontStyles[face], `${face} font-style`).toEqual(["normal"]);
+      expect(faces.fontWeights[face], `${face} font-weight`).toEqual([
+        PINNED_RED_HAT[face].range,
+      ]);
+    }
+    expect(
+      faces.sizeAdjusted
+        .filter((f) => /^Red Hat (Display|Text) Fallback$/.test(f))
+        .sort(),
+      "size-adjusted fallback faces"
+    ).toEqual(["Red Hat Display Fallback", "Red Hat Text Fallback"]);
+
     // The weight range each emitted Red Hat face covers ("400 900" or "600").
     const covers = (family: string, weight: number) =>
       (faces.fontWeights[family] ?? []).some((range) => {
@@ -1520,15 +1684,9 @@ test.describe("Range design system", () => {
   test("LCP within budget at the measured sha", async () => {
     const testInfo = test.info();
     chromiumOnly(testInfo);
-    const perf = perfRecord();
-    expect(perf.measured_sha).toMatch(/^[0-9a-f]{40}$/);
-    expect(perf.route).toBe("/");
-    expect(perf.lighthouse_version).toMatch(/^\d+\.\d+\.\d+/);
-    expect(perf.runs).toHaveLength(3);
-    expect(perfRunProblems(perf.runs)).toEqual([]);
     // Controls: an infinite LCP beside two finite ones would leave a
     // plausible median; it fails, as do a zero LCP and a missing value.
-    const [run] = perf.runs;
+    const [run] = perfRecord().runs;
     expect(
       perfRunProblems(
         JSON.parse(
@@ -1542,59 +1700,314 @@ test.describe("Range design system", () => {
     expect(perfRunProblems([{ ...run, cls: undefined }])).toEqual([
       "run 1 cls is not a finite number",
     ]);
-    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
-    for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
-      expect(perf.median[key], `median ${key}`).toBeCloseTo(
-        median(perf.runs.map((r) => r[key])),
-        6
-      );
-    }
-    expect(perf.median.lcp_ms, "median LCP on /").toBeLessThanOrEqual(3800);
 
-    // PRV-1's rule: the record binds only the PR that changes it. A later PR
+    // Both records (PRV-2's and PRV-26's) are validated on every execution,
+    // and the 3.8 s gate applies to the median recomputed from the runs.
+    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
+    for (const file of [PERF, PERF_26]) {
+      const perf = JSON.parse(read(file)) as PerfRecord;
+      expect(perf.measured_sha, `${file} measured_sha`).toMatch(
+        /^[0-9a-f]{40}$/
+      );
+      expect(perf.route, `${file} route`).toBe("/");
+      expect(perf.lighthouse_version, `${file} lighthouse`).toMatch(
+        /^\d+\.\d+\.\d+/
+      );
+      expect(perf.runs, `${file} runs`).toHaveLength(3);
+      expect(perfRunProblems(perf.runs), `${file} runs`).toEqual([]);
+      for (const key of ["perf", "a11y", "lcp_ms", "cls"] as const) {
+        expect(perf.median[key], `${file} median ${key}`).toBeCloseTo(
+          median(perf.runs.map((r) => r[key])),
+          6
+        );
+      }
+      expect(
+        median(perf.runs.map((r) => r.lcp_ms)),
+        `${file} median LCP on /`
+      ).toBeLessThanOrEqual(3800);
+    }
+
+    // PRV-1's rule: a record binds only the PR that changes it. A later PR
     // that leaves it alone is checked against the thresholds above, never
-    // against PRV-2's measured commit.
+    // against the record's measured commit.
     // Controls: a push build has no PR, and a PR whose base already holds
-    // this record does not bind it.
+    // these records does not bind them.
     const sha = prHead();
     expect(prRange({ CI: "true", PR_HEAD_SHA: "" })).toBeNull();
     expect(prRange({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })).toEqual(
       { base: sha, head: sha }
     );
-    expect(
-      perfBinding({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha })
-    ).toBe(null);
-    const range = perfBinding();
-    if (!range) {
-      testInfo.annotations.push({
-        type: "not bound",
-        description: `${prRange() ? `this PR does not change ${PERF}` : NO_PR}, so only the thresholds are asserted.`,
-      });
-      return;
+    for (const file of [PERF, PERF_26]) {
+      expect(
+        perfBinding({ CI: "true", PR_HEAD_SHA: sha, PR_BASE_SHA: sha }, file)
+      ).toBe(null);
     }
-    const { head } = range;
+    for (const file of [PERF, PERF_26]) {
+      const range = perfBinding(process.env, file);
+      if (!range) {
+        testInfo.annotations.push({
+          type: "not bound",
+          description: `${prRange() ? `this PR does not change ${file}` : NO_PR}, so only the thresholds are asserted.`,
+        });
+        continue;
+      }
+      const { head } = range;
+      const perf = JSON.parse(read(file)) as PerfRecord;
 
-    // This PR changes the record, so it binds: measured at an ancestor of the
-    // head, with no code change since. A rebase rewrites the measured commit;
-    // re-measure then, as below.
-    const remeasure = [
-      `Re-measure at ${head}:`,
-      "npm run build, then npx next start -p <port>;",
-      `run npx -y lighthouse@${perf.lighthouse_version} http://localhost:<port>/ --only-categories=performance,accessibility three times;`,
-      `write the three runs and their median to ${PERF} with measured_sha set to the commit measured;`,
-      "commit that file alone, on top.",
-    ].join(" ");
+      // This PR changes the record, so it binds: measured at an ancestor of
+      // the head, with no code change since. A rebase rewrites the measured
+      // commit; re-measure then, as below.
+      const remeasure = [
+        `Re-measure at ${head}:`,
+        "npm run build, then npx next start -p <port>;",
+        `run npx -y lighthouse@${perf.lighthouse_version} http://localhost:<port>/ --only-categories=performance,accessibility three times;`,
+        `write the three runs and their median to ${file} with measured_sha set to the commit measured;`,
+        "commit that file alone, on top.",
+      ].join(" ");
+      expect(
+        gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
+        `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
+      ).toBe(true);
+      const changed = git("diff", "--name-only", perf.measured_sha, head)
+        .split("\n")
+        .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+      expect(
+        changed,
+        `code changed since ${perf.measured_sha}. ${remeasure}`
+      ).toEqual([]);
+    }
+  });
+
+  test("red hat files match the boards' pins", async ({
+    page,
+    browser,
+    baseURL,
+  }, testInfo) => {
+    chromiumOnly(testInfo);
+    test.setTimeout(600_000);
+    const pins = latinPins();
+    const source = read(FONTS);
+
+    // The pins are the Latin faces of google.css, one per family.
+    for (const family of RED_HAT_FAMILIES) {
+      expect(pins[family], `${family} Latin pin in google.css`).toBeDefined();
+    }
+    expect(pins["Red Hat Display"].file).not.toBe(pins["Red Hat Text"].file);
+
+    // The declarations use next/font/local and the checked-in copies, which
+    // are the pinned bytes; the licences are the originals.
+    for (const family of RED_HAT_FAMILIES) {
+      const pinned = PINNED_RED_HAT[family];
+      const exportName = pinned.exportName;
+      expect(source, `${family} loader`).toMatch(
+        new RegExp(`export const ${exportName} = localFont\\(\\{`)
+      );
+      expect(optionValue(fontOptions(source, exportName), "src")).toBe(
+        `../${pinned.copy}`
+      );
+      expect(
+        sha256Of(fs.readFileSync(path.join(ROOT, pinned.copy))),
+        `${family} copy is its pin`
+      ).toBe(pins[family].sha256);
+      expect(
+        read(pinned.licence) === read(pinned.original),
+        `${family} licence is the original`
+      ).toBe(true);
+    }
+    expect(source).toMatch(/import localFont from "next\/font\/local";/);
+
+    // The Type section says where both fonts come from.
+    const type = doc().sections.get("Type") ?? "";
+    expect(type, "Type section").toMatch(/next\/font\/local/);
+    for (const family of RED_HAT_FAMILIES) {
+      expect(type, `Type names the ${family} copy`).toContain(
+        path.dirname(PINNED_RED_HAT[family].copy)
+      );
+    }
+    expect(type, "Type names the pinned source").toContain(
+      "docs/boards/fonts/google.css"
+    );
+
+    // A fresh load of the production build of `/`: one successful response
+    // per Red Hat family, and its bytes are the family's pin.
+    const settle = watchFonts(page);
+    await page.goto("/");
+    const loads = await settle();
+    expect(redHatPinProblems(loads, pins)).toEqual([]);
+    // Controls: other bytes, a second response and a failed response each fail.
+    const own = loads.filter((l) => l.family === "Red Hat Display");
     expect(
-      gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
-      `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
+      redHatPinProblems(
+        loads.map((l) => (l === own[0] ? { ...l, sha256: "0".repeat(64) } : l)),
+        pins
+      )
+    ).toHaveLength(1);
+    expect(redHatPinProblems([...loads, own[0]], pins)).toHaveLength(1);
+    expect(
+      redHatPinProblems(
+        loads.map((l) => (l === own[0] ? { ...l, status: 404 } : l)),
+        pins
+      )
+    ).toHaveLength(1);
+
+    // The fidelity harness, on the production build of `/`: an in-memory
+    // `chrome/header` row marked built, with a selector that matches the
+    // rendered header, reports no font failure for either family.
+    const dir = path.resolve("docs/boards");
+    const loaded = loadBoards(dir).sections;
+    const row = loaded.rows.find((r) => r.id === "chrome/header");
+    expect(row, "chrome/header row in sections.json").toBeDefined();
+    const sections = {
+      ...loaded,
+      rows: loaded.rows.map((r) =>
+        r.id === "chrome/header" ? { ...r, built: true, site: "header" } : r
+      ),
+    };
+    expect(await page.locator(row ? "header" : "").count()).toBeGreaterThan(0);
+    const only = {
+      rows: ["chrome/header"],
+      widths: ["1440" as const],
+      themes: ["light" as const],
+      states: ["default"],
+      rm: false,
+    };
+    const fontFailures = (
+      failures: Awaited<ReturnType<typeof checkSite>>["failures"],
+      family: string
+    ) =>
+      failures.filter((f) =>
+        f.property.toLowerCase().startsWith(`font ${family.toLowerCase()}`)
+      );
+    const clean = await checkSite({
+      dir,
+      baseURL: baseURL!,
+      browser,
+      only,
+      boards: { sections },
+    });
+    expect(
+      clean.checked.filter((c) => c.startsWith("chrome/header ")),
+      "comparisons made for chrome/header"
+    ).not.toHaveLength(0);
+    for (const family of RED_HAT_FAMILIES) {
+      expect(
+        fontFailures(clean.failures, family),
+        `${family} failures`
+      ).toEqual([]);
+    }
+
+    // Control: the same run against a server that answers each family's
+    // request with other bytes (the other family's file, a valid font that is
+    // not that family's pin) fails for that family.
+    const bytesOfPin = (family: RedHatFamily) =>
+      fs.readFileSync(path.join(ROOT, PINNED_RED_HAT[family].copy));
+    for (const family of RED_HAT_FAMILIES) {
+      const other = RED_HAT_FAMILIES.find((f) => f !== family) as RedHatFamily;
+      const proxy = await swapFontProxy(baseURL!, {
+        sha256: pins[family].sha256,
+        body: bytesOfPin(other),
+      });
+      try {
+        const control = await checkSite({
+          dir,
+          baseURL: proxy.url,
+          browser,
+          only,
+          boards: { sections },
+        });
+        expect(proxy.swapped(), `${family} bytes were swapped`).toBeGreaterThan(
+          0
+        );
+        expect(
+          fontFailures(control.failures, family),
+          `${family} control failures`
+        ).not.toHaveLength(0);
+      } finally {
+        await proxy.close();
+      }
+    }
+  });
+
+  test("changes stay within PRV-26 scope", async () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    const range = prRange();
+    test.skip(!range, `${NO_PR}: PRV-26's scope is checked on its own PR.`);
+    const { base, head } = range as PrRange;
+    test.skip(
+      gitOk("cat-file", "-e", `${base}:${TICKET_26}`),
+      `${base} already holds ${TICKET_26}: PRV-26's scope is checked on its own PR.`
+    );
+    expect(
+      gitOk("cat-file", "-e", `${head}:${TICKET_26}`),
+      "the PR introduces its ticket"
     ).toBe(true);
-    const changed = git("diff", "--name-only", perf.measured_sha, head)
-      .split("\n")
-      .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+
+    // Files: only Scope's, both paths of a rename.
     expect(
-      changed,
-      `code changed since ${perf.measured_sha}. ${remeasure}`
+      changedFiles(base, head).filter(
+        (f) =>
+          !SCOPE_26.some((s) => (s.endsWith("/") ? f.startsWith(s) : f === s))
+      ),
+      "files changed outside PRV-26's Scope"
     ).toEqual([]);
+    const moved = fs.mkdtempSync(path.join(os.tmpdir(), "prv26-rename-"));
+    try {
+      const inRepo = (...args: string[]) =>
+        execFileSync(
+          "git",
+          [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            ...args,
+          ],
+          { cwd: moved, stdio: "ignore", env: gitEnv() }
+        );
+      inRepo("init", "-q");
+      fs.writeFileSync(path.join(moved, "README.md"), "outside\n".repeat(20));
+      inRepo("add", "README.md");
+      inRepo("commit", "-q", "--no-verify", "-m", "before");
+      fs.mkdirSync(path.join(moved, "app/fonts/red-hat-text"), {
+        recursive: true,
+      });
+      inRepo("mv", "README.md", "app/fonts/red-hat-text/OFL.txt");
+      inRepo("commit", "-q", "--no-verify", "-m", "after");
+      expect(
+        changedFiles("HEAD~1", "HEAD", moved).sort(),
+        "both paths of a rename"
+      ).toEqual(["README.md", "app/fonts/red-hat-text/OFL.txt"]);
+    } finally {
+      fs.rmSync(moved, { recursive: true, force: true });
+    }
+
+    // The other faces: the same loaders, sources and options at the head as
+    // at the base.
+    const before = git("show", `${base}:${FONTS}`);
+    const after = git("show", `${head}:${FONTS}`);
+    for (const name of ["jetbrainsMono", "manrope", "ibmPlexSans"]) {
+      expect(declaration(after, name), `${name} at the head`).toBeDefined();
+      expect(declaration(after, name), `${name} unchanged`).toBe(
+        declaration(before, name)
+      );
+    }
+    // Control: a changed option or a changed loader differs.
+    const edited = after.replace('weight: "400",', 'weight: "500",');
+    expect(declaration(edited, "jetbrainsMono")).not.toBe(
+      declaration(after, "jetbrainsMono")
+    );
+    expect(
+      declaration(
+        after.replace(
+          '= localFont({\n  src: "../app/fonts/ibm',
+          '= Manrope({\n  src: "../app/fonts/ibm'
+        ),
+        "ibmPlexSans"
+      )
+    ).not.toBe(declaration(after, "ibmPlexSans"));
   });
 
   test("board motion rules are present", async () => {
@@ -2216,6 +2629,70 @@ async function settledText(page: Page): Promise<string> {
     await page.waitForTimeout(300);
   }
   return last;
+}
+
+const TICKET_26 = "docs/tickets/PRV-26.md";
+const SCOPE_26 = [
+  "lib/fonts.ts",
+  "app/fonts/red-hat-display/red-hat-display-latin.woff2",
+  "app/fonts/red-hat-display/OFL.txt",
+  "app/fonts/red-hat-text/red-hat-text-latin.woff2",
+  "app/fonts/red-hat-text/OFL.txt",
+  "e2e/design-tokens.spec.ts",
+  "docs/design-system.md",
+  "docs/perf/prv-26.json",
+  TICKET_26,
+] as const;
+
+/** One whole `export const <name> = <loader>({ ... });` declaration, or undefined. */
+function declaration(source: string, name: string): string | undefined {
+  return new RegExp(
+    `export const ${name} = [A-Za-z_]+\\(\\{[\\s\\S]*?\\}\\);`
+  ).exec(source)?.[0];
+}
+
+/**
+ * A proxy in front of the site that answers a request for the font file with
+ * the given sha256 with other bytes: how the control run serves unpinned bytes.
+ */
+async function swapFontProxy(
+  target: string,
+  swap: { sha256: string; body: Uint8Array }
+): Promise<{ url: string; swapped: () => number; close: () => Promise<void> }> {
+  let swapped = 0;
+  const server = http.createServer((req, res) => {
+    void (async () => {
+      const upstream = await fetch(new URL(req.url ?? "/", target), {
+        headers: { accept: String(req.headers.accept ?? "*/*") },
+        redirect: "manual",
+      });
+      let body: Uint8Array = Buffer.from(await upstream.arrayBuffer());
+      if (sha256Of(Buffer.from(body)) === swap.sha256) {
+        body = swap.body;
+        swapped += 1;
+      }
+      const headers: Record<string, string> = {};
+      upstream.headers.forEach((value, key) => {
+        if (!/^(content-encoding|content-length|transfer-encoding)$/i.test(key))
+          headers[key] = value;
+      });
+      headers["content-length"] = String(body.length);
+      res.writeHead(upstream.status, headers);
+      res.end(body);
+    })().catch(() => {
+      res.writeHead(502);
+      res.end();
+    });
+  });
+  const port = await freePort();
+  await new Promise<void>((resolve) =>
+    server.listen(port, "127.0.0.1", resolve)
+  );
+  return {
+    url: `http://127.0.0.1:${port}`,
+    swapped: () => swapped,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
 }
 
 function freePort(): Promise<number> {
