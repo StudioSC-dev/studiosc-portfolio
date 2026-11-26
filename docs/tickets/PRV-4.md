@@ -1,4 +1,3 @@
-PRV-4
 # Shared chrome and the theme switch
 
 **Planned:** Sonnet, M, wave 2
