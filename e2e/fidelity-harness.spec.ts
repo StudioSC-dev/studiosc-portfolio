@@ -2415,6 +2415,53 @@ test.describe("fidelity harness", () => {
       expect(slow.held).toEqual(halfway);
       expect(await failures(checkSite, SLOW_DRIVER)).toEqual([]);
 
+      // A short transition, not held, plays and is torn down (its
+      // animations cancelled to idle) before the recorder's frames come
+      // round, as on a slow host: it still counts as run.
+      const short = await measuredPage(browser);
+      try {
+        const ran = await short.evaluate(async () => {
+          const f = (
+            window as unknown as {
+              __fidelity: {
+                motionStart(): void;
+                transitionReady(): Promise<void>;
+                motionTake(s: unknown): { name: string; duration: number }[];
+              };
+            }
+          ).__fidelity;
+          const style = document.createElement("style");
+          style.textContent =
+            "::view-transition-group(*), ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 1ms !important; }";
+          document.head.append(style);
+          // Every animation frame callback runs three frames late.
+          const raf = window.requestAnimationFrame.bind(window);
+          window.requestAnimationFrame = (cb) => raf(() => raf(() => raf(cb)));
+          f.motionStart();
+          const t = document.startViewTransition(() => {
+            document.querySelector("h1")!.textContent = "Changed";
+          });
+          await f.transitionReady();
+          await t.finished;
+          const live = document
+            .getAnimations()
+            .filter((a) =>
+              (a.effect as KeyframeEffect).pseudoElement?.startsWith(
+                "::view-transition"
+              )
+            ).length;
+          const taken = f.motionTake({
+            rows: [{ id: "r", selector: "#r", exclude: [], named: [] }],
+            keys: { heading: "h1", text: "p" },
+          });
+          return { live, names: taken.map((m) => `${m.name} ${m.duration}`) };
+        });
+        expect(ran.live).toBe(0);
+        expect(ran.names).toContain("-ua-view-transition-group-anim-root 1");
+      } finally {
+        await short.close();
+      }
+
       // A reveal the page skips once it is ready never plays: the theme
       // still switches, and neither motion counts.
       const skipped = await site(SKIP_ON_READY);

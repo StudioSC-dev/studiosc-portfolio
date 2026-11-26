@@ -279,6 +279,11 @@
   let transition = null;
   /** Per transition: settles once its animations are noted and confirmed. */
   const playing = new WeakMap();
+  /**
+   * Transition animations seen to play: finished before teardown, or still
+   * live two frames after ready.
+   */
+  const ran = new WeakSet();
   /** The fraction an in-flight capture holds the next transition at. */
   let armed = null;
   const frame = () => new Promise((r) => requestAnimationFrame(r));
@@ -287,8 +292,12 @@
    * moment they exist, so none (the UA's short group animation most of all)
    * can finish before a sweep sees it, and held at once when an in-flight
    * capture armed a hold, so none can finish before the capture. The notes
-   * stay provisional for two frames: a reveal the page skips once it is
-   * ready never plays, and its animations are cancelled (idle) by then.
+   * are provisional: one counts once its animation finished before the
+   * transition was torn down (a short one, not held: teardown cancels it to
+   * idle afterwards), or is still live two frames on or when the record is
+   * taken. A reveal the page skips once it is ready never plays: its
+   * animations are cancelled before any of that, which rejects their
+   * finished promise.
    */
   const onReady = async () => {
     const anims = document
@@ -306,6 +315,11 @@
         nameOf(a),
         true
       );
+    for (const a of anims)
+      a.finished.then(
+        () => ran.add(a),
+        () => {}
+      );
     if (armed !== null) {
       const at = armed;
       armed = null;
@@ -314,13 +328,7 @@
     }
     await frame();
     await frame();
-    for (const rec of records)
-      if (
-        rec.provisional &&
-        anims.includes(rec.anim) &&
-        rec.anim.playState !== "idle"
-      )
-        rec.provisional = false;
+    for (const a of anims) if (a.playState !== "idle") ran.add(a);
   };
   const startViewTransition = Document.prototype.startViewTransition;
   if (startViewTransition)
@@ -706,8 +714,17 @@
         els: rowElements(row),
         excluded: excludedFor(row),
       }));
-      // A note never confirmed is a reveal that did not play.
-      const kept = records.splice(0).filter((rec) => !rec.provisional);
+      // A transition's note counts once it played, or while it is still
+      // live; one cancelled before it played (a reveal skipped once ready)
+      // does not.
+      const kept = records
+        .splice(0)
+        .filter(
+          (rec) =>
+            !rec.provisional ||
+            ran.has(rec.anim) ||
+            rec.anim.playState !== "idle"
+        );
       const out = kept.map((rec) => {
         const target = rec.el;
         // The innermost row that holds the element wins (a child row).
