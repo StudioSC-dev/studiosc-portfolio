@@ -482,13 +482,29 @@ const CALLERS = [
   "app/page.tsx",
 ];
 
-/** The primitives PRV-4 changed, and the export it removed. */
-const NAMES_PRIMITIVE =
-  /\b(?:StatusBadge|StatusText|CtaLink|PageHeader|INSTAGRAM)\b/;
+/** A caller's import of a changed primitive, and the removed export. */
+const PRIMITIVE_IMPORT =
+  /^\s*import \w+ from "@\/components\/(?:ui|layout)\/(?:StatusBadge|StatusText|CtaLink|PageHeader)";?\s*$/;
+const NAMES_INSTAGRAM = /\bINSTAGRAM\b/;
 const PRIMITIVE_TAG = /<(StatusBadge|StatusText|CtaLink|PageHeader)\b/g;
 
-/** Text a caller line may lose and otherwise stay the same: CtaLink's size. */
-const DROPPED = [/ size="sm"/g, / Sized `sm` to fit a three-column card\./g];
+/**
+ * The primitive migrations PRV-4 makes in its callers: what each call becomes
+ * and the props it may lose or gain. Every other prop, and the children, must
+ * stay as they were.
+ */
+const MIGRATIONS: Record<
+  string,
+  { to: string; drop: string[]; add: string[] }
+> = {
+  StatusBadge: { to: "StatusText", drop: [], add: ["className"] },
+  StatusText: { to: "StatusText", drop: [], add: [] },
+  CtaLink: { to: "CtaLink", drop: ["size"], add: [] },
+  PageHeader: { to: "PageHeader", drop: ["label"], add: [] },
+};
+
+/** Comment text a caller line may lose and otherwise stay the same. */
+const DROPPED = [/ Sized `sm` to fit a three-column card\./g];
 
 /** A bare wrapper that only held a replaced primitive. */
 const PRIMITIVE_WRAPPER = /^\s*(?:<span\b[^>]*>|<\/span>|\{\w+ && \(|\)\})\s*$/;
@@ -513,50 +529,160 @@ const WRAPPER_FILES = [
  */
 const WORK_PAGE = "app/work/page.tsx";
 
-/**
- * The primitive element a line sits in, if any: from its opening `<Tag` to
- * its `/>` or `</Tag>`.
- */
-function enclosingPrimitive(lines: string[], at: number): string | null {
-  for (let j = at; j >= 0; j--) {
-    for (const m of [...lines[j].matchAll(PRIMITIVE_TAG)].reverse()) {
-      const end = elementEnd(lines, j, m.index, m[1]);
-      if (end >= at) return m[1];
-    }
-  }
-  return null;
-}
-
-/** The last line of the element whose `<Tag` starts at lines[line][col]. */
-function elementEnd(
-  lines: string[],
-  line: number,
-  col: number,
-  tag: string
-): number {
+/** The index just past the `{…}` that opens at text[at]. */
+function pastBraces(text: string, at: number): number {
   let depth = 0;
   let quote: string | null = null;
-  for (let l = line; l < lines.length; l++) {
-    const text = lines[l];
-    for (let c = l === line ? col + 1 : 0; c < text.length; c++) {
-      const ch = text[c];
-      if (quote) {
-        if (ch === quote) quote = null;
-      } else if (ch === '"' || ch === "'" || ch === "`") quote = ch;
-      else if (ch === "{") depth++;
-      else if (ch === "}") depth--;
-      else if (depth === 0 && ch === "/" && text[c + 1] === ">") return l;
-      else if (depth === 0 && ch === ">") {
-        const close = `</${tag}>`;
-        for (let m = l; m < lines.length; m++) {
-          const from = m === l ? c : 0;
-          if (lines[m].indexOf(close, from) >= 0) return m;
-        }
-        return lines.length - 1;
-      }
+  for (let i = at; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === "`") quote = ch;
+    else if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return i + 1;
+  }
+  return text.length;
+}
+
+/** A JSX attribute list as name to source, whitespace collapsed. */
+function jsxProps(attrs: string): Record<string, string> {
+  const props: Record<string, string> = {};
+  let i = 0;
+  let spreads = 0;
+  while (i < attrs.length) {
+    if (/\s/.test(attrs[i])) {
+      i++;
+      continue;
+    }
+    if (attrs[i] === "{") {
+      const end = pastBraces(attrs, i);
+      props[`{spread ${spreads++}}`] = attrs.slice(i, end).replace(/\s+/g, " ");
+      i = end;
+      continue;
+    }
+    const name = /^[\w:.-]+/.exec(attrs.slice(i))?.[0];
+    if (!name) {
+      props[`{unparsed ${i}}`] = attrs.slice(i);
+      break;
+    }
+    i += name.length;
+    if (attrs[i] !== "=") {
+      props[name] = "true";
+      continue;
+    }
+    i++;
+    if (attrs[i] === "{") {
+      const end = pastBraces(attrs, i);
+      props[name] = attrs.slice(i, end).replace(/\s+/g, " ");
+      i = end;
+    } else {
+      const end = attrs.indexOf(attrs[i], i + 1);
+      props[name] = attrs.slice(i, end + 1);
+      i = end + 1;
     }
   }
-  return lines.length - 1;
+  return props;
+}
+
+interface PrimitiveCall {
+  tag: string;
+  /** Its first and last lines, 0-based. */
+  first: number;
+  last: number;
+  props: Record<string, string>;
+  /** Its children's source, whitespace collapsed. */
+  children: string;
+}
+
+/** Every call of a changed primitive in a file, in order. */
+function primitiveCalls(lines: string[]): PrimitiveCall[] {
+  const src = lines.join("\n");
+  const lineAt = (pos: number) => src.slice(0, pos).split("\n").length - 1;
+  const calls: PrimitiveCall[] = [];
+  for (const m of src.matchAll(PRIMITIVE_TAG)) {
+    const tag = m[1];
+    const from = m.index + 1 + tag.length;
+    let quote: string | null = null;
+    let open = src.length;
+    let selfClosing = false;
+    for (let i = from; i < src.length; i++) {
+      const ch = src[i];
+      if (quote) {
+        if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === "{") i = pastBraces(src, i) - 1;
+      else if (ch === "/" && src[i + 1] === ">") {
+        open = i + 2;
+        selfClosing = true;
+        break;
+      } else if (ch === ">") {
+        open = i + 1;
+        break;
+      }
+    }
+    const attrs = src.slice(from, selfClosing ? open - 2 : open - 1);
+    let end = open;
+    let children = "";
+    if (!selfClosing) {
+      const close = src.indexOf(`</${tag}>`, open);
+      end = close < 0 ? src.length : close + tag.length + 3;
+      children = src.slice(open, close < 0 ? src.length : close);
+    }
+    calls.push({
+      tag,
+      first: lineAt(m.index),
+      last: lineAt(end - 1),
+      props: jsxProps(attrs),
+      children: children.replace(/\s+/g, " ").trim(),
+    });
+  }
+  return calls;
+}
+
+/**
+ * For each version's lines: inside a primitive call, whether that call is a
+ * permitted migration of its counterpart (paired in order: the k-th
+ * StatusBadge before with the k-th StatusText after, and so on). Lines
+ * outside every call are absent.
+ */
+function callLines(before: string[], after: string[]) {
+  const old = primitiveCalls(before);
+  const now = primitiveCalls(after);
+  const group = (c: PrimitiveCall, migrated: boolean) =>
+    migrated ? MIGRATIONS[c.tag].to : c.tag;
+  const omit = (props: Record<string, string>, keys: string[]) =>
+    Object.fromEntries(
+      Object.entries(props).filter(([k]) => !keys.includes(k))
+    );
+  const same = (a: Record<string, string>, b: Record<string, string>) =>
+    JSON.stringify(Object.entries(a).sort()) ===
+    JSON.stringify(Object.entries(b).sort());
+  const oldOk = new Map<number, boolean>();
+  const nowOk = new Map<number, boolean>();
+  const mark = (map: Map<number, boolean>, c: PrimitiveCall, ok: boolean) => {
+    for (let l = c.first; l <= c.last; l++)
+      map.set(l, (map.get(l) ?? true) && ok);
+  };
+  for (const name of new Set(Object.values(MIGRATIONS).map((m) => m.to))) {
+    const from = old.filter((c) => group(c, true) === name);
+    const to = now.filter((c) => group(c, false) === name);
+    for (let k = 0; k < Math.max(from.length, to.length); k++) {
+      const a = from[k];
+      const b = to[k];
+      let ok = Boolean(a && b);
+      if (a && b) {
+        const rule = MIGRATIONS[a.tag];
+        ok =
+          b.tag === rule.to &&
+          a.children === b.children &&
+          rule.drop.every((key) => !(key in b.props)) &&
+          same(omit(a.props, rule.drop), omit(b.props, rule.add));
+      }
+      if (a) mark(oldOk, a, ok);
+      if (b) mark(nowOk, b, ok);
+    }
+  }
+  return { oldOk, nowOk };
 }
 
 interface Hunk {
@@ -585,12 +711,14 @@ function parseHunks(diff: string): Hunk[] {
 }
 
 /**
- * The changed lines of a caller that no permitted edit explains (AC12): a
- * line naming a changed primitive or the removed export; a line inside a
- * replaced StatusBadge, StatusText or CtaLink call, or a bare wrapper that
- * held one; a removed PageHeader `label` (the eyebrow); a line that only
- * loses CtaLink's `size`; and, in the files allowed it, an outer wrapper that
- * changes only its alignment classes.
+ * The changed lines of a caller that no permitted edit explains (AC12). A
+ * line inside a primitive call is permitted only when that call is one of
+ * the migrations (StatusBadge to StatusText with a class, CtaLink losing
+ * `size`, PageHeader losing its `label` eyebrow) and its other props and
+ * children are unchanged. Outside calls: the primitive's import, the removed
+ * export, a bare wrapper that held a migrated call, the comment about the
+ * removed size, and, in the files allowed it, an outer wrapper that changes
+ * only its alignment classes.
  */
 function strayCallerLines(
   file: string,
@@ -600,18 +728,14 @@ function strayCallerLines(
 ): string[] {
   const before = fork.split("\n");
   const after = head.split("\n");
-  const inCall = (lines: string[], at: number) => {
-    const tag = enclosingPrimitive(lines, at);
-    return tag !== null && tag !== "PageHeader";
-  };
-  const heldPrimitive = (lines: string[], at: number) =>
+  const { oldOk, nowOk } = callLines(before, after);
+  const heldPrimitive = (
+    lines: string[],
+    ok: Map<number, boolean>,
+    at: number
+  ) =>
     PRIMITIVE_WRAPPER.test(lines[at]) &&
-    [at - 1, at + 1].some(
-      (n) =>
-        n >= 0 &&
-        n < lines.length &&
-        (NAMES_PRIMITIVE.test(lines[n]) || inCall(lines, n))
-    );
+    [at - 1, at + 1].some((n) => ok.get(n) === true);
   const drop = (text: string) =>
     DROPPED.reduce((t, pattern) => t.replace(pattern, ""), text);
   const stray: string[] = [];
@@ -649,24 +773,24 @@ function strayCallerLines(
       }
     });
     for (const { at, text } of hunk.removed) {
-      const ok =
-        moved.has(`-${at}`) ||
-        NAMES_PRIMITIVE.test(text) ||
-        inCall(before, at) ||
-        heldPrimitive(before, at) ||
-        (enclosingPrimitive(before, at) === "PageHeader" &&
-          /^\s*label="[^"]*"\s*$/.test(text)) ||
-        hunk.added.some((l) => drop(text) === l.text && drop(text) !== text);
+      const ok = oldOk.has(at)
+        ? oldOk.get(at)!
+        : moved.has(`-${at}`) ||
+          PRIMITIVE_IMPORT.test(text) ||
+          NAMES_INSTAGRAM.test(text) ||
+          heldPrimitive(before, oldOk, at) ||
+          hunk.added.some((l) => drop(text) === l.text && drop(text) !== text);
       if (!ok) stray.push(`${file}: -${text.trim()}`);
     }
     for (const { at, text } of hunk.added) {
-      const ok =
-        moved.has(`+${at}`) ||
-        NAMES_PRIMITIVE.test(text) ||
-        inCall(after, at) ||
-        hunk.removed.some(
-          (l) => drop(l.text) === text && drop(l.text) !== l.text
-        );
+      const ok = nowOk.has(at)
+        ? nowOk.get(at)!
+        : moved.has(`+${at}`) ||
+          PRIMITIVE_IMPORT.test(text) ||
+          NAMES_INSTAGRAM.test(text) ||
+          hunk.removed.some(
+            (l) => drop(l.text) === text && drop(l.text) !== l.text
+          );
       if (!ok) stray.push(`${file}: +${text.trim()}`);
     }
   }
@@ -1838,6 +1962,7 @@ test.describe("chrome", () => {
       ])
     ).toEqual([
       'app/blog/page.tsx: -title="Blog"',
+      'app/blog/page.tsx: -label="Writing"',
       'app/blog/page.tsx: +title="Notes"',
     ]);
     // /work may move its one outer wrapper's alignment, nothing else.
@@ -1866,6 +1991,82 @@ test.describe("chrome", () => {
       `${WORK_PAGE}: -<section className="mb-16">`,
       `${WORK_PAGE}: +<section className="mb-16 px-gutter">`,
     ]);
+    // A primitive's own migration passes; other edits inside its call fail.
+    const github = (copy: string) => [
+      "              {project.githubUrl && (",
+      '                <CtaLink href={project.githubUrl} variant="secondary">',
+      '                  <Github className="h-4 w-4" />',
+      `                  ${copy}`,
+      "                </CtaLink>",
+      "              )}",
+    ];
+    expect(
+      check(
+        "app/work/[slug]/page.tsx",
+        github("View on GitHub"),
+        github("View the code on GitHub"),
+        [
+          "@@ -4 +4 @@",
+          "-                  View on GitHub",
+          "+                  View the code on GitHub",
+        ]
+      )
+    ).toEqual([
+      "app/work/[slug]/page.tsx: -View on GitHub",
+      "app/work/[slug]/page.tsx: +View the code on GitHub",
+    ]);
+    expect(
+      check(
+        "components/home/ProjectCard.tsx",
+        [
+          "            {liveUrl && (",
+          '              <CtaLink href={liveUrl} size="sm">',
+          "                Visit",
+          "              </CtaLink>",
+          "            )}",
+        ],
+        ["            {liveUrl && <CtaLink href={liveUrl}>Visit</CtaLink>}"],
+        [
+          "@@ -1,5 +1 @@",
+          "-            {liveUrl && (",
+          '-              <CtaLink href={liveUrl} size="sm">',
+          "-                Visit",
+          "-              </CtaLink>",
+          "-            )}",
+          "+            {liveUrl && <CtaLink href={liveUrl}>Visit</CtaLink>}",
+        ]
+      )
+    ).toEqual([]);
+    const badge = ["            <StatusBadge status={project.status} />"];
+    const text = (status: string) => [
+      "            <StatusText",
+      `              status={${status}}`,
+      '              className="text-sm font-semibold"',
+      "            />",
+    ];
+    const swap = (status: string) => [
+      "@@ -1 +1,4 @@",
+      "-            <StatusBadge status={project.status} />",
+      ...text(status).map((l) => `+${l}`),
+    ];
+    expect(
+      check(
+        "app/work/[slug]/page.tsx",
+        badge,
+        text("project.status"),
+        swap("project.status")
+      )
+    ).toEqual([]);
+    expect(
+      check("app/work/[slug]/page.tsx", badge, text('"live"'), swap('"live"'))
+    ).toEqual([
+      "app/work/[slug]/page.tsx: -<StatusBadge status={project.status} />",
+      "app/work/[slug]/page.tsx: +<StatusText",
+      'app/work/[slug]/page.tsx: +status={"live"}',
+      'app/work/[slug]/page.tsx: +className="text-sm font-semibold"',
+      "app/work/[slug]/page.tsx: +/>",
+    ]);
+
     // A home wrapper may change alignment classes only.
     expect(
       check(
