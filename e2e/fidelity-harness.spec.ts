@@ -2567,11 +2567,63 @@ test.describe("fidelity harness", () => {
     const range = prRange();
     test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
     test.setTimeout(60 * 60_000);
-    const base = inputsAt(forkOf(range!));
-    const affected = affectedBoards(base, inputsAt(range!.head));
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    const affected = affectedBoards(base, head);
     expect(affected.length).toBeGreaterThan(0);
-    // The committed tree's boards, regenerated for the affected boards from
-    // scratch with the pinned runtime, equal the committed outputs.
+    const changed = changedCaptures(base, head);
+    // Committed: every capture whose plan is unchanged, and its reference
+    // files, as at the base; only changed captures' references differ.
+    const blobs = (sha: string) =>
+      new Map(
+        git(["ls-tree", "-r", sha, "--", "docs/boards/ref/"])
+          .split("\n")
+          .filter(Boolean)
+          .map((l) => {
+            const [meta, file] = l.split("\t");
+            return [file.slice("docs/boards/".length), meta.split(" ")[2]];
+          })
+      );
+    const baseBlobs = blobs(fork);
+    const headBlobs = blobs(range!.head);
+    const shots = (spec: SpecFile, board: string, keys: string[]) =>
+      keys.flatMap((k) =>
+        Object.values(spec.boards[board].captures[k]?.rows ?? {})
+          .map((r) => r?.shot)
+          .filter((f): f is string => !!f)
+      );
+    for (const board of affected) {
+      const keys = changed[board];
+      expect(keys.length, board).toBeGreaterThan(0);
+      const { captures: was, ...wasMeta } = base.spec.boards[board];
+      const { captures: now, ...nowMeta } = head.spec.boards[board];
+      expect(nowMeta, board).toEqual(wasMeta);
+      const kept = Object.keys(now).filter((k) => !keys.includes(k));
+      const keptSince = Object.keys(was).filter((k) => !keys.includes(k));
+      expect(kept.sort(), board).toEqual(keptSince.sort());
+      for (const k of kept) {
+        const entry = JSON.stringify(now[k]);
+        expect(entry, `${board} ${k}`).toBe(JSON.stringify(was[k]));
+        for (const f of shots(head.spec, board, [k]))
+          expect(headBlobs.get(f), `${board} ${k} ${f}`).toBe(baseBlobs.get(f));
+      }
+      // Reference files that differ from the base belong to changed captures.
+      const mine = new Set([
+        ...shots(head.spec, board, keys),
+        ...shots(base.spec, board, keys),
+      ]);
+      const prefix = `ref/${board.replace(/\.dc\.html$/, "")}/`;
+      const moved = [...new Set([...baseBlobs.keys(), ...headBlobs.keys()])]
+        .filter((f) => f.startsWith(prefix))
+        .filter((f) => baseBlobs.get(f) !== headBlobs.get(f));
+      expect(
+        moved.filter((f) => !mine.has(f)),
+        board
+      ).toEqual([]);
+    }
+    // Regenerated from the committed tree with the pinned runtime: every
+    // changed capture's entry, reference paths and bytes are the committed ones.
     const dir = tmp("fidelity-prv27-");
     try {
       const archive = spawnSync(
@@ -2586,11 +2638,6 @@ test.describe("fidelity harness", () => {
       expect(untar.status).toBe(0);
       const work = path.join(dir, "docs/boards");
       const committed = snapshot(work);
-      for (const board of affected)
-        rmSync(path.join(work, "ref", board.replace(/\.dc\.html$/, "")), {
-          recursive: true,
-          force: true,
-        });
       const cache = runtimeCache();
       // One board per run, each inside regen's time limit on a loaded host.
       for (const board of affected) {
@@ -2600,7 +2647,19 @@ test.describe("fidelity harness", () => {
         ]);
         expect(run.status, `${board}: ${run.stderr}`).toBe(0);
       }
-      expect(snapshot(work)).toEqual(committed);
+      const made = readSpec(path.join(work, "spec.json"));
+      const fresh = snapshot(work);
+      for (const board of affected)
+        for (const k of changed[board]) {
+          const at = `${board} ${k}`;
+          const entry = JSON.stringify(made.boards[board].captures[k]);
+          const want = JSON.stringify(head.spec.boards[board].captures[k]);
+          expect(entry, at).toBe(want);
+          for (const f of shots(made, board, [k])) {
+            expect(committed[f], `${at} ${f}`).toBeDefined();
+            expect(fresh[f], `${at} ${f}`).toBe(committed[f]);
+          }
+        }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -2794,6 +2853,34 @@ function affectedBoards(base: BoardInputs, head: BoardInputs): string[] {
   return [...new Set([...Object.keys(a), ...Object.keys(b)])]
     .filter((board) => a[board] !== b[board])
     .sort();
+}
+
+/**
+ * Per affected board, the capture keys whose plan (state, motion, partial
+ * build and hide selectors) differs between the base and the head, or that
+ * only one of them has.
+ */
+function changedCaptures(
+  base: BoardInputs,
+  head: BoardInputs
+): Record<string, string[]> {
+  const plans = (inputs: BoardInputs, board: string) => {
+    const pin = inputs.manifest.boards[board];
+    const out = new Map<string, string>();
+    for (const bt of boardThemes(inputs.sections, board, pin.width))
+      for (const plan of plannedCaptures(inputs.sections, bt, inputs.register))
+        out.set(plan.key, JSON.stringify({ toggle: bt.toggle, plan }));
+    return out;
+  };
+  const out: Record<string, string[]> = {};
+  for (const board of affectedBoards(base, head)) {
+    const a = plans(base, board);
+    const b = plans(head, board);
+    out[board] = [...new Set([...a.keys(), ...b.keys()])]
+      .filter((k) => a.get(k) !== b.get(k))
+      .sort();
+  }
+  return out;
 }
 
 /** The boards directory with one board's source replaced, for a control. */
