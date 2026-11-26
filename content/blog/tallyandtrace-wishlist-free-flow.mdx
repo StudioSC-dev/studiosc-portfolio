@@ -38,12 +38,15 @@ their goals or their habits.
 ## Free flow, built from what happened
 
 The replacement is a figure called **free flow**: the money left each month once your real spending and
-your savings plans are paid for. It has three parts, and each is a monthly average over your last full
-months (up to 12, and never the current month, which is not finished).
+your savings plans are paid for. It has three parts. Net flow and saving are monthly averages over your
+last full months (up to 12, and never the current month, which is not finished). A goal's pace is
+different: it comes from the goal's current target, its deadline and what it already holds.
 
 1. **Net flow** is what actually came in, minus what actually went out, minus loan payments. It is
    read from posted transactions on your own accounts, not from what was scheduled. Moving money
-   between your own accounts is not income and is not spending. Money borrowed is not income.
+   between your own accounts is not income and is not spending, though some fees on those moves count
+   as spending. On a loan payment, the amount repaid is the loan payment and its fee is spending.
+   Money borrowed is not income.
 2. **Saving** is what you actually put into savings accounts, net of anything taken back out. Money that
    comes back out of savings never counts as new income.
 3. **Goals, in rank order.** Each savings goal has a monthly pace it needs to hit its target. If you
@@ -53,7 +56,7 @@ months (up to 12, and never the current month, which is not finished).
 Free flow is net flow, minus saving, minus the top-ups, and never below zero.
 
 A worked example, all invented. Over the last 12 months you averaged ₱50,000 in, ₱31,000 of spending
-and ₱4,000 in loan payments. Net flow is ₱15,000. You put ₱6,000 a month into a savings account that
+and ₱4,000 in loan repayments. Net flow is ₱15,000. You put ₱6,000 a month into a savings account that
 a goal tracks. That goal needs ₱9,000 a month to reach its target on time, so its top-up is ₱3,000.
 Free flow is ₱15,000 minus ₱6,000 minus ₱3,000, which is **₱6,000**. The old method said ₱13,000.
 
@@ -79,7 +82,8 @@ The rule is that a critical item is funded from net flow, which is the money bef
 from free flow, which is the money after saving. An urgent need should not wait behind your savings
 plan. A want should not jump ahead of it.
 
-Take a ₱18,000 repair and a ₱60,000 want, using the numbers above:
+Take two full-payment items in the same currency, a ₱18,000 repair and a ₱60,000 want, using the
+numbers above:
 
 - The repair is critical, so it uses net flow of ₱15,000. It takes 2 months.
 - For the repair, the app also shows what the month would look like if you bought it now: net flow
@@ -89,21 +93,24 @@ Take a ₱18,000 repair and a ₱60,000 want, using the numbers above:
 
 An item is only given a date when the figures behind it are sound. Otherwise it gets a plain label
 instead of a made-up date, such as "nothing is left after your savings goals" or "more than 5 years away".
-An item you plan to pay from a savings account gets no date, because the wishlist never reaches
+An item you plan to pay from a savings account of your own gets no date, because the wishlist never reaches
 into savings.
 
 ## Why the first slice covers one currency
 
-Tally & Trace is multi-currency. Free flow is single currency, on purpose.
+Tally & Trace is multi-currency. Each free flow estimate uses one currency, and if your currencies
+never mix, you can get an estimate in each.
 
 If you move money between your own accounts in different currencies, the app has to pick an exchange rate
 for that move. Whatever it picks, converting money can look like earning or spending it. Several
 versions of the plan tried to handle this and kept getting it wrong, so I made a ruling: **single
 currency first**.
 
-In this slice, if your money or your goals cross currencies, you get no estimate. The app says "Money
-in more than one currency is involved, so this cannot be estimated yet" and shows no date. Nothing is
-converted anywhere. This is the cautious choice, and it is the main limit of the first slice. One
+What switches the estimate off is money or goals that cross currencies: a transfer between your own
+accounts in different currencies, or certain goals that span currencies. Then you get no estimate.
+The app says "Money
+in more than one currency is involved, so this cannot be estimated yet" and shows no date. The free
+flow figure and its dates never convert money. This is the cautious choice, and it is the main limit of the first slice. One
 cross-currency transfer inside the 12-month window is enough to switch the estimate off in every
 currency until it ages out.
 
@@ -154,15 +161,16 @@ findings were declined, and a few were kept as stated limits instead of fixed.
 
 ## The limits, stated plainly
 
-The app shows these next to the figure. In short:
+These are the limits of the calculation. In short:
 
 - **It is what happened.** A new bill, a raise or a lost income only shows once it has posted, and
   takes up to 12 months to count fully.
 - **It is a plain average.** A one-off windfall raises it and a one-off large purchase lowers it for
   up to a year.
 - **A new user has no estimate** until one full calendar month of history exists.
-- **Shared accounts do not count**, including a partner's account.
-- **Cash already on hand is never counted.** Only monthly flow is.
+- **Accounts shared with you do not count**, including a partner's account.
+- **Existing balances are not money the wishlist can spend.** Only monthly flow is. A goal's own
+  savings do reduce what it still needs.
 - **A goal that tracks a checking account or wallet** is treated as holding nothing there, so it
   reserves its whole pace.
 
