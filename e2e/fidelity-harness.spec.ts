@@ -2592,9 +2592,14 @@ test.describe("fidelity harness", () => {
           force: true,
         });
       const cache = runtimeCache();
-      const args = affected.flatMap((b) => ["--board", b]);
-      const run = await regen(work, { BOARDS_CACHE: cache }, args);
-      expect(run.status, run.stderr).toBe(0);
+      // One board per run, each inside regen's time limit on a loaded host.
+      for (const board of affected) {
+        const run = await regen(work, { BOARDS_CACHE: cache }, [
+          "--board",
+          board,
+        ]);
+        expect(run.status, `${board}: ${run.stderr}`).toBe(0);
+      }
       expect(snapshot(work)).toEqual(committed);
     } finally {
       rmSync(dir, { recursive: true, force: true });
