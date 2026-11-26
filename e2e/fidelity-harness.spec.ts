@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -53,7 +54,9 @@ import {
   load,
   pickShot,
   rowQueries,
+  runSteps,
   shoot,
+  siteContext,
 } from "../scripts/boards/capture";
 import { runtimeBytes, runtimeSource } from "../scripts/boards-regen";
 import {
@@ -2274,8 +2277,300 @@ test.describe("fidelity harness", () => {
       expect(changed.length).toBeGreaterThan(0);
       expect(changed.filter((f) => !allowed.test(f))).toEqual([]);
     });
+
+    test("records theme-reveal motion under the reproduced timing condition", async ({
+      browser,
+    }) => {
+      chromiumOnly();
+      test.setTimeout(5 * 60_000);
+      const fx = fixture();
+      const only: Only = {
+        rows: ["fx/header"],
+        widths: ["1440"],
+        themes: ["dark"],
+        states: ["theme-reveal"],
+        rm: false,
+      };
+      const missed = [
+        "fx/header [theme-reveal, 1440, dark] motion page theme-reveal: expected grow@button[Switch to the dark theme] 560ms, got does not run",
+        "fx/header [theme-reveal, 1440, dark] motion page -ua-view-transition-group-anim-root: expected none 250ms, got does not run",
+      ];
+      const failures = async (site: typeof checkSite, js: string) => {
+        server.setDrift({ js });
+        try {
+          const result = await site({
+            dir: CANVAS,
+            baseURL: server.url,
+            browser,
+            only,
+          });
+          return result.failures.map(describeFailure);
+        } finally {
+          server.setDrift(null);
+        }
+      };
+
+      // The harness as PRV-22 merged it, before PRV-25's fix.
+      const old = tmp("fidelity-pre-fix-");
+      try {
+        const archive = spawnSync(
+          "git",
+          ["archive", "--format=tar", PRE_FIX, "scripts/boards"],
+          { cwd: ROOT, env: cleanEnv(), maxBuffer: 1 << 28 }
+        );
+        expect(archive.status).toBe(0);
+        const untar = spawnSync("tar", ["-x", "-C", old], {
+          input: archive.stdout,
+        });
+        expect(untar.status).toBe(0);
+        const preFix = createRequire(__filename)(
+          path.join(old, "scripts/boards/check.ts")
+        ) as { checkSite: typeof checkSite };
+        // The reveal is ready only after the fixed wait has run out: the
+        // pre-fix harness takes its record first and sees neither motion.
+        expect(await failures(preFix.checkSite, LATE_REVEAL)).toEqual(missed);
+      } finally {
+        rmSync(old, { recursive: true, force: true });
+      }
+
+      // The fixed harness, under the same condition: both motions, within
+      // the duration tolerance.
+      expect(await failures(checkSite, LATE_REVEAL)).toEqual([]);
+
+      // The fixed capture itself: the board's motions, and the reveal held
+      // at the in-flight point the verifier's shot is taken at.
+      const motion =
+        fx.spec.boards["fx-dark-desktop.dc.html"].captures["dark/theme-reveal"]
+          .motion;
+      const site = async (js: string) => {
+        const ctx = await siteContext(browser, fx.sections, server.url, {
+          width: "1440",
+          reducedMotion: false,
+        });
+        const page = await ctx.newPage();
+        server.setDrift({ js });
+        try {
+          await load(page, "/", fx.sections.clock);
+        } finally {
+          server.setDrift(null);
+        }
+        return { ctx, page };
+      };
+      /** The dark row's reveal captured, and what the page then holds. */
+      const reveal = async (js: string) => {
+        const { ctx, page } = await site(js);
+        try {
+          const capture = await captureState(
+            page,
+            fx.sections,
+            rowQueries(
+              fx.sections.rows.filter((r) => r.built),
+              fx.sections.rows,
+              "site"
+            ),
+            { state: "theme-reveal", theme: "dark", toggle: true },
+            "site"
+          );
+          const held = await page.evaluate(() =>
+            document
+              .getAnimations()
+              .filter((a) => a.playState !== "finished")
+              .map((a) => {
+                const t = a.effect!.getComputedTiming();
+                return {
+                  name: (a as CSSAnimation).animationName,
+                  state: a.playState,
+                  at: Number(t.localTime) / Number(t.activeDuration),
+                };
+              })
+          );
+          const theme = await page.evaluate(
+            () => document.documentElement.dataset.theme
+          );
+          return { capture, held, theme };
+        } finally {
+          await ctx.close();
+        }
+      };
+      const halfway = [
+        {
+          name: "-ua-view-transition-group-anim-root",
+          state: "paused",
+          at: IN_FLIGHT_AT,
+        },
+        { name: "theme-reveal", state: "paused", at: IN_FLIGHT_AT },
+      ];
+      const frame = { at: IN_FLIGHT_AT, viewport: [0, 0, 1440, 900] };
+      const late = await reveal(LATE_REVEAL);
+      expect(late.capture.motion).toEqual(motion);
+      expect(late.capture.frame).toEqual(frame);
+      expect(late.held).toEqual(halfway);
+
+      // The driver resuming 800 ms after the reveal is ready, longer than
+      // either animation runs: both are still held at the midpoint, armed
+      // before the step and held in the page the moment the reveal is ready.
+      const slow = await reveal(SLOW_DRIVER);
+      expect(slow.capture.motion).toEqual(motion);
+      expect(slow.capture.frame).toEqual(frame);
+      expect(slow.held).toEqual(halfway);
+      expect(await failures(checkSite, SLOW_DRIVER)).toEqual([]);
+
+      // A short transition, not held, plays and is torn down (its
+      // animations cancelled to idle) before the recorder's frames come
+      // round, as on a slow host: it still counts as run.
+      const short = await measuredPage(browser);
+      try {
+        const ran = await short.evaluate(async () => {
+          const f = (
+            window as unknown as {
+              __fidelity: {
+                motionStart(): void;
+                transitionReady(): Promise<void>;
+                motionTake(s: unknown): { name: string; duration: number }[];
+              };
+            }
+          ).__fidelity;
+          const style = document.createElement("style");
+          style.textContent =
+            "::view-transition-group(*), ::view-transition-image-pair(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: 1ms !important; }";
+          document.head.append(style);
+          // Every animation frame callback runs three frames late.
+          const raf = window.requestAnimationFrame.bind(window);
+          window.requestAnimationFrame = (cb) => raf(() => raf(() => raf(cb)));
+          f.motionStart();
+          const t = document.startViewTransition(() => {
+            document.querySelector("h1")!.textContent = "Changed";
+          });
+          await f.transitionReady();
+          await t.finished;
+          const live = document
+            .getAnimations()
+            .filter((a) =>
+              (a.effect as KeyframeEffect).pseudoElement?.startsWith(
+                "::view-transition"
+              )
+            ).length;
+          const taken = f.motionTake({
+            rows: [{ id: "r", selector: "#r", exclude: [], named: [] }],
+            keys: { heading: "h1", text: "p" },
+          });
+          return { live, names: taken.map((m) => `${m.name} ${m.duration}`) };
+        });
+        expect(ran.live).toBe(0);
+        expect(ran.names).toContain("-ua-view-transition-group-anim-root 1");
+      } finally {
+        await short.close();
+      }
+
+      // A reveal the page skips once it is ready never plays: the theme
+      // still switches, and neither motion counts.
+      const skipped = await site(SKIP_ON_READY);
+      try {
+        const page = skipped.page;
+        const theme = () =>
+          page.evaluate(() => document.documentElement.dataset.theme);
+        await runSteps(page, fx.sections.theme.light);
+        await expect.poll(theme).toBe("dark");
+        await runSteps(page, fx.sections.theme.dark);
+        await expect.poll(theme).toBe("light");
+      } finally {
+        await skipped.ctx.close();
+      }
+      const cancelled = await reveal(SKIP_ON_READY);
+      expect(cancelled.capture.motion).toEqual([]);
+      expect(cancelled.theme).toBe("light");
+      const skips = await failures(checkSite, SKIP_ON_READY);
+      expect(skips).toEqual(expect.arrayContaining(missed));
+
+      // A page whose reveal really does not run still fails: no view
+      // transition, the theme toggle still switching the theme.
+      const still = await site(NO_VIEW_TRANSITION);
+      try {
+        await runSteps(still.page, fx.sections.theme.light);
+        const theme = await still.page.evaluate(
+          () => document.documentElement.dataset.theme
+        );
+        expect(theme).toBe("dark");
+      } finally {
+        await still.ctx.close();
+      }
+      const none = await failures(checkSite, NO_VIEW_TRANSITION);
+      expect(none).toEqual(expect.arrayContaining(missed));
+    });
   });
 });
+
+/** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
+const PRE_FIX = "f0f08ab405cad5a5acf45f9a8e8e8f63b7485f56";
+
+/**
+ * PRV-25's timing condition, injected into the fixture site: the page's
+ * second view transition (the dark row's reveal, after the toggle into dark)
+ * holds its DOM update until the harness next calls its recorder, so the
+ * reveal is ready only after the harness's fixed wait has run out, however
+ * fast the host is. Chromium keeps running frames while a transition's
+ * update is pending, so the wait of three frames and 60 ms runs out just as
+ * it does when a loaded host makes the reveal late.
+ */
+const LATE_REVEAL = `(() => {
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  Document.prototype.startViewTransition = function (update) {
+    if (++n !== 2) return start.call(this, update);
+    const f = window.__fidelity;
+    const calls = ["transitionReady", "motionTake"].filter((k) => k in f);
+    const own = Object.fromEntries(calls.map((k) => [k, f[k]]));
+    let release;
+    const held = new Promise((r) => (release = r));
+    for (const k of calls)
+      f[k] = function (...args) {
+        Object.assign(f, own);
+        release();
+        return own[k].apply(this, args);
+      };
+    return start.call(this, () => held.then(update));
+  };
+})();`;
+
+/**
+ * A slow driver: the harness's wait for the dark row's reveal returns 800 ms
+ * after the reveal is ready, longer than either of its animations runs.
+ */
+const SLOW_DRIVER = `(() => {
+  const f = window.__fidelity;
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  let late = false;
+  Document.prototype.startViewTransition = function (update) {
+    if (++n === 2) late = true;
+    return start.call(this, update);
+  };
+  const ready = f.transitionReady;
+  f.transitionReady = async function (...args) {
+    await ready.apply(this, args);
+    if (!late) return;
+    late = false;
+    await new Promise((r) => setTimeout(r, 800));
+  };
+})();`;
+
+/**
+ * The page skips the dark row's reveal in its own ready callback: the theme
+ * switches, and the reveal never plays.
+ */
+const SKIP_ON_READY = `(() => {
+  const start = Document.prototype.startViewTransition;
+  let n = 0;
+  Document.prototype.startViewTransition = function (update) {
+    const t = start.call(this, update);
+    if (++n === 2) t.ready.then(() => t.skipTransition());
+    return t;
+  };
+})();`;
+
+/** No view transition at all: the toggle switches the theme in one step. */
+const NO_VIEW_TRANSITION =
+  'Object.defineProperty(document, "startViewTransition", { value: undefined });';
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
