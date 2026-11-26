@@ -1365,24 +1365,73 @@ test.describe("chrome", () => {
       )
     ).toHaveCount(0);
 
-    // Every instagram.com URL in authored source, and where it sits. A script
-    // source is not a hyperlink; the one post URL is PRV-16's.
-    const url = /https?:\/\/(?:[a-z0-9-]+\.)*instagram\.com[^\s"'`)]*/gi;
+    // Every Instagram URL in authored source, absolute or scheme-relative,
+    // judged by its host: instagram.com or any subdomain. A script source is
+    // not a hyperlink. The one post URL is PRV-16's: allowed while it exists,
+    // and gone once PRV-16 has merged.
+    const url = /(?:\bhttps?:)?\/\/[^\s"'`<>(){}\\]+/gi;
+    const instagram = (href: string) => {
+      try {
+        const host = new URL(href, "https://example.invalid").hostname;
+        return host === "instagram.com" || host.endsWith(".instagram.com");
+      } catch {
+        return false;
+      }
+    };
     const found: string[] = [];
     for (const dir of ["app", "components", "content", "lib"]) {
       for (const file of filesUnder(dir)) {
-        if (!/\.(tsx?|jsx?|mdx?|json)$/.test(file)) continue;
+        if (!/\.(?:[cm]?[jt]sx?|mdx?|json|html?)$/.test(file)) continue;
         const text = readFileSync(path.join(ROOT, file), "utf8");
         for (const m of text.matchAll(url)) {
+          if (!instagram(m[0])) continue;
           const before = text.slice(Math.max(0, m.index - 6), m.index);
           if (/src=["']$/.test(before) && /\.js$/.test(m[0])) continue;
           found.push(`${file} ${m[0]}`);
         }
       }
     }
-    expect(found).toEqual([
-      "content/blog/first-marathon.mdx https://www.instagram.com/p/DUxtiRsARJw/",
+    const MARATHON =
+      "content/blog/first-marathon.mdx https://www.instagram.com/p/DUxtiRsARJw/";
+    const prv16 = readJson<string[]>(
+      path.join(ROOT, "docs/boards/merged.json")
+    ).includes("PRV-16");
+    expect(found.filter((f) => prv16 || f !== MARATHON)).toEqual([]);
+
+    // The scan itself: both URL forms, by host, and nothing else.
+    const sample = [
+      '<a href="https://instagram.com/x">',
+      '<a href="//www.instagram.com/studiosc">',
+      '<a href="https://cdn.instagram.com/y">',
+      '<a href="https://notinstagram.com/z">',
+      '<a href="https://example.com/?u=instagram.com">',
+      "// a comment, not a link",
+    ].join("\n");
+    expect(
+      [...sample.matchAll(url)].map((m) => m[0]).filter(instagram)
+    ).toEqual([
+      "https://instagram.com/x",
+      "//www.instagram.com/studiosc",
+      "https://cdn.instagram.com/y",
     ]);
+
+    // And on the pages the chrome appears on, no rendered link goes there.
+    for (const route of ["/", "/work", "/blog", "/about", "/contact"]) {
+      await open(page, route);
+      const hosts = await page
+        .locator("a[href]")
+        .evaluateAll((as) =>
+          as.map(
+            (a) => new URL(a.getAttribute("href")!, location.href).hostname
+          )
+        );
+      expect(
+        hosts.filter(
+          (h) => h === "instagram.com" || h.endsWith(".instagram.com")
+        ),
+        route
+      ).toEqual([]);
+    }
   });
 });
 
