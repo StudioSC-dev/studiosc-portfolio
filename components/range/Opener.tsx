@@ -2,10 +2,13 @@ import { RANGE_CATEGORIES } from "@/content/range";
 import { OPENER_DOTS, PHONE_DOTS } from "./dots";
 import { RangeWord } from "./RangeSwitch";
 
-const DOTS_STYLE = {
-  opacity: "var(--dots-opacity)",
-  animation: "fade-in 900ms ease-out 120ms both",
-} as const;
+/**
+ * A dot field rests at its theme's --dots-opacity. The load fade plays on the
+ * drawing inside it, so fade-in's final frame (opacity 1) multiplies the
+ * field's own opacity instead of replacing it.
+ */
+const DOTS_STYLE = { opacity: "var(--dots-opacity)" } as const;
+const DOTS_FADE = { animation: "fade-in 900ms ease-out 120ms both" } as const;
 
 const RISE = "rise 560ms cubic-bezier(0.2, 0.7, 0.2, 1)";
 
@@ -30,13 +33,13 @@ function Dots({
       height={height}
       viewBox={`0 0 ${width} ${height}`}
       fill="none"
-      data-motion=""
       className={`pointer-events-none absolute top-0 ${className}`}
       style={DOTS_STYLE}
     >
       <path
         d={d}
-        style={{ stroke: "var(--accent)" }}
+        data-motion=""
+        style={{ stroke: "var(--accent)", ...DOTS_FADE }}
         strokeWidth="2.6"
         strokeLinecap="round"
       />

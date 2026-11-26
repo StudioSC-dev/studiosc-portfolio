@@ -154,6 +154,18 @@ const opener = (page: Page) =>
 const prv8Merged = () =>
   (JSON.parse(read(MERGED)) as string[]).includes("PRV-8");
 
+/** The current theme's resting dot-field opacity (--dots-opacity). */
+const dotsToken = (page: Page) =>
+  page.evaluate(() =>
+    String(
+      Number(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          "--dots-opacity"
+        )
+      )
+    )
+  );
+
 /** The counter's visible text, without the words only a screen reader reads. */
 const counterText = (page: Page) =>
   counter(page).evaluate((p) =>
@@ -452,13 +464,14 @@ test("swap motion, fallback and announcement", async ({ page }, testInfo) => {
 
 test("load moment plays once", async ({ page }, testInfo) => {
   chromiumOnly(testInfo);
-  const opener = '[data-board-section="home/opener"]';
+  const openerRow = '[data-board-section="home/opener"]';
   const range = '[data-board-section="home/range"]';
   const line = (n: number) => page.locator(`h1 > span:nth-child(${n})`);
   const tabRow = () => page.locator(`${range} > div[data-motion]`).nth(0);
   const stage = () => page.locator(`${range} > div[data-motion]`).nth(1);
-  const dots = (scope: string) =>
-    page.locator(`${scope} > svg[data-motion]:visible`);
+  const dots = (scope: string) => page.locator(`${scope} > svg:visible`);
+  // The element in a dot field that plays fade-in: the field or its drawing.
+  const MOVER = "xpath=descendant-or-self::*[@data-motion]";
   const css = (target: Locator) =>
     target.evaluate((el) => {
       const cs = getComputedStyle(el);
@@ -470,17 +483,20 @@ test("load moment plays once", async ({ page }, testInfo) => {
     await open(page, width);
     expect(await css(line(1))).toBe("rise 0.56s 0s");
     expect(await css(line(2))).toBe("rise 0.56s 0.09s");
-    await expect(dots(opener)).toHaveCount(width === 1440 ? 1 : 2);
-    for (const svg of await dots(opener).all())
-      expect((await css(svg)).split(" ").slice(0, 2).join(" ")).toBe(
-        "fade-in 0.9s"
-      );
+    await expect(dots(openerRow)).toHaveCount(width === 1440 ? 1 : 2);
+    for (const svg of await dots(openerRow).all())
+      expect(
+        (await css(svg.locator(MOVER).first())).split(" ").slice(0, 2).join(" ")
+      ).toBe("fade-in 0.9s");
     if (width === 1440) {
       expect(await css(tabRow())).toBe("fade-in 0.42s 0.36s");
       expect(await css(stage())).toBe("stage-in 0.64s 0.22s");
-      expect((await css(dots(range))).split(" ").slice(0, 2).join(" ")).toBe(
-        "fade-in 0.9s"
-      );
+      expect(
+        (await css(dots(range).locator(MOVER).first()))
+          .split(" ")
+          .slice(0, 2)
+          .join(" ")
+      ).toBe("fade-in 0.9s");
     } else {
       expect(await css(tabRow())).toBe("fade-in 0.42s 0.3s");
       expect((await css(stage())).split(" ")[0]).toBe("none");
@@ -493,11 +509,15 @@ test("load moment plays once", async ({ page }, testInfo) => {
       await expect(target).toHaveCSS("opacity", "1");
       expect(SETTLED).toContain(await transformOf(target));
     }
-    // The board's dots settle at fade-in's last frame.
-    for (const svg of await dots(opener).all())
-      await expect(svg).toHaveCSS("opacity", "1");
+    // The dot fields rest at the theme's dot opacity, not fade-in's 1.
+    const allDots = async () => [
+      ...(await dots(openerRow).all()),
+      ...(width === 1440 ? [dots(range)] : []),
+    ];
+    for (const svg of await allDots())
+      await expect(svg).toHaveCSS("opacity", await dotsToken(page));
     if (width === 390)
-      await expect(dots(opener).nth(1)).toHaveCSS("scale", "-1 1");
+      await expect(dots(openerRow).nth(1)).toHaveCSS("scale", "-1 1");
 
     // No later tab, back, next or theme action starts any of them again.
     await page.evaluate(() => {
@@ -510,8 +530,20 @@ test("load moment plays once", async ({ page }, testInfo) => {
     await tabs(page).nth(3).click();
     await page.getByRole("button", { name: "Next plate" }).click();
     await page.getByRole("button", { name: "Previous plate" }).click();
-    await page.getByRole("button", { name: /^switch to (the )?dark/i }).click();
+    await page.waitForTimeout(400);
+    // After a selection, still the theme's resting opacity.
+    for (const svg of await allDots())
+      await expect(svg).toHaveCSS("opacity", await dotsToken(page));
+    await page
+      .getByRole("button", { name: /^switch to (the )?dark/i })
+      .filter({ visible: true })
+      .first()
+      .click();
     await page.waitForTimeout(1000);
+    // After the theme change, the dark theme's resting opacity (0.7).
+    expect(await dotsToken(page)).toBe("0.7");
+    for (const svg of await allDots())
+      await expect(svg).toHaveCSS("opacity", "0.7");
     const starts = await page.evaluate(
       () => (window as unknown as { __starts: string[] }).__starts
     );
@@ -530,7 +562,7 @@ test("load moment plays once", async ({ page }, testInfo) => {
       line(2),
       tabRow(),
       stage(),
-      ...(await dots(opener).all()),
+      ...(await dots(openerRow).locator(MOVER).all()),
     ])
       expect((await css(target)).split(" ")[0]).toBe("none");
     for (const target of [line(1), line(2), tabRow(), stage()])

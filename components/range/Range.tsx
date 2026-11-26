@@ -155,16 +155,17 @@ export async function Range() {
         height="460"
         viewBox="0 0 200 460"
         fill="none"
-        data-motion=""
         className="pointer-events-none absolute top-8 left-0 hidden md:block"
-        style={{
-          opacity: "var(--dots-opacity)",
-          animation: "fade-in 900ms ease-out 200ms both",
-        }}
+        style={{ opacity: "var(--dots-opacity)" }}
       >
+        {/* The fade plays on the drawing; the field keeps its resting opacity. */}
         <path
           d={RANGE_DOTS}
-          style={{ stroke: "var(--accent)" }}
+          data-motion=""
+          style={{
+            stroke: "var(--accent)",
+            animation: "fade-in 900ms ease-out 200ms both",
+          }}
           strokeWidth="2.6"
           strokeLinecap="round"
         />
