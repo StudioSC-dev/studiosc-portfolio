@@ -23,6 +23,7 @@ import {
   type Sections,
 } from "../scripts/boards/model";
 import { TSX } from "./support/config";
+import { BUDGET_ROUTES } from "./support/perf";
 import { collectErrors, stubVercelInsights } from "./support/page";
 import { existsAt, git, prRange, type PrRange, ROOT } from "./support/git";
 
@@ -111,6 +112,18 @@ const firstFrame = (page: Page) =>
 /** Holds back every Next.js script, so nothing hydrates. */
 const holdHydration = (page: Page) =>
   page.route(/\/_next\/static\/.*\.js(\?|$)/, (route) => route.abort());
+
+/**
+ * Where a nav link lands: Writing keeps href="/blog", and once PRV-14 merges
+ * /blog redirects to the work stream at /blog/work.
+ */
+const landsOn = (href: string) =>
+  href === "/blog" &&
+  readJson<string[]>(path.join(ROOT, "docs/boards/merged.json")).includes(
+    "PRV-14"
+  )
+    ? "/blog/work"
+    : href;
 
 const CASE_SLUGS = readdirSync(path.join(ROOT, "content/projects"))
   .filter((f) => f.endsWith(".mdx"))
@@ -749,14 +762,66 @@ test.describe("chrome", () => {
         .locator('a[aria-current="page"]')
         .evaluateAll((as) => as.map((a) => a.getAttribute("href")));
     await expect.poll(current).toEqual([]);
+
+    // Client navigation: a value set on this document survives every click.
+    await page.evaluate(() => {
+      (window as unknown as { __sameDocument: string }).__sameDocument = "yes";
+    });
     for (const [label, href] of NAV) {
       await nav.getByRole("link", { name: label }).click();
-      await expect(page).toHaveURL(href);
+      await expect(page).toHaveURL(landsOn(href));
       await expect.poll(current).toEqual([href]);
+      expect(
+        await page.evaluate(
+          () =>
+            (window as unknown as { __sameDocument?: string }).__sameDocument
+        ),
+        `${label} navigates on the client`
+      ).toBe("yes");
     }
-    for (const [, href] of NAV) {
-      await open(page, href);
-      await expect.poll(current).toEqual([href]);
+
+    // Loaded directly, each section and its detail pages mark their link.
+    const caseRoute = `/work/${CASE_SLUGS[0]}`;
+    const postRoute = BUDGET_ROUTES.find((r) => r.startsWith("/blog/"))!;
+    const sections: [string, string | null][] = [
+      ["/", null],
+      ["/about", null],
+      ["/work", "/work"],
+      [caseRoute, "/work"],
+      ["/blog", "/blog"],
+      [postRoute, "/blog"],
+      ["/contact", "/contact"],
+    ];
+    for (const [route, section] of sections) {
+      await open(page, route);
+      await expect.poll(current, route).toEqual(section ? [section] : []);
+      const looks = await nav.getByRole("link").evaluateAll((as) =>
+        as.map((a) => {
+          const css = getComputedStyle(a);
+          return {
+            href: a.getAttribute("href"),
+            line: css.textDecorationLine,
+            thickness: css.textDecorationThickness,
+            offset:
+              parseFloat(css.textUnderlineOffset) / parseFloat(css.fontSize),
+            background: css.backgroundColor,
+          };
+        })
+      );
+      for (const link of looks) {
+        const at = `${route}: ${link.href}`;
+        if (link.href === "/contact") {
+          // The call to action keeps its fill, current or not.
+          expect(link.background, at).toBe(ink);
+          expect(link.line, at).toBe("none");
+        } else if (link.href === section) {
+          expect(link.line, at).toBe("underline");
+          expect(link.thickness, at).toBe("2px");
+          expect(link.offset, at).toBeCloseTo(0.45, 2);
+        } else {
+          expect(link.line, at).toBe("none");
+        }
+      }
     }
   });
 

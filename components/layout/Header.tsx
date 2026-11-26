@@ -3,6 +3,10 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 import MenuRouteHandler from "@/components/layout/MenuRouteHandler";
 import { PHONE_MENU_ID, PRIMARY_NAV } from "@/components/layout/nav";
 
+/** The boards' current section: a 2px underline, set well below the text. */
+const CURRENT =
+  "aria-[current=page]:underline aria-[current=page]:decoration-2 aria-[current=page]:underline-offset-[0.45em]";
+
 /**
  * The shared header, as the Range boards draw it (`range-light-desktop`,
  * `range-phone`). Desktop: the wordmark, then the nav and the round theme
@@ -36,7 +40,7 @@ export default function Header() {
                     className={
                       item.cta
                         ? "inline-flex min-h-11 items-center rounded-control bg-ink px-[1.125rem] font-semibold text-gallery no-underline"
-                        : "no-underline hover:text-muted"
+                        : `no-underline hover:text-muted ${CURRENT}`
                     }
                   >
                     {item.label}
@@ -74,7 +78,7 @@ export default function Header() {
                   className={
                     item.cta
                       ? "my-2 flex min-h-11 items-center justify-center rounded-control bg-ink px-[1.125rem] font-semibold text-gallery no-underline"
-                      : "flex min-h-11 items-center font-semibold no-underline hover:text-muted"
+                      : `flex min-h-11 items-center font-semibold no-underline hover:text-muted ${CURRENT}`
                   }
                 >
                   {item.label}

@@ -11,8 +11,9 @@ interface MenuRouteHandlerProps {
 /**
  * The header's one route-aware piece. The header itself is server-rendered
  * and does not re-render on client navigation, so this marks the current
- * page's nav links with `aria-current="page"` and closes the phone menu
- * whenever the route changes. It renders nothing.
+ * section's nav links with `aria-current="page"` (Work on /work and every
+ * /work/<slug>, as the case and post boards draw it) and closes the phone
+ * menu whenever the route changes. It renders nothing.
  */
 export default function MenuRouteHandler({ menuId }: MenuRouteHandlerProps) {
   const pathname = usePathname();
@@ -21,7 +22,9 @@ export default function MenuRouteHandler({ menuId }: MenuRouteHandlerProps) {
     for (const link of document.querySelectorAll<HTMLAnchorElement>(
       "a[data-nav-link]"
     )) {
-      if (link.getAttribute("href") === pathname) {
+      const href = link.getAttribute("href") ?? "";
+      // Matched at a path boundary: /work/x is in /work, /workshop is not.
+      if (pathname === href || pathname.startsWith(`${href}/`)) {
         link.setAttribute("aria-current", "page");
       } else {
         link.removeAttribute("aria-current");
