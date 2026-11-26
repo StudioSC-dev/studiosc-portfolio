@@ -166,26 +166,66 @@ const dotsToken = (page: Page) =>
     )
   );
 
+/** What the overflow probe saw over one plate entrance. */
+interface SwapProbe {
+  /** The incoming plate's entrance animation, once it started. */
+  entrance: string | null;
+  /** Largest scrollWidth - clientWidth seen from arming to the entrance's end. */
+  worst: number;
+}
+
 /**
- * Starts sampling the page's horizontal overflow on every frame for `ms`;
- * the returned promise resolves to the largest scrollWidth - clientWidth seen.
+ * Arms a probe, before the click, that samples the page's horizontal
+ * overflow on every frame. It waits for a hidden plate to be shown, reads that
+ * plate's entrance animation, and keeps sampling until the animation has
+ * finished, however long the click takes to land. Collect it with
+ * `swapProbe`.
  */
-const sampleOverflow = (page: Page, ms: number) =>
+const armSwapProbe = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as { __swap: Promise<SwapProbe> };
+    const root = document.documentElement;
+    const overflow = () => root.scrollWidth - root.clientWidth;
+    w.__swap = new Promise<SwapProbe>((resolve) => {
+      let worst = overflow();
+      let done = false;
+      const sample = () => {
+        worst = Math.max(worst, overflow());
+        if (!done) requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+      const observer = new MutationObserver((records) => {
+        const shown = records
+          .map((r) => r.target as HTMLElement)
+          .find(
+            (el) =>
+              el.getAttribute("aria-roledescription") === "slide" && !el.hidden
+          );
+        if (!shown) return;
+        observer.disconnect();
+        requestAnimationFrame(async () => {
+          const entrance = shown
+            .getAnimations()
+            .find((a) =>
+              /^plate-from-/.test((a as CSSAnimation).animationName)
+            ) as CSSAnimation | undefined;
+          if (entrance) await entrance.finished;
+          worst = Math.max(worst, overflow());
+          done = true;
+          resolve({ entrance: entrance?.animationName ?? null, worst });
+        });
+      });
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["hidden"],
+        subtree: true,
+      });
+    });
+  });
+
+const swapProbe = (page: Page) =>
   page.evaluate(
-    (duration) =>
-      new Promise<number>((resolve) => {
-        const root = document.documentElement;
-        let worst = root.scrollWidth - root.clientWidth;
-        const start = performance.now();
-        const frame = () => {
-          worst = Math.max(worst, root.scrollWidth - root.clientWidth);
-          if (performance.now() - start < duration)
-            requestAnimationFrame(frame);
-          else resolve(worst);
-        };
-        requestAnimationFrame(frame);
-      }),
-    ms
+    () => (window as unknown as { __swap: Promise<SwapProbe> }).__swap
   );
 
 /** The counter's visible text, without the words only a screen reader reads. */
@@ -687,10 +727,16 @@ test("phone chip row", async ({ page }, testInfo) => {
   await expect(tabs(page).nth(0)).toBeInViewport({ ratio: 1 });
 
   // The page never scrolls sideways, not even while a plate slides in.
-  for (const name of ["Next plate", "Previous plate", "Next plate"]) {
-    const sampling = sampleOverflow(page, 500);
+  for (const [name, from] of [
+    ["Next plate", "plate-from-right"],
+    ["Previous plate", "plate-from-left"],
+    ["Next plate", "plate-from-right"],
+  ]) {
+    await armSwapProbe(page);
     await page.getByRole("button", { name }).click();
-    expect(await sampling).toBeLessThanOrEqual(0);
+    const probe = await swapProbe(page);
+    expect(probe.entrance).toBe(from);
+    expect(probe.worst).toBeLessThanOrEqual(0);
   }
   const sideways = await page.evaluate(
     () =>
@@ -856,7 +902,24 @@ test("credit and Christine lines", async ({ page, request }, testInfo) => {
   const without = renderPlate(real);
   expect(without).not.toContain("data-christine-line");
   expect(without).not.toContain("Checked by Christine");
-  expect(without).toContain("Built by Seth · Tested by Christine");
+  // The credit as rendered text, so it holds whether or not PRV-8 has
+  // wrapped the names in their person anchors.
+  const creditTexts = async (html: string) => {
+    await page.setContent(html);
+    return (
+      await page.locator("p", { hasText: /^Built by/ }).allInnerTexts()
+    ).map(norm);
+  };
+  const CREDIT = "Built by Seth · Tested by Christine";
+  expect(await creditTexts(without)).toEqual([CREDIT, CREDIT]);
+  // Control: the same plate with PRV-8's anchors mocked in.
+  const anchored = without
+    .split(CREDIT)
+    .join(
+      'Built by <a href="#seth">Seth</a> · Tested by <a href="#christine">Christine</a>'
+    );
+  expect(anchored).not.toContain(CREDIT);
+  expect(await creditTexts(anchored)).toEqual([CREDIT, CREDIT]);
   expect(without).not.toContain("Illustrative wording");
 });
 
