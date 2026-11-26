@@ -1880,6 +1880,22 @@ test.describe("guards", () => {
     const range = prRange();
     const base = range?.base ?? "";
     const changed = range !== null && changedByPr(range, FILE);
+
+    // AC13 of PRV-4: the PR that adds PRV-4 to docs/boards/merged.json drops
+    // Framer Motion from the header, so it must remeasure. It changes the
+    // fixture, and each route's `current` is exactly the bytes measured here.
+    const MERGED = "docs/boards/merged.json";
+    const mergedAt = (ref: string): string[] =>
+      existsAt(ref, MERGED)
+        ? (JSON.parse(git(["show", `${ref}:${MERGED}`])) as string[])
+        : [];
+    const remeasures =
+      range !== null &&
+      !mergedAt(range.base).includes("PRV-4") &&
+      mergedAt(range.head).includes("PRV-4");
+    if (remeasures) {
+      expect(changed, `the PR adding PRV-4 must remeasure ${FILE}`).toBe(true);
+    }
     if (changed) {
       const prHead = process.env.PR_HEAD_SHA?.trim();
       expect(
@@ -1924,6 +1940,7 @@ test.describe("guards", () => {
 
     // On every run: each route's first-load JS is within 3% of `current`.
     const over: string[] = [];
+    const inexact: string[] = [];
     for (const route of BUDGET_ROUTES) {
       const { status, scripts, bytes } = await firstLoadJs(
         browser,
@@ -1941,8 +1958,12 @@ test.describe("guards", () => {
       if (bytes > 1.03 * current[route]) {
         over.push(`${route}: ${bytes} bytes > 1.03 x ${current[route]}`);
       }
+      if (remeasures && bytes !== current[route]) {
+        inexact.push(`${route}: measured ${bytes}, recorded ${current[route]}`);
+      }
     }
     expect(over).toEqual([]);
+    expect(inexact, "PRV-4 records the exact bytes").toEqual([]);
   });
 
   test("no layout shift", async ({ browser, baseURL }, testInfo) => {

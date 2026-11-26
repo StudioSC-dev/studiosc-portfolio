@@ -1,5 +1,5 @@
 {
-  "measured_sha": "82f1c2c9407225e27373256db49b9eedb84c0c09",
+  "measured_sha": "4cf3880bdf0977b817b748e757f791eb5d633a2e",
   "metric": "First-load JS: total transferred (encoded) response-body bytes of script requests, from navigation to the first network idle, in a fresh Chromium context, against a production build.",
   "unit": "bytes",
   "rules": "`original` is never edited. `current` may only go down, and only with a fresh measurement at `measured_sha`.",
@@ -12,11 +12,11 @@
     "/about": 276828
   },
   "current": {
-    "/": 273291,
-    "/work": 280646,
-    "/work/tallyandtrace": 280646,
-    "/blog": 280646,
-    "/blog/tallyandtrace-performance": 280646,
-    "/about": 275022
+    "/": 273311,
+    "/work": 280666,
+    "/work/tallyandtrace": 280666,
+    "/blog": 280666,
+    "/blog/tallyandtrace-performance": 280666,
+    "/about": 275042
   }
 }
