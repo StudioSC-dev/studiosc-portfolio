@@ -13,6 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
+import ts from "typescript";
 import * as links from "../lib/links";
 import { THEME_STORAGE_KEY } from "../lib/theme";
 import { getProjects } from "../lib/mdx";
@@ -278,15 +279,50 @@ const MODULE_EXTENSIONS = [
 ];
 
 /**
- * Every import form: `import … from`, `export … from`, a bare side-effect
- * `import "x"`, a dynamic `import("x")` and `require("x")`.
+ * The module specifiers a file names, read from its TypeScript syntax tree,
+ * so comments and strings never count and every form does: `import … from`,
+ * a bare `import "x"` (comments or not), `export … from`, `import x =
+ * require("x")`, a dynamic `import("x")` and `require("x")`.
  */
-const IMPORT_FORMS = [
-  /\b(?:import|export)\b[^"';]*?\bfrom\s*["']([^"']+)["']/g,
-  /\bimport\s*["']([^"']+)["']/g,
-  /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-  /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g,
-];
+function moduleSpecifiers(file: string, source: string): string[] {
+  const kind = /\.tsx$/.test(file)
+    ? ts.ScriptKind.TSX
+    : /\.jsx$/.test(file)
+      ? ts.ScriptKind.JSX
+      : /\.[cm]?ts$/.test(file)
+        ? ts.ScriptKind.TS
+        : ts.ScriptKind.JS;
+  const tree = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    kind
+  );
+  const out: string[] = [];
+  const literal = (node: ts.Node | undefined) => {
+    if (node && ts.isStringLiteralLike(node)) out.push(node.text);
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+      literal(node.moduleSpecifier);
+    else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference)
+    )
+      literal(node.moduleReference.expression);
+    else if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require"))
+    )
+      literal(node.arguments[0]);
+    ts.forEachChild(node, visit);
+  };
+  visit(tree);
+  return out;
+}
 
 /**
  * The modules a module reaches through local imports (`@/` and relative),
@@ -303,9 +339,7 @@ function localImports(
   if (seen.has(entry)) return { modules: seen, missing };
   seen.add(entry);
   const source = readFileSync(path.join(root, entry), "utf8");
-  const specifiers = IMPORT_FORMS.flatMap((form) =>
-    [...source.matchAll(form)].map((m) => m[1])
-  );
+  const specifiers = moduleSpecifiers(entry, source);
   const isFile = (f: string) =>
     existsSync(path.join(root, f)) && statSync(path.join(root, f)).isFile();
   for (const spec of specifiers) {
@@ -1403,6 +1437,11 @@ test.describe("chrome", () => {
           'const d = import("./d");',
           'const e = require("./e");',
           'import "./style.css";',
+          'import /* setup */ "./setup";',
+          '// For example, import "./not-an-import";',
+          '/* or require("./nor-this") */',
+          "const text = 'import \"./a-string\"';",
+          "import f = require('./f');",
         ].join("\n")
       );
       put("types.ts", "export type A = 1;");
@@ -1412,6 +1451,8 @@ test.describe("chrome", () => {
       put("d.cjs", "module.exports = 1;");
       put("e.js", "module.exports = 1;");
       put("style.css", "");
+      put("setup.ts", "export {};");
+      put("f.cts", "export = 1;");
       const walked = localImports("entry.tsx", fixture);
       expect([...walked.modules].sort()).toEqual([
         "b.ts",
@@ -1419,6 +1460,8 @@ test.describe("chrome", () => {
         "d.cjs",
         "e.js",
         "entry.tsx",
+        "f.cts",
+        "setup.ts",
         "side-effect.jsx",
         "types.ts",
       ]);
