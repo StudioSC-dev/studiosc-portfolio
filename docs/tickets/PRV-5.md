@@ -1,4 +1,3 @@
-PRV-5
 # The opener, the range and the Central Command plate
 
 **Planned:** Opus, L, wave 2
