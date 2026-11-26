@@ -504,6 +504,35 @@ function outsideScope(files: readonly string[]): string[] {
   );
 }
 
+/**
+ * Files under the production directories that differ between two commits:
+ * without rename detection, so a file moved out of one shows at its source,
+ * and a removal shows too, and with the directories as pathspecs.
+ */
+function productionChanges(from: string, to: string, cwd = ROOT): string[] {
+  return execFileSync(
+    "git",
+    [
+      "-c",
+      "core.quotePath=false",
+      "diff",
+      "--name-only",
+      "--no-renames",
+      from,
+      to,
+      "--",
+      "app",
+      "components",
+      "content",
+      "lib",
+      "public",
+    ],
+    { cwd, encoding: "utf8", env: gitEnv() }
+  )
+    .split("\n")
+    .filter(Boolean);
+}
+
 /** A push build: no PR, so the PR-only checks skip with this reason. */
 const NO_PR = "a CI build without PR_HEAD_SHA (a push) has no PR to judge";
 
@@ -1739,6 +1768,48 @@ test.describe("Range design system", () => {
       "run 1 cls is not a finite number",
     ]);
 
+    // Controls for the measured-commit gate: a file moved out of `public/`
+    // into `docs/`, and a removed one, both show as production changes.
+    const tmpRepo = fs.mkdtempSync(path.join(os.tmpdir(), "prv26-prod-"));
+    try {
+      const inRepo = (...args: string[]) =>
+        execFileSync(
+          "git",
+          [
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            ...args,
+          ],
+          { cwd: tmpRepo, stdio: "ignore", env: gitEnv() }
+        );
+      inRepo("init", "-q");
+      fs.mkdirSync(path.join(tmpRepo, "public"));
+      fs.mkdirSync(path.join(tmpRepo, "docs"));
+      fs.writeFileSync(
+        path.join(tmpRepo, "public/a.txt"),
+        "moved\n".repeat(30)
+      );
+      fs.writeFileSync(
+        path.join(tmpRepo, "public/b.txt"),
+        "removed\n".repeat(30)
+      );
+      inRepo("add", "-A");
+      inRepo("commit", "-q", "--no-verify", "-m", "before");
+      inRepo("mv", "public/a.txt", "docs/a.txt");
+      inRepo("rm", "-q", "public/b.txt");
+      inRepo("commit", "-q", "--no-verify", "-m", "after");
+      expect(productionChanges("HEAD~1", "HEAD", tmpRepo).sort()).toEqual([
+        "public/a.txt",
+        "public/b.txt",
+      ]);
+    } finally {
+      fs.rmSync(tmpRepo, { recursive: true, force: true });
+    }
+
     // Both records (PRV-2's and PRV-26's) are validated on every execution,
     // and the 3.8 s gate applies to the median recomputed from the runs.
     const median = (values: number[]) => [...values].sort((a, b) => a - b)[1];
@@ -1749,7 +1820,7 @@ test.describe("Range design system", () => {
       );
       expect(perf.route, `${file} route`).toBe("/");
       expect(perf.lighthouse_version, `${file} lighthouse`).toMatch(
-        /^\d+\.\d+\.\d+/
+        /^\d+\.\d+\.\d+$/
       );
       expect(perf.runs, `${file} runs`).toHaveLength(3);
       expect(perfRunProblems(perf.runs), `${file} runs`).toEqual([]);
@@ -1806,9 +1877,7 @@ test.describe("Range design system", () => {
         gitOk("merge-base", "--is-ancestor", perf.measured_sha, head),
         `${perf.measured_sha} is not an ancestor of ${head}. ${remeasure}`
       ).toBe(true);
-      const changed = git("diff", "--name-only", perf.measured_sha, head)
-        .split("\n")
-        .filter((f) => /^(app|components|content|lib|public)\//.test(f));
+      const changed = productionChanges(perf.measured_sha, head);
       expect(
         changed,
         `code changed since ${perf.measured_sha}. ${remeasure}`
@@ -1914,57 +1983,119 @@ test.describe("Range design system", () => {
     expect(ticket, "ticket records the JetBrains Mono source").toContain(
       JETBRAINS_MONO.source
     );
-    // Served bytes: the fragment face where a fragment renders, the code face
-    // where code does, one successful response each.
-    const manropeSettle = watchFonts(page);
-    await page.goto("/");
-    await inject(page, FRAGMENT_FIXTURES);
-    const withFragments = await manropeSettle();
-    expect(
-      redHatPinProblems(withFragments, pins, ["Manrope"]),
-      "Manrope served on a fragment route"
-    ).toEqual([]);
-    const codeSettle = watchFonts(page);
-    await page.goto(CODE_ROUTE);
-    const withCode = (await codeSettle()).filter(
-      (l) => l.family === "JetBrains Mono"
-    );
-    expect(withCode.map((l) => [l.status, l.sha256])).toEqual([
-      [200, JETBRAINS_MONO.sha256],
-    ]);
-    // Limited to where they apply: neither is fetched on `/` without a
-    // fragment or code, nor is Manrope on the code page.
-    const plainPage = await page.context().newPage();
-    const plainSettle = watchFonts(plainPage);
-    await plainPage.goto("/");
-    const plain = await plainSettle();
-    await plainPage.close();
-    expect(
-      plain.filter((l) => /^(Manrope|JetBrains Mono)$/.test(l.family)),
-      "Manrope or JetBrains Mono on a page with neither"
-    ).toEqual([]);
-    // Control: other bytes in place of Manrope's pin fail.
-    const manropeProxy = await swapFontProxy(baseURL!, {
-      sha256: pins.Manrope.sha256,
-      body: fs.readFileSync(
-        path.join(ROOT, PINNED_RED_HAT["Red Hat Text"].copy)
-      ),
-    });
-    try {
-      const swapPage = await page.context().newPage();
-      const swapSettle = watchFonts(swapPage);
-      await swapPage.goto(manropeProxy.url + "/");
-      await inject(swapPage, FRAGMENT_FIXTURES);
-      const swapped = await swapSettle();
-      expect(manropeProxy.swapped()).toBeGreaterThan(0);
+    // Served bytes, on every sampled route: each face is fetched once where
+    // its element renders (a Manrope fragment, a `pre` or `code`) and never
+    // elsewhere, and every response is the face's pin. What renders is read
+    // from the page itself, so a route that later renders a fragment on `/`
+    // stays green.
+    const shas = {
+      Manrope: pins.Manrope.sha256,
+      "JetBrains Mono": JETBRAINS_MONO.sha256,
+    };
+    // A home page that renders a Manrope fragment, as the Range homepage will
+    // (a proxy appends one to the home document).
+    const fragmentRow = "[data-prv26-manrope-row]";
+    const fragmentMarkup =
+      '<div data-fragment="central-command" data-prv26-manrope-row>' +
+      "<p>Day feed, 12 November</p></div>";
+    const scopeOf = async (target: string, markup?: string) => {
+      const sample = await page.context().newPage();
+      try {
+        const settle = watchFonts(sample);
+        await sample.goto(target);
+        if (markup) await inject(sample, markup);
+        const found = await settle();
+        const scope = await sample.evaluate<FontScope>(() => ({
+          manrope: Array.from(
+            document.querySelectorAll<HTMLElement>("[data-fragment]")
+          ).some((el) =>
+            ["central-command", "habit-tracker"].includes(
+              el.dataset.fragment ?? ""
+            )
+          ),
+          mono: document.querySelector("pre, code") !== null,
+        }));
+        return { loads: found, scope };
+      } finally {
+        await sample.close();
+      }
+    };
+    const sampled = [
+      ...new Set(["/", CODE_ROUTE, ...BUDGET_ROUTES, ...SCOPE_ROUTES]),
+    ];
+    for (const target of sampled) {
+      const { loads: found, scope } = await scopeOf(target);
       expect(
-        redHatPinProblems(swapped, pins, ["Manrope"]),
-        "Manrope control"
-      ).toHaveLength(1);
-      await swapPage.close();
-    } finally {
-      await manropeProxy.close();
+        fontScopeProblems(found, scope, shas),
+        `Manrope and JetBrains Mono on ${target}, which renders ${JSON.stringify(scope)}`
+      ).toEqual([]);
     }
+    const injected = await scopeOf("/", FRAGMENT_FIXTURES);
+    expect(
+      injected.scope.manrope,
+      "the fixtures render a Manrope fragment"
+    ).toBe(true);
+    expect(
+      injected.loads.filter((l) => l.family === "Manrope"),
+      "Manrope beside the fixtures"
+    ).toHaveLength(1);
+    expect(fontScopeProblems(injected.loads, injected.scope, shas)).toEqual([]);
+    const fragmentHome = await swapFontProxy(baseURL!, null, fragmentMarkup);
+    try {
+      const native = await scopeOf(`${fragmentHome.url}/`);
+      expect(native.scope, "the proxied home renders a fragment").toEqual({
+        manrope: true,
+        mono: false,
+      });
+      expect(
+        fontScopeProblems(native.loads, native.scope, shas),
+        "Manrope where `/` itself renders a fragment"
+      ).toEqual([]);
+      expect(
+        native.loads.filter((l) => l.family === "Manrope"),
+        "Manrope on a home that renders a fragment"
+      ).toHaveLength(1);
+    } finally {
+      await fragmentHome.close();
+    }
+    const codePage = await scopeOf(CODE_ROUTE);
+    expect(codePage.scope.mono, "the code route renders code").toBe(true);
+    expect(
+      codePage.loads.filter((l) => l.family === "JetBrains Mono"),
+      "JetBrains Mono on the code route"
+    ).toHaveLength(1);
+    // Controls: a face where nothing renders it, a face with other bytes, a
+    // failed response and a missing face each fail.
+    const manropeLoad = injected.loads.find((l) => l.family === "Manrope")!;
+    const monoLoad = codePage.loads.find((l) => l.family === "JetBrains Mono")!;
+    const none: FontScope = { manrope: false, mono: false };
+    expect(fontScopeProblems([manropeLoad], none, shas)).toHaveLength(1);
+    expect(fontScopeProblems([monoLoad], none, shas)).toHaveLength(1);
+    expect(
+      fontScopeProblems(
+        [{ ...manropeLoad, sha256: "0".repeat(64) }],
+        { ...none, manrope: true },
+        shas
+      )
+    ).toHaveLength(1);
+    expect(
+      fontScopeProblems(
+        [{ ...monoLoad, status: 404 }],
+        { ...none, mono: true },
+        shas
+      )
+    ).toHaveLength(1);
+    expect(
+      fontScopeProblems([], { ...none, manrope: true }, shas)
+    ).toHaveLength(1);
+    // A Manrope response on a code page is caught, not filtered away.
+    expect(
+      fontScopeProblems(
+        [...codePage.loads, manropeLoad],
+        { ...none, mono: true },
+        shas
+      )
+    ).toHaveLength(1);
 
     // The fidelity harness, on the production build of `/`: an in-memory
     // `chrome/header` row marked built, with a selector that matches the
@@ -1973,13 +2104,21 @@ test.describe("Range design system", () => {
     const loaded = loadBoards(dir).sections;
     const row = loaded.rows.find((r) => r.id === "chrome/header");
     expect(row, "chrome/header row in sections.json").toBeDefined();
-    const sections = {
+    const withRow = (site: string) => ({
       ...loaded,
       rows: loaded.rows.map((r) =>
-        r.id === "chrome/header" ? { ...r, built: true, site: "header" } : r
+        r.id === "chrome/header" ? { ...r, built: true, site } : r
       ),
-    };
-    expect(await page.locator(row ? "header" : "").count()).toBeGreaterThan(0);
+    });
+    const sections = withRow("header");
+    // The selector is checked on `/`, the route the row is measured on.
+    const homePage = await page.context().newPage();
+    await homePage.goto("/");
+    expect(
+      await homePage.locator("header").count(),
+      "headers on /"
+    ).toBeGreaterThan(0);
+    await homePage.close();
     const only = {
       rows: ["chrome/header"],
       widths: ["1440" as const],
@@ -1994,6 +2133,12 @@ test.describe("Range design system", () => {
       failures.filter((f) =>
         f.property.toLowerCase().startsWith(`font ${family.toLowerCase()}`)
       );
+    const notDrawn = (
+      failures: Awaited<ReturnType<typeof checkSite>>["failures"]
+    ) =>
+      failures.filter(
+        (f) => f.section === "chrome/header" && f.property === "drawn"
+      );
     const clean = await checkSite({
       dir,
       baseURL: baseURL!,
@@ -2005,12 +2150,23 @@ test.describe("Range design system", () => {
       clean.checked.filter((c) => c.startsWith("chrome/header ")),
       "comparisons made for chrome/header"
     ).not.toHaveLength(0);
+    expect(notDrawn(clean.failures), "the header is drawn on /").toEqual([]);
     for (const family of RED_HAT_FAMILIES) {
       expect(
         fontFailures(clean.failures, family),
         `${family} failures`
       ).toEqual([]);
     }
+    // Control: a selector that matches nothing is reported as not drawn, so
+    // the assertion above does detect a row the harness could not capture.
+    const missing = await checkSite({
+      dir,
+      baseURL: baseURL!,
+      browser,
+      only,
+      boards: { sections: withRow("[data-prv26-no-such-element]") },
+    });
+    expect(notDrawn(missing.failures), "a missing header").not.toHaveLength(0);
 
     // Control: the same run against a server that answers each family's
     // request with other bytes (the other family's file, a valid font that is
@@ -2042,6 +2198,53 @@ test.describe("Range design system", () => {
         await proxy.close();
       }
     }
+
+    // Manrope through the same harness: no page renders a Manrope fragment
+    // yet, so a proxy appends one to the home document, and the in-memory row
+    // is that element. Served as is, the harness reports no Manrope failure;
+    // with the proxy swapping Manrope's bytes it reports one.
+    const manropeSections = withRow(fragmentRow);
+    const manropeRun = async (
+      swap: { sha256: string; body: Uint8Array } | null
+    ) => {
+      const proxy = await swapFontProxy(baseURL!, swap, fragmentMarkup);
+      try {
+        const result = await checkSite({
+          dir,
+          baseURL: proxy.url,
+          browser,
+          only,
+          boards: { sections: manropeSections },
+        });
+        return { result, swapped: proxy.swapped() };
+      } finally {
+        await proxy.close();
+      }
+    };
+    const manropeClean = await manropeRun(null);
+    expect(
+      manropeClean.result.checked.filter((c) => c.startsWith("chrome/header ")),
+      "comparisons made for the Manrope row"
+    ).not.toHaveLength(0);
+    expect(notDrawn(manropeClean.result.failures), "the Manrope row").toEqual(
+      []
+    );
+    expect(
+      fontFailures(manropeClean.result.failures, "Manrope"),
+      "Manrope failures"
+    ).toEqual([]);
+    const manropeSwapped = await manropeRun({
+      sha256: pins.Manrope.sha256,
+      body: bytesOfPin("Red Hat Text"),
+    });
+    expect(
+      manropeSwapped.swapped,
+      "Manrope bytes were swapped"
+    ).toBeGreaterThan(0);
+    expect(
+      fontFailures(manropeSwapped.result.failures, "Manrope"),
+      "Manrope control failures"
+    ).not.toHaveLength(0);
   });
 
   test("changes stay within PRV-26 scope", async () => {
@@ -2112,36 +2315,68 @@ test.describe("Range design system", () => {
     expect(declaration(after, "ibmPlexSans"), "ibmPlexSans unchanged").toBe(
       declaration(before, "ibmPlexSans")
     );
-    const options = (source: string, name: string) => {
-      const opts = fontOptions(source, name);
-      return {
-        variable: optionValue(opts, "variable"),
-        display: optionValue(opts, "display"),
-        preload: optionValue(opts, "preload"),
-        weight: optionValue(opts, "weight"),
-      };
+    // The complete option lists, key by key. The documented differences are
+    // the loader, the source file, `subsets` (a local file has no subsets),
+    // `style: "normal"`, an explicit fallback setting, and Manrope's one
+    // variable range for its four listed weights; everything else is equal.
+    const optionMap = (source: string, name: string) =>
+      Object.fromEntries(
+        Array.from(
+          fontOptions(source, name).matchAll(/^\s*(\w+):\s*(.+?),?\s*$/gm),
+          (m) => [m[1], m[2]]
+        )
+      ) as Record<string, string>;
+    const normalised = (map: Record<string, string>, drop: readonly string[]) =>
+      Object.fromEntries(
+        Object.entries(map).filter(([k]) => !drop.includes(k))
+      );
+    const monoProblems = (headSource: string) => {
+      const head = optionMap(headSource, JETBRAINS_MONO.exportName);
+      const base = optionMap(before, "jetbrainsMono");
+      const problems: string[] = [];
+      if (head.adjustFontFallback !== "false")
+        problems.push("adjustFontFallback is not false");
+      if (head.style !== '"normal"') problems.push("style is not normal");
+      const same =
+        JSON.stringify(
+          normalised(head, ["src", "style", "adjustFontFallback"])
+        ) === JSON.stringify(normalised(base, ["subsets"]));
+      if (!same) problems.push("options differ from the base");
+      return problems;
     };
-    expect(options(after, JETBRAINS_MONO.exportName)).toEqual(
-      options(before, "jetbrainsMono")
-    );
-    const manropeBefore = options(before, "manrope");
-    const manropeAfter = options(after, MANROPE.exportName);
-    expect({ ...manropeAfter, weight: undefined }).toEqual({
-      ...manropeBefore,
-      weight: undefined,
-    });
+    expect(monoProblems(after), "JetBrains Mono options").toEqual([]);
+    const manropeBase = optionMap(before, "manrope");
+    const manropeHead = optionMap(after, MANROPE.exportName);
+    expect(manropeHead.adjustFontFallback, "Manrope fallback").toBe('"Arial"');
+    expect(manropeHead.style).toBe('"normal"');
+    expect(
+      normalised(manropeHead, ["src", "style", "adjustFontFallback", "weight"]),
+      "Manrope options"
+    ).toEqual(normalised(manropeBase, ["subsets", "weight"]));
     // The base listed four weights; the one variable file covers them all.
-    const listed = (manropeBefore.weight as string[]).map(Number);
-    const [lo, hi] = String(manropeAfter.weight).split(" ").map(Number);
+    const listed = Array.from(manropeBase.weight.matchAll(/\d+/g), (m) =>
+      Number(m[0])
+    );
+    const [lo, hi] = manropeHead.weight
+      .replace(/"/g, "")
+      .split(" ")
+      .map(Number);
+    expect(listed).toHaveLength(4);
     for (const w of listed) expect(w >= lo && w <= hi).toBe(true);
     expect(after).not.toMatch(/from\s+["']next\/font\/google["']/);
-    // Controls: a changed option, and a changed loader on IBM Plex Sans, differ.
+    // Controls: a fallback face for JetBrains Mono, another changed option, and
+    // a changed loader on IBM Plex Sans each fail.
     expect(
-      options(
-        after.replace('weight: "400",', 'weight: "500",'),
-        JETBRAINS_MONO.exportName
+      monoProblems(
+        after.replace(
+          "adjustFontFallback: false",
+          'adjustFontFallback: "Arial"'
+        )
       )
-    ).not.toEqual(options(before, "jetbrainsMono"));
+    ).not.toEqual([]);
+    expect(
+      monoProblems(after.replace('weight: "400",', 'weight: "500",'))
+    ).not.toEqual([]);
     expect(
       declaration(
         after.replace(
@@ -2798,13 +3033,53 @@ function declaration(source: string, name: string): string | undefined {
   ).exec(source)?.[0];
 }
 
+/** What a route renders that decides which of the two pinned faces it may load. */
+interface FontScope {
+  /** A Central Command or habit-tracker fragment: the Manrope fragments. */
+  manrope: boolean;
+  /** A `pre` or `code` element: JetBrains Mono's only use. */
+  mono: boolean;
+}
+
+/**
+ * What is wrong with the Manrope and JetBrains Mono responses of one page,
+ * given what the page renders: each face is fetched exactly once where its
+ * element renders and never elsewhere, and every response is a 2xx whose bytes
+ * are the face's pin (Manrope: the board's; JetBrains Mono: the ticket's).
+ */
+function fontScopeProblems(
+  loads: readonly FontLoad[],
+  scope: FontScope,
+  shas: { Manrope: string; "JetBrains Mono": string }
+): string[] {
+  const problems: string[] = [];
+  const wants = { Manrope: scope.manrope, "JetBrains Mono": scope.mono };
+  for (const family of ["Manrope", "JetBrains Mono"] as const) {
+    const own = loads.filter((l) => l.family === family);
+    if (own.length !== (wants[family] ? 1 : 0)) {
+      problems.push(
+        `${family}: ${own.length} responses where ${wants[family] ? "one is" : "none are"} expected`
+      );
+    }
+    for (const l of own) {
+      if (l.status < 200 || l.status >= 300) {
+        problems.push(`${family}: status ${l.status}`);
+      } else if (l.sha256 !== shas[family]) {
+        problems.push(`${family}: sha256 ${l.sha256} is not its pin`);
+      }
+    }
+  }
+  return problems;
+}
+
 /**
  * A proxy in front of the site that answers a request for the font file with
  * the given sha256 with other bytes: how the control run serves unpinned bytes.
  */
 async function swapFontProxy(
   target: string,
-  swap: { sha256: string; body: Uint8Array }
+  swap: { sha256: string; body: Uint8Array } | null,
+  appendToHome?: string
 ): Promise<{ url: string; swapped: () => number; close: () => Promise<void> }> {
   let swapped = 0;
   const server = http.createServer((req, res) => {
@@ -2814,9 +3089,21 @@ async function swapFontProxy(
         redirect: "manual",
       });
       let body: Uint8Array = Buffer.from(await upstream.arrayBuffer());
-      if (sha256Of(Buffer.from(body)) === swap.sha256) {
+      if (swap && sha256Of(Buffer.from(body)) === swap.sha256) {
         body = swap.body;
         swapped += 1;
+      }
+      // The home document with markup appended: a page that renders a fragment.
+      if (
+        appendToHome &&
+        req.url === "/" &&
+        /text\/html/.test(upstream.headers.get("content-type") ?? "")
+      ) {
+        body = Buffer.from(
+          Buffer.from(body)
+            .toString("utf8")
+            .replace("</body>", `${appendToHome}</body>`)
+        );
       }
       const headers: Record<string, string> = {};
       upstream.headers.forEach((value, key) => {
