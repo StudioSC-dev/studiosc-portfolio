@@ -118,7 +118,6 @@ export default function AboutPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <PageHeader
-        label="About"
         title="About Us"
         lead="Two professionals, one mission: delivering exceptional software."
         divider={false}

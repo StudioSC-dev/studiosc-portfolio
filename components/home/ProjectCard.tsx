@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Github } from "lucide-react";
-import StatusBadge from "@/components/ui/StatusBadge";
+import StatusText from "@/components/ui/StatusText";
 import CtaLink from "@/components/ui/CtaLink";
 import type { ProjectStatus } from "@/lib/statuses";
 
@@ -58,9 +58,10 @@ const ProjectCard = ({
       <div className="flex flex-1 flex-col p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <h3 className="font-serif text-xl leading-snug text-ink">{title}</h3>
-          <span className="mt-1">
-            <StatusBadge status={status} />
-          </span>
+          <StatusText
+            status={status}
+            className="mt-1 shrink-0 text-sm font-semibold whitespace-nowrap"
+          />
         </div>
 
         <p className="mb-6 line-clamp-2 text-sm leading-relaxed text-body">
@@ -72,16 +73,12 @@ const ProjectCard = ({
         </p>
 
         {/* z-20 lifts these above the stretched card link so they stay
-            independently clickable. Sized `sm` to fit a three-column card. */}
+            independently clickable. */}
         {(liveUrl || githubUrl) && (
           <div className="relative z-20 mt-auto flex flex-wrap items-center gap-3 border-t border-line pt-5">
-            {liveUrl && (
-              <CtaLink href={liveUrl} size="sm">
-                Visit
-              </CtaLink>
-            )}
+            {liveUrl && <CtaLink href={liveUrl}>Visit</CtaLink>}
             {githubUrl && (
-              <CtaLink href={githubUrl} variant="secondary" size="sm">
+              <CtaLink href={githubUrl} variant="secondary">
                 <Github className="h-3.5 w-3.5" />
                 GitHub
               </CtaLink>

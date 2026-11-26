@@ -14,7 +14,6 @@ export default function HermesPersonalAssistantPrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <PageHeader
-        label="Privacy"
         title="Hermes Personal Assistant"
         lead="This policy explains how the personal Google Workspace integration used by Hermes Personal Assistant accesses, uses, stores, and protects Google user data."
       />

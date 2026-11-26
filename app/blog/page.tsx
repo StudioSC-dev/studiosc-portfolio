@@ -15,7 +15,6 @@ export default async function BlogPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <PageHeader
-        label="Writing"
         title="Blog"
         lead="Technical insights, QA strategies, and stories from the field."
       />

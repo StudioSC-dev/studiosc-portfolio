@@ -1,6 +1,13 @@
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 import { THEME_STORAGE_KEY } from "../lib/theme";
+import { STATUS_KEYS, STATUSES } from "../lib/statuses";
+import { TSX } from "./support/config";
 import { collectErrors, stubVercelInsights } from "./support/page";
+import { ROOT } from "./support/git";
 
 /**
  * PRV-4: the shared header and footer, the theme switch, and the shared
@@ -87,6 +94,69 @@ const firstFrame = (page: Page) =>
 /** Holds back every Next.js script, so nothing hydrates. */
 const holdHydration = (page: Page) =>
   page.route(/\/_next\/static\/.*\.js(\?|$)/, (route) => route.abort());
+
+const CASE_SLUGS = readdirSync(path.join(ROOT, "content/projects"))
+  .filter((f) => f.endsWith(".mdx"))
+  .map((f) => f.replace(/\.mdx$/, ""));
+
+/** The computed colour a token resolves to, as `rgb(...)`. */
+async function tokenColour(page: Page, token: string) {
+  return page.evaluate((t) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${t})`;
+    document.body.appendChild(probe);
+    const colour = getComputedStyle(probe).color;
+    probe.remove();
+    return colour;
+  }, token);
+}
+
+interface Render {
+  /** The component's module, repo-relative. */
+  module: string;
+  props: Record<string, unknown>;
+  children?: string;
+}
+
+/**
+ * Renders shared components to static markup in a plain Node process. The
+ * test runner compiles JSX for its own component testing, so a component
+ * imported here would not render as React.
+ */
+function renderMarkup(renders: Render[]): string[] {
+  // Outside the repo, so no lint, type-check or git status ever sees it.
+  const dir = mkdtempSync(path.join(tmpdir(), "prv4-render-"));
+  const script = path.join(dir, "render.mjs");
+  const calls = renders.map((r, i) => {
+    const args = [`C${i}`, JSON.stringify(r.props)];
+    if (r.children !== undefined) args.push(JSON.stringify(r.children));
+    return `renderToStaticMarkup(createElement(${args.join(", ")}))`;
+  });
+  writeFileSync(
+    script,
+    [
+      'import { createRequire } from "node:module";',
+      `const require = createRequire(${JSON.stringify(path.join(ROOT, "package.json"))});`,
+      'const { createElement } = require("react");',
+      'const { renderToStaticMarkup } = require("react-dom/server");',
+      ...renders.map(
+        (r, i) =>
+          `const C${i} = (await import(${JSON.stringify(path.join(ROOT, r.module))})).default;`
+      ),
+      `console.log(JSON.stringify([${calls.join(", ")}]));`,
+    ].join("\n")
+  );
+  try {
+    const out = execFileSync(
+      TSX,
+      ["--tsconfig", path.join(ROOT, "tsconfig.json"), script],
+      { cwd: ROOT, encoding: "utf8" }
+    );
+    return JSON.parse(out.trim().split("\n").at(-1)!) as string[];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 test.describe("chrome", () => {
   test("theme follows, stores, no flash", async ({ page }) => {
@@ -262,5 +332,158 @@ test.describe("chrome", () => {
     await toggle(page).click();
     expect(await theme(page)).toBe(before === "dark" ? "light" : "dark");
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe("chrome", () => {
+  test("status as a word", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    // The shared renderer: the word, and nothing else, for all four.
+    const rendered = renderMarkup(
+      STATUS_KEYS.map((status) => ({
+        module: "components/ui/StatusText.tsx",
+        props: { status },
+      }))
+    );
+    expect(rendered).toEqual(
+      STATUS_KEYS.map(
+        (status) =>
+          `<span data-status="${status}">${STATUSES[status].label}</span>`
+      )
+    );
+
+    const routes = ["/", "/work", ...CASE_SLUGS.map((s) => `/work/${s}`)];
+    for (const route of routes) {
+      await open(page, route);
+      const shown = await page.locator("[data-status]").evaluateAll((els) =>
+        els.map((el) => {
+          const own = getComputedStyle(el);
+          const parent = getComputedStyle(el.parentElement!);
+          const pseudo = (p: string) => getComputedStyle(el, p).content;
+          return {
+            status: el.getAttribute("data-status"),
+            text: el.textContent,
+            children: el.childElementCount,
+            before: pseudo("::before"),
+            after: pseudo("::after"),
+            colourOwn: own.color === parent.color,
+            background: own.backgroundColor,
+          };
+        })
+      );
+      expect(shown.length, route).toBeGreaterThan(0);
+      for (const s of shown) {
+        const label = STATUSES[s.status as keyof typeof STATUSES]?.label;
+        expect(s, route).toEqual({
+          status: s.status,
+          text: label,
+          children: 0,
+          before: "none",
+          after: "none",
+          colourOwn: true,
+          background: "rgba(0, 0, 0, 0)",
+        });
+      }
+    }
+  });
+
+  test("shared primitives", async ({ page }, testInfo) => {
+    chromiumOnly(testInfo.project.name);
+    const markup = renderMarkup([
+      {
+        module: "components/ui/CtaLink.tsx",
+        props: { href: "/work" },
+        children: "Every project",
+      },
+      {
+        module: "components/ui/CtaLink.tsx",
+        props: { href: "/contact", variant: "secondary" },
+        children: "Start a project",
+      },
+      {
+        module: "components/layout/PageHeader.tsx",
+        props: { title: "Every project", lead: "A lead." },
+      },
+      {
+        module: "components/ui/FilterGroup.tsx",
+        props: {
+          label: "Filter by status",
+          options: [
+            { value: "all", label: "All" },
+            { value: "live", label: "Live" },
+            { value: "in-qa", label: "In QA" },
+          ],
+          selected: "live",
+        },
+      },
+    ]).join("");
+    expect(markup).not.toMatch(/[←-⇿➔-➿⟰-⟿]/u);
+
+    await open(page, "/no-such-page");
+    await page.evaluate((html) => {
+      document.querySelector("main")!.innerHTML =
+        `<div id="fixture">${html}</div>`;
+    }, markup);
+    const fixture = page.locator("#fixture");
+    const ink = await tokenColour(page, "--ink");
+    const gallery = await tokenColour(page, "--gallery");
+
+    // CtaLink: both variants, 6px, at least 48px tall.
+    for (const [variant, background, border] of [
+      ["primary", ink, "0px"],
+      ["secondary", "rgba(0, 0, 0, 0)", "1px"],
+    ]) {
+      const cta = fixture.locator(`[data-cta="${variant}"]`);
+      await expect(cta).toHaveCSS("border-top-left-radius", "6px");
+      await expect(cta).toHaveCSS("background-color", background);
+      await expect(cta).toHaveCSS("border-top-width", border);
+      expect((await cta.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+    }
+    await expect(fixture.locator('[data-cta="primary"]')).toHaveCSS(
+      "color",
+      gallery
+    );
+
+    // PageHeader: the title and the lead, no eyebrow above the title.
+    expect(
+      await fixture
+        .locator("[data-page-header]")
+        .evaluate((el) => [...el.children].map((c) => c.tagName))
+    ).toEqual(["H1", "P"]);
+
+    // FilterGroup: pills that are toggles, only the picked one pressed and inked.
+    const group = fixture.getByRole("group", { name: "Filter by status" });
+    const pills = group.getByRole("button");
+    await expect(pills).toHaveCount(3);
+    expect(
+      await pills.evaluateAll((bs) =>
+        bs.map((b) => b.getAttribute("aria-pressed"))
+      )
+    ).toEqual(["false", "true", "false"]);
+    for (const [i, background] of [
+      "rgba(0, 0, 0, 0)",
+      ink,
+      "rgba(0, 0, 0, 0)",
+    ].entries()) {
+      const pill = pills.nth(i);
+      await expect(pill).toHaveCSS("background-color", background);
+      const b = (await pill.boundingBox())!;
+      const radius = parseFloat(
+        await pill.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)
+      );
+      expect(radius).toBeGreaterThanOrEqual(b.height / 2);
+    }
+
+    // The pages that use PageHeader show no eyebrow either.
+    for (const route of ["/work", "/blog", "/about", "/contact"]) {
+      await open(page, route);
+      expect(
+        await page
+          .locator("main [data-page-header]")
+          .first()
+          .evaluate((el) => el.firstElementChild?.tagName),
+        route
+      ).toBe("H1");
+    }
   });
 });

@@ -7,7 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Mermaid } from "@/components/blog/ClientComponents";
 import RelatedPosts from "@/components/work/RelatedPosts";
-import StatusBadge from "@/components/ui/StatusBadge";
+import StatusText from "@/components/ui/StatusText";
 import CtaLink from "@/components/ui/CtaLink";
 import { Github } from "lucide-react";
 import { Children, isValidElement } from "react";
@@ -127,7 +127,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
           <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
             <span className="label">{formattedDate}</span>
-            <StatusBadge status={project.status} />
+            <StatusText
+              status={project.status}
+              className="text-sm font-semibold"
+            />
           </div>
 
           {project.tags && project.tags.length > 0 && (
