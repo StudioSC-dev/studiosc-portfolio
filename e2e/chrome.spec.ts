@@ -845,6 +845,16 @@ test.describe("chrome", () => {
       expect(m.x).toBeGreaterThanOrEqual(w.x + w.width);
 
       const isOpen = () => panel.evaluate((el) => el.matches(":popover-open"));
+      // A value on this document survives only client navigation.
+      await page.evaluate(() => {
+        (window as unknown as { __sameDocument: string }).__sameDocument =
+          "yes";
+      });
+      const sameDocument = () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __sameDocument?: string }).__sameDocument
+        );
 
       // Opens by click, holding the same three links in order.
       await menu.click();
@@ -861,6 +871,7 @@ test.describe("chrome", () => {
       await panel.getByRole("link", { name: "Work" }).click();
       await expect(page).toHaveURL("/work");
       await expect.poll(isOpen).toBe(false);
+      expect(await sameDocument()).toBe("yes");
       await menu.click();
       await expect.poll(isOpen).toBe(true);
       await expect(panel.getByRole("link", { name: "Work" })).toHaveAttribute(
@@ -868,7 +879,9 @@ test.describe("chrome", () => {
         "page"
       );
 
-      // Escape closes it and gives focus back to Menu.
+      // Escape from inside the panel closes it and gives focus back to Menu.
+      await panel.getByRole("link", { name: "Writing" }).focus();
+      await expect(panel.getByRole("link", { name: "Writing" })).toBeFocused();
       await page.keyboard.press("Escape");
       await expect.poll(isOpen).toBe(false);
       await expect(menu).toBeFocused();
@@ -878,6 +891,8 @@ test.describe("chrome", () => {
       await menu.focus();
       await page.keyboard.press("Enter");
       await expect.poll(isOpen).toBe(true);
+      await page.keyboard.press("Tab");
+      await expect(panel.getByRole("link", { name: "Work" })).toBeFocused();
       await page.keyboard.press("Escape");
       await expect.poll(isOpen).toBe(false);
       await expect(menu).toBeFocused();
@@ -894,6 +909,7 @@ test.describe("chrome", () => {
       await page.goBack();
       await expect(page).toHaveURL("/");
       await expect.poll(isOpen).toBe(false);
+      expect(await sameDocument(), "history stays on the client").toBe("yes");
     });
   });
 
