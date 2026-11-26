@@ -1,0 +1,31 @@
+{
+  "measured_sha": "a39011ddd2611fde4c537846375d515676474c75",
+  "route": "/preview/home",
+  "lighthouse_version": "13.6.0",
+  "runs": [
+    {
+      "perf": 91,
+      "a11y": 100,
+      "lcp_ms": 911.8,
+      "cls": 0.000151
+    },
+    {
+      "perf": 100,
+      "a11y": 100,
+      "lcp_ms": 907.3,
+      "cls": 0.000151
+    },
+    {
+      "perf": 100,
+      "a11y": 100,
+      "lcp_ms": 910.4,
+      "cls": 0.000151
+    }
+  ],
+  "median": {
+    "perf": 100,
+    "a11y": 100,
+    "lcp_ms": 910.4,
+    "cls": 0.000151
+  }
+}
