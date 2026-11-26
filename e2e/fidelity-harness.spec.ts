@@ -77,6 +77,7 @@ import { DRIFTS } from "./fixtures/fidelity/drifts";
 import {
   boardThemes,
   hiddenFor,
+  laterSelector,
   plannedCaptures,
   rowStates,
   type BoardTheme,
@@ -2597,6 +2598,110 @@ test.describe("fidelity harness", () => {
       expect(snapshot(work)).toEqual(committed);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("deviations carry the owner's signatures", () => {
+    chromiumOnly();
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    const before = base.register.deviations;
+    const after = head.register.deviations;
+    const ids = (rows: Deviation[]) => rows.map((d) => d.id);
+    expect(ids(after)).toEqual(ids(before));
+    const accepted = Object.fromEntries(after.map((d) => [d.id, d.accepted]));
+    expect(accepted.D1).toBe("");
+    for (let n = 2; n <= 14; n++)
+      expect(accepted[`D${n}`], `D${n}`).toBe("owner, 2026-11-26");
+    // Every other field as at the base, but D9's (and D5's) board selector.
+    const reselected = ["D9", "D5"];
+    const rest = (d: Deviation) => ({
+      ...d,
+      accepted: "",
+      board: reselected.includes(d.id) ? "" : d.board,
+    });
+    for (const [i, d] of after.entries())
+      expect(rest(d), d.id).toEqual(rest(before[i]));
+    const d9 = after.find((d) => d.id === "D9")!;
+    const items = 'li:has(> a[href="/seth"]), li:has(> a[href="/christine"])';
+    expect(d9.board).toBe(items);
+    // The mapped sections hide exactly the D9 and D5 board selectors.
+    const reset = structuredClone(head.sections);
+    for (const id of reselected) {
+      const d = after.find((x) => x.id === id)!;
+      for (const section of d.section) {
+        const row = head.sections.rows.find((r) => r.id === section)!;
+        const later = row.later!.find((l) => l.ticket === d.expires)!;
+        expect(laterSelector(later.hide), `${id} ${section}`).toBe(d.board);
+        const was = base.sections.rows.find((r) => r.id === section)!;
+        const prior = was.later!.find((l) => l.ticket === d.expires)!;
+        const mine = reset.rows.find((r) => r.id === section)!;
+        const at = mine.later!.findIndex((l) => l.ticket === d.expires);
+        mine.later![at] = prior;
+      }
+    }
+    // Every other value in sections.json as at the base.
+    expect(reset).toEqual(base.sections);
+    // The register's text: only the sentence on acceptance changed.
+    const prose = (sha: string) =>
+      git(["show", `${sha}:docs/boards/deviations.md`])
+        .split("\n")
+        .filter((l) => !l.trim().startsWith("|"));
+    const was = prose(fork);
+    const now = prose(range!.head);
+    const old =
+      "PRV-22 seeds the rows below. None is accepted: the owner signs each one, with the date, before it applies.";
+    const sentence =
+      "PRV-22 seeds the rows below. A row applies once the owner signs and dates it in the `accepted` column, subject to the matching and expiry rules above.";
+    expect(was).toContain(old);
+    expect(now).toEqual(was.map((l) => (l === old ? sentence : l)));
+  });
+
+  test("PRV-27 changes only scoped paths", () => {
+    chromiumOnly();
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV27_TICKET), PRV27_ONLY);
+    const fork = forkOf(range!);
+    const base = inputsAt(fork);
+    const head = inputsAt(range!.head);
+    // Affected boards: those whose capture plans (hide selectors included)
+    // differ between the base and the head.
+    const affected = affectedBoards(base, head);
+    expect(affected.length).toBeGreaterThan(0);
+    const refDir = (board: string) =>
+      `docs/boards/ref/${board.replace(/\.dc\.html$/, "")}/`;
+    const scoped = [
+      "docs/boards/deviations.md",
+      "docs/boards/sections.json",
+      "docs/boards/spec.json",
+      "e2e/fidelity-harness.spec.ts",
+      PRV27_TICKET,
+    ];
+    const changed = git([
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${range!.base}...${range!.head}`,
+    ])
+      .split("\n")
+      .filter(Boolean);
+    const inScope = (f: string) =>
+      scoped.includes(f) || affected.some((b) => f.startsWith(refDir(b)));
+    expect(changed).toContain(PRV27_TICKET);
+    expect(changed.filter((f) => !inScope(f))).toEqual([]);
+    // Every unaffected board: its spec.json entry and its reference files'
+    // paths and bytes as at the base.
+    const files = (sha: string, board: string) =>
+      git(["ls-tree", "-r", sha, "--", refDir(board)]);
+    const boards = Object.keys(head.manifest.boards).sort();
+    expect(boards).toEqual(Object.keys(base.manifest.boards).sort());
+    for (const board of boards.filter((b) => !affected.includes(b))) {
+      const entry = JSON.stringify(head.spec.boards[board]);
+      expect(entry, board).toBe(JSON.stringify(base.spec.boards[board]));
+      expect(files(range!.head, board), board).toBe(files(fork, board));
     }
   });
 });
