@@ -75,9 +75,16 @@ function PeekContent({ shown }: { shown: Shown }) {
         {name}
       </p>
       {category.plate.kind === "lab" ? (
-        <p className="mt-1 text-[0.8125rem] leading-5 text-muted">
-          <LabTag />
-        </p>
+        <>
+          <p className="mt-1 text-[0.8125rem] leading-5 text-muted">
+            <LabTag />
+          </p>
+          {fragment && (
+            <div className="mt-5 opacity-75">
+              <fragment.Peek />
+            </div>
+          )}
+        </>
       ) : (
         status &&
         fragment && (

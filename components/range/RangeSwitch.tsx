@@ -37,6 +37,11 @@ function useRange(): RangeState {
   return state;
 }
 
+/** The picked plate's index: what a lab demo watches to mount and to turn. */
+export function useRangeIndex(): number {
+  return useRange().index;
+}
+
 export function RangeSwitch({
   count,
   children,

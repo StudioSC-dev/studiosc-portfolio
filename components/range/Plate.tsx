@@ -1,5 +1,9 @@
 import { Fragment } from "react";
-import type { ChristineCheck, RangeCategory } from "@/content/range";
+import {
+  PHONE_LAB_LINE,
+  type ChristineCheck,
+  type RangeCategory,
+} from "@/content/range";
 import type { Fragment as PlateFragment } from "./fragments/types";
 
 /** The dashed tag a lab plate's title carries (range-light-desktop). */
@@ -69,13 +73,19 @@ function Facts({
   facts,
   className,
   first,
+  section,
 }: {
   facts: { label: string; value: string }[];
   className: string;
   first: string;
+  /** The fidelity row this list belongs to, when it is a plate interior. */
+  section?: string;
 }) {
   return (
-    <dl className={`grid text-[0.9375rem] leading-6 ${first} ${className}`}>
+    <dl
+      data-board-section={section}
+      className={`grid text-[0.9375rem] leading-6 ${first} ${className}`}
+    >
       {facts.map((fact, i) => {
         const last = i === facts.length - 1 ? "border-b" : "";
         return (
@@ -143,6 +153,65 @@ export function Plate({
       )}
     </h2>
   );
+  if (plate.kind === "lab" && fragment) {
+    // The row each interior element belongs to, in docs/boards/sections.json.
+    const interior = `home/plate-${category.id}-interior`;
+    return (
+      <>
+        <div className="hidden md:grid md:grid-cols-[19rem_minmax(0,1fr)] md:gap-x-12 md:gap-y-8">
+          <div className="flex flex-col">
+            {title}
+            <p data-board-section={interior} className="mt-3">
+              {plate.description}
+            </p>
+            <Facts
+              facts={[
+                { label: "Built with", value: plate.builtWith.join(", ") },
+              ]}
+              first="grid-cols-[6.5rem_minmax(0,1fr)]"
+              className="mt-6"
+              section={interior}
+            />
+            <p
+              data-board-section={interior}
+              className="mt-5 text-[0.875rem] leading-[1.375rem] text-muted"
+            >
+              {plate.labLine}
+            </p>
+          </div>
+          <figure data-board-section={interior} className="min-w-0">
+            <fragment.Desktop />
+            <figcaption className="mt-3 text-[0.8125rem] leading-5 text-muted">
+              {fragment.caption}
+            </figcaption>
+          </figure>
+        </div>
+        <div className="md:hidden">
+          {title}
+          <p
+            data-board-section={interior}
+            className="mt-2 text-[0.9375rem] leading-6"
+          >
+            {plate.description}
+          </p>
+          <div data-board-section={interior} className="mt-4">
+            <figure className="min-w-0">
+              <fragment.Phone />
+              <figcaption className="mt-3 text-[0.8125rem] leading-5 text-muted">
+                {fragment.phoneCaption}
+              </figcaption>
+            </figure>
+          </div>
+          <p
+            data-board-section={interior}
+            className="mt-4 border-t border-rule pt-3 text-[0.8125rem] leading-5 text-muted"
+          >
+            {PHONE_LAB_LINE}
+          </p>
+        </div>
+      </>
+    );
+  }
   if (plate.kind === "lab" || !fragment) {
     return (
       <div className="md:grid md:grid-cols-[19rem_minmax(0,1fr)] md:gap-x-12 md:gap-y-8">

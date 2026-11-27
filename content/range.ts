@@ -72,6 +72,10 @@ export type RangeCategory = z.infer<typeof rangeCategorySchema>;
 const LAB_LINE =
   "Nobody's hired us for one of these yet. We built this so you don't have to take our word for it.";
 
+/** The lab line every lab plate carries at 390 (range-phone). */
+export const PHONE_LAB_LINE =
+  "A lab demo. Nobody's hired us for one of these yet, so we built one anyway.";
+
 /**
  * The seven categories, in board order (range-light-desktop, range-phone).
  * PRV-5 builds the Central Command fragment; PRV-6 and PRV-7 fill the other
@@ -161,8 +165,8 @@ export const RANGE_CATEGORIES: RangeCategory[] = [
       kind: "lab",
       name: "Turntable scene",
       fragmentId: "turntable",
-      description: "A small 3D scene you can turn and pause.",
-      builtWith: ["CSS 3D transforms"],
+      description: "A six-sided CSS cube that turns while this plate is open.",
+      builtWith: ["React and CSS 3D transforms"],
       labLine: LAB_LINE,
     },
   },

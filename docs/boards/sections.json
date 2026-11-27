@@ -1017,7 +1017,7 @@
       "section": "plate-mobile-interior",
       "route": "/preview/home",
       "ticket": "PRV-7",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": Mobile,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-mobile-interior\"]",
       "sources": {
@@ -1098,7 +1098,7 @@
       "section": "plate-ai-interior",
       "route": "/preview/home",
       "ticket": "PRV-7",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": AI features,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-ai-interior\"]",
       "sources": {
@@ -1179,7 +1179,7 @@
       "section": "plate-3d-interior",
       "route": "/preview/home",
       "ticket": "PRV-7",
-      "built": false,
+      "built": true,
       "board": ":is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]) > :not(h2):not(:has(h2)), :is(#cabinet [aria-roledescription=\"slide\"][aria-label*=\": 3D & motion,\"]) > div:has(> h2) > :not(h2)",
       "site": "[data-board-section=\"home/plate-3d-interior\"]",
       "sources": {
