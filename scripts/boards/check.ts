@@ -40,7 +40,9 @@ import {
   stateName,
   type BoardsDir,
   type Capture,
+  type Deviation,
   type Row,
+  type RowMeasure,
   type Theme,
   type Width,
 } from "./model";
@@ -164,6 +166,76 @@ function faceFamily(raw: string) {
   };
 }
 
+/**
+ * A `font` deviation: the family the site's face renders under (`built`, as
+ * the harness reads a family) stands for the board's family, and its faces
+ * may load the one file whose sha256 the row names. The built cell reads
+ * `<family> sha256:<hex>`.
+ */
+export interface FontAlias {
+  board: string;
+  built: string;
+  sha256: string;
+}
+
+export function fontAlias(d: Deviation): FontAlias | null {
+  if (d.property !== "font") return null;
+  const m = /^(\S.*?) sha256:([0-9a-f]{64})$/.exec(d.built.trim());
+  const board = d.board.trim().toLowerCase();
+  if (!m || !board) return null;
+  return { board, built: faceFamily(m[1]).family, sha256: m[2] };
+}
+
+/**
+ * The font deviations in force for a row here: each names the row, state,
+ * width and theme exactly, and the selected reference draws the row's text
+ * in the deviation's board family.
+ */
+function rowAliases(
+  active: Deviation[],
+  section: string,
+  where: Where,
+  ref: RowMeasure | null | undefined
+): FontAlias[] {
+  if (!ref) return [];
+  const drawn = new Set(ref.keys.map((k) => k.type?.family));
+  return active.flatMap((d) => {
+    const a =
+      d.section.includes(section) &&
+      d.state.includes(where.state) &&
+      d.width.includes(where.width) &&
+      d.theme.includes(where.theme)
+        ? fontAlias(d)
+        : null;
+    return a && drawn.has(a.board) ? [a] : [];
+  });
+}
+
+/**
+ * The site's row with the built family read as the board family, on each key
+ * whose board counterpart is set in that family: only that comparison of
+ * `font-family` changes.
+ */
+function asBoardFamily(
+  ref: RowMeasure | null,
+  site: RowMeasure | null,
+  aliases: FontAlias[]
+): RowMeasure | null {
+  if (!ref || !site || !aliases.length) return site;
+  const board = new Map(ref.keys.map((k) => [k.key, k.type?.family]));
+  return {
+    ...site,
+    keys: site.keys.map((k) => {
+      const a =
+        k.type &&
+        aliases.find(
+          (x) => x.built === k.type!.family && x.board === board.get(k.key)
+        );
+      return a ? { ...k, type: { ...k.type!, family: a.board } } : k;
+    }),
+  };
+}
+
 const covers = (range: string, weight: number) => {
   const named: Record<string, number> = { normal: 400, bold: 700 };
   const [a, b] = range
@@ -179,22 +251,33 @@ const covers = (range: string, weight: number) => {
  * bytes), none fails to load, and every family and weight the rows' text
  * uses has a face loaded from a pinned file, so a fallback or a system font
  * under the family's name fails.
+ *
+ * `aliases` are the font deviations in force on the page: a face under a
+ * built family is checked as the board family, with the deviation's one
+ * file as its pin. `aliased` is the text those deviations cover (`used`
+ * entries of their rows); other text under a built family is not checked.
  */
 function fontFailures(
   report: { faces: FontFaceReport[]; used: string[] },
   pinned: Map<string, Set<string>>,
   served: Map<string, string>,
   section: string,
-  where: Where
+  where: Where,
+  aliases: FontAlias[] = [],
+  aliased: Set<string> = new Set()
 ): Failure[] {
   const out: Failure[] = [];
   const push = (property: string, expected: string, actual: string) =>
     out.push({ section, ...where, property, expected, actual });
-  const faces = report.faces
-    .map((f) => ({ ...f, ...faceFamily(f.family) }))
-    .filter((f) => pinned.has(f.family) && !f.fallback);
+  const faces = report.faces.flatMap((f) => {
+    const { family: name, fallback } = faceFamily(f.family);
+    const alias = aliases.find((a) => a.built === name);
+    const pins = alias ? new Set([alias.sha256]) : pinned.get(name);
+    if (!pins || fallback) return [];
+    return [{ ...f, name, family: alias?.board ?? name, pins }];
+  });
   const fromPin = (f: (typeof faces)[number]) =>
-    !f.local && f.urls.some((u) => pinned.get(f.family)!.has(served.get(u)!));
+    !f.local && f.urls.some((u) => f.pins.has(served.get(u)!));
   for (const f of faces) {
     const property = `font ${f.family} ${f.weight}`;
     if (f.local)
@@ -217,7 +300,7 @@ function fontFailures(
       );
     for (const url of f.urls) {
       const sha = served.get(url);
-      if (sha && !pinned.get(f.family)!.has(sha))
+      if (sha && !f.pins.has(sha))
         push(
           property,
           `a pinned ${f.family} file`,
@@ -227,11 +310,15 @@ function fontFailures(
   }
   for (const used of report.used) {
     const [raw, weight, style] = used.split("|");
-    const { family, fallback } = faceFamily(raw);
-    if (!pinned.has(family) || fallback) continue;
+    const { family: name, fallback } = faceFamily(raw);
+    const alias = aliased.has(used)
+      ? aliases.find((a) => a.built === name)
+      : undefined;
+    if (fallback || (!alias && !pinned.has(name))) continue;
+    const family = alias?.board ?? name;
     const ok = faces.some(
       (f) =>
-        f.family === family &&
+        f.name === name &&
         f.status === "loaded" &&
         fromPin(f) &&
         f.style === style &&
@@ -365,7 +452,25 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
           async (page, cap, fonts) => {
             // In every state, motion on and reduced: a font a step or the
             // reduced-motion styles swap in is still the site's font. Each
-            // failure is named once, in the first state it shows.
+            // failure is named once, in the first state it shows. A font
+            // deviation covers the text of the rows it is in force for.
+            const covered = g.rows.filter(
+              (r) => rowAliases(active, r.id, where, ref.rows[r.id]).length
+            );
+            const aliases = covered.flatMap((r) =>
+              rowAliases(active, r.id, where, ref.rows[r.id])
+            );
+            const aliased = new Set(
+              covered.length
+                ? (
+                    await fontsReport(
+                      page,
+                      rowQueries(covered, sections.rows, "site"),
+                      sections
+                    )
+                  ).used
+                : []
+            );
             if (g.rows.length)
               for (const f of fontFailures(
                 await fontsReport(
@@ -376,7 +481,9 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
                 pinned,
                 fonts,
                 g.rows[0].id,
-                where
+                where,
+                aliases,
+                aliased
               )) {
                 const id = `${g.route}|${g.width}|${g.theme}|${f.property}|${f.actual}`;
                 if (fontsSeen.has(id)) continue;
@@ -422,12 +529,17 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
           result.checked.push(`${row.id} ${label} ${g.width} ${g.theme}`);
           if (!def?.inFlight) {
             const b = ref.rows[row.id];
+            const board = b ? applyToReference(b, row.id, where, active) : null;
             failures.push(
               ...compareRow(
                 row.id,
                 where,
-                b ? applyToReference(b, row.id, where, active) : null,
-                capture.rows[row.id] ?? null
+                board,
+                asBoardFamily(
+                  board,
+                  capture.rows[row.id] ?? null,
+                  rowAliases(active, row.id, where, b)
+                )
               )
             );
           }
