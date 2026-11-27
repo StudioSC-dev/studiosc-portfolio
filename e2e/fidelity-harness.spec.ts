@@ -3367,6 +3367,83 @@ test.describe("fidelity harness", () => {
         .map((d) => d.id)
     ).toEqual(existsAt(range!.base, PRV31_TICKET) ? [] : ["D16"]);
   });
+
+  test("PRV-31 changes only scoped paths", async ({ baseURL }) => {
+    chromiumOnly();
+    test.setTimeout(10 * 60_000);
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV31_TICKET), PRV31_ONLY);
+    const fork = forkOf(range!);
+    const head = range!.head;
+    const changed = git([
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${range!.base}...${head}`,
+    ])
+      .split("\n")
+      .filter(Boolean);
+    expect(changed).toContain(PRV31_TICKET);
+    expect(changed.filter((f) => !PRV31_SCOPE.includes(f))).toEqual([]);
+    // The tolerances, spec.json, ref/, sections.json and manifest.json are
+    // as at the base.
+    const object = (sha: string, p: string) =>
+      git(["rev-parse", `${sha}:${p}`]).trim();
+    for (const p of [
+      "docs/boards/spec.json",
+      "docs/boards/ref",
+      "docs/boards/sections.json",
+      "docs/boards/manifest.json",
+    ])
+      expect(object(head, p), p).toBe(object(fork, p));
+    const tolerances = (text: string) =>
+      /export const TOLERANCE = \{[^}]*\} as const;/.exec(text)?.[0];
+    const before = tolerances(
+      git(["show", `${fork}:scripts/boards/compare.ts`])
+    );
+    expect(before, "TOLERANCE at the base").toBeDefined();
+    expect(tolerances(git(["show", `${head}:scripts/boards/compare.ts`]))).toBe(
+      before
+    );
+    // PRV-2's "one superfamily, within size", run on its own against the
+    // build under test, still passes.
+    const out = tmp("prv31-prv2-");
+    try {
+      const config = path.join(out, "playwright.config.ts");
+      writeFileSync(
+        config,
+        [
+          `import { defineConfig, devices } from ${JSON.stringify(createRequire(__filename).resolve("@playwright/test"))};`,
+          "export default defineConfig({",
+          `  testDir: ${JSON.stringify(path.join(ROOT, "e2e"))},`,
+          `  outputDir: ${JSON.stringify(path.join(out, "results"))},`,
+          '  reporter: "line",',
+          "  retries: 0,",
+          `  use: { baseURL: ${JSON.stringify(baseURL)} },`,
+          '  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],',
+          "});",
+        ].join("\n")
+      );
+      const run = spawnSync(
+        path.join(ROOT, "node_modules/.bin/playwright"),
+        [
+          "test",
+          "--config",
+          config,
+          "--workers=1",
+          "e2e/design-tokens.spec.ts",
+          "-g",
+          "one superfamily, within size",
+        ],
+        { cwd: ROOT, env: childEnv(), encoding: "utf8", timeout: 8 * 60_000 }
+      );
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status, output).toBe(0);
+      expect(output).toMatch(/\b1 passed\b/);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
 });
 
 /** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
@@ -3642,6 +3719,17 @@ async function plexRun(
     fixture.setDrift(null);
   }
 }
+const PRV31_ONLY = "PRV-31's checks run on the PR that adds its ticket";
+/** The paths PRV-31's PR may change. */
+const PRV31_SCOPE = [
+  "scripts/boards/check.ts",
+  "scripts/boards/inpage.js",
+  "docs/boards/deviations.md",
+  "lib/fonts.ts",
+  "e2e/fidelity-harness.spec.ts",
+  "e2e/design-tokens.spec.ts",
+  PRV31_TICKET,
+];
 
 /** PRV-27's ticket: its PR-boundary checks run on the PR that adds it. */
 const PRV27_TICKET = "docs/tickets/PRV-27.md";
