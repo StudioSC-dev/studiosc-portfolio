@@ -20,6 +20,7 @@ import {
   expect,
   test,
   type Browser,
+  type BrowserContext,
   type Locator,
   type Page,
 } from "@playwright/test";
@@ -3152,10 +3153,11 @@ test.describe("real-board regeneration across host speeds", () => {
         shoot,
       };
 
-      /** What one case records under one condition, at one revision. */
-      const observe = async (
+      /** What one capture of a case records under one condition. */
+      const observeKey = async (
         code: CaptureCode,
         c: HostSpeedCase,
+        key: string,
         condition: "normal" | "reproduced"
       ) => {
         const width = manifest.boards[c.board].width;
@@ -3163,7 +3165,7 @@ test.describe("real-board regeneration across host speeds", () => {
           (t) => t.theme === c.theme
         )!;
         const plan = plannedCaptures(sections, bt, register).find(
-          (p) => p.key === c.key
+          (p) => p.key === key
         )!;
         const row = sections.rows.find((r) => r.id === c.row)!;
         const ctx = await code.boardContext(
@@ -3179,6 +3181,7 @@ test.describe("real-board regeneration across host speeds", () => {
           click: Locator["click"];
         };
         const click = locator.click;
+        let unstall = () => {};
         try {
           if (c.kind === "steps" && condition === "normal") {
             // A host that is never behind: the deck has not moved when the
@@ -3195,12 +3198,15 @@ test.describe("real-board regeneration across host speeds", () => {
               await new Promise((r) => setTimeout(r, SLOW_CLICK_MS));
               return click.apply(this, args);
             };
-          if (c.kind === "shot" && condition === "reproduced")
-            // A loaded host: the page keeps drawing frames before the shot.
+          if (c.kind === "shot" && condition === "reproduced") {
+            // A loaded host: the page keeps drawing frames, and the driver
+            // stalls after every read of the viewport and before the shot.
             await ctx.addInitScript(() => {
               const loop = () => requestAnimationFrame(loop);
               loop();
             });
+            unstall = await stallAfterViewportRead(ctx, page);
+          }
           await code.load(page, `${BOARD_ORIGIN}/${c.board}`, sections.clock);
           const capture = await code.captureState(
             page,
@@ -3223,8 +3229,26 @@ test.describe("real-board regeneration across host speeds", () => {
           );
         } finally {
           locator.click = click;
+          unstall();
           await ctx.close();
         }
+      };
+
+      /**
+       * What one case records under one condition, at one revision. A shot
+       * case shoots both its captures: their shots and how many reference
+       * files regeneration would file them under.
+       */
+      const observe = async (
+        code: CaptureCode,
+        c: HostSpeedCase,
+        condition: "normal" | "reproduced"
+      ) => {
+        if (c.kind === "steps") return observeKey(code, c, c.key, condition);
+        const shots: string[] = [];
+        for (const key of [c.key, c.twin])
+          shots.push(await observeKey(code, c, key, condition));
+        return JSON.stringify({ shots, files: new Set(shots).size });
       };
 
       for (const c of HOST_SPEED_CASES)
@@ -3422,8 +3446,9 @@ type CaptureCode = {
  * "Next photo" clicks, and the opener's shot once "Sites" is chosen. A
  * gallery's two-click state records its fades the way the holly deck
  * records its slides, so the holly fix changes it too: it has a case of its
- * own. A "steps" case compares the row's recorded motion, a "shot" case the
- * row's shot.
+ * own. A "steps" case compares the row's recorded motion. A "shot" case
+ * compares the row's shot in two captures that share one reference file
+ * when both are drawn alike, and how many files they are filed under.
  */
 const HOST_SPEED_CASES = [
   {
@@ -3449,6 +3474,7 @@ const HOST_SPEED_CASES = [
     board: "range-dark-desktop.dc.html",
     theme: "dark",
     key: "dark/tab-sites",
+    twin: "dark/tab-sites+pre-D11+D13+D14",
   },
 ] as const;
 type HostSpeedCase = (typeof HOST_SPEED_CASES)[number];
@@ -3459,17 +3485,77 @@ const SLOW_CLICK_MS = 600;
 /** Long enough for the page's own late rendering to land first. */
 const SLOW_SHOT_MS = 800;
 
+type ShotProto = { screenshot: Page["screenshot"] };
+type SendProto = {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+};
+
+/**
+ * Stalls the driver for SLOW_SHOT_MS between a read of the viewport coming
+ * back and the page's next request for a full-page shot, through Playwright
+ * or through CDP, while the page draws on. Returns the undo.
+ */
+async function stallAfterViewportRead(ctx: BrowserContext, page: Page) {
+  const shotProto = Object.getPrototypeOf(page) as ShotProto;
+  const session = await ctx.newCDPSession(page);
+  const sendProto = Object.getPrototypeOf(session) as SendProto;
+  await session.detach();
+  const screenshot = shotProto.screenshot;
+  const send = sendProto.send;
+  const stall = () => new Promise((r) => setTimeout(r, SLOW_SHOT_MS));
+  let read = false;
+  shotProto.screenshot = async function (this: Page, opts) {
+    if (opts?.fullPage && read) {
+      read = false;
+      await stall();
+    }
+    const shot = await screenshot.call(this, opts);
+    if (!opts?.fullPage) read = true;
+    return shot;
+  };
+  sendProto.send = async function (this: SendProto, method, params) {
+    const shot = method === "Page.captureScreenshot";
+    const beyond = shot && params?.captureBeyondViewport === true;
+    if (beyond && read) {
+      read = false;
+      await stall();
+    }
+    const result = await send.call(this, method, params);
+    if (shot && !beyond) read = true;
+    return result;
+  };
+  return () => {
+    shotProto.screenshot = screenshot;
+    sendProto.send = send;
+  };
+}
+
 /**
  * The slow host for boards:regen, preloaded into the child with
  * NODE_OPTIONS: the page draws frames all the time, every click waits
- * SLOW_CLICK_MS, and the first shot after the capture's in-page work waits
- * SLOW_SHOT_MS. Each is one of the two reproductions above, applied to the
- * whole run.
+ * SLOW_CLICK_MS, the first shot after the capture's in-page work waits
+ * SLOW_SHOT_MS, and so does the first request for a full-page shot after a
+ * read of the viewport comes back (as stallAfterViewportRead does). Each is
+ * one of the reproductions above, applied to the whole run.
  */
 const SLOW_HOST = `"use strict";
 const { createRequire } = require("node:module");
 const pw = createRequire(process.env.SLOW_HOST_ROOT + "/package.json")("@playwright/test");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The capture's in-page work has run, and no shot has been asked for since.
+let captured = false;
+// A read of the viewport has come back, and no full-page shot has followed.
+let read = false;
+const slowShot = async (fullPage) => {
+  if (captured) {
+    captured = false;
+    await sleep(${SLOW_SHOT_MS});
+  }
+  if (fullPage && read) {
+    read = false;
+    await sleep(${SLOW_SHOT_MS});
+  }
+};
 const wrap = (obj, name, make) => {
   const proto = Object.getPrototypeOf(obj);
   const mark = "__slowHost_" + name;
@@ -3481,6 +3567,18 @@ wrap(pw.chromium, "launch", (launch) => async function (...a) {
   const browser = await launch.apply(this, a);
   wrap(browser, "newContext", (newContext) => async function (...b) {
     const ctx = await newContext.apply(this, b);
+    wrap(ctx, "newCDPSession", (newCDPSession) => async function (...c) {
+      const session = await newCDPSession.apply(this, c);
+      wrap(session, "send", (send) => async function (method, params) {
+        const shot = method === "Page.captureScreenshot";
+        const beyond = shot && !!params && params.captureBeyondViewport === true;
+        if (shot) await slowShot(beyond);
+        const result = await send.call(this, method, params);
+        if (shot && !beyond) read = true;
+        return result;
+      });
+      return session;
+    });
     wrap(ctx, "newPage", (newPage) => async function (...c) {
       const page = await newPage.apply(this, c);
       await page.addInitScript(() => {
@@ -3488,15 +3586,15 @@ wrap(pw.chromium, "launch", (launch) => async function (...a) {
         loop();
       });
       wrap(page, "evaluate", (evaluate) => function (fn, ...d) {
-        if (String(fn).includes("__fidelity")) this.__slowHostShot = true;
+        if (String(fn).includes("__fidelity")) captured = true;
         return evaluate.call(this, fn, ...d);
       });
-      wrap(page, "screenshot", (screenshot) => async function (...d) {
-        if (this.__slowHostShot) {
-          this.__slowHostShot = false;
-          await sleep(${SLOW_SHOT_MS});
-        }
-        return screenshot.apply(this, d);
+      wrap(page, "screenshot", (screenshot) => async function (opts) {
+        const fullPage = !!opts && opts.fullPage === true;
+        await slowShot(fullPage);
+        const result = await screenshot.call(this, opts);
+        if (!fullPage) read = true;
+        return result;
       });
       wrap(page.locator("html"), "click", (click) => async function (...d) {
         await sleep(${SLOW_CLICK_MS});

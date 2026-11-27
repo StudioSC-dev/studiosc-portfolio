@@ -339,15 +339,25 @@ const fid = (page: Page) => ({
     page.evaluate((x) => (window as unknown as Fid).__fidelity.hide(x), e),
 });
 
-/** A read of the viewport, then the page's first full-page shot. */
+/**
+ * A read of the viewport, then the page's first full-page shot, as one
+ * driver step: both requests leave together, so no stall of the driver can
+ * fall between them and let the page draw on before the full-page shot.
+ */
 async function fixRendering(page: Page) {
-  await page.screenshot({ animations: "allow", caret: "hide" });
-  await page.screenshot({
-    fullPage: true,
-    animations: "allow",
-    caret: "hide",
-    clip: { x: 0, y: 0, width: 1, height: 1 },
-  });
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await Promise.all([
+      cdp.send("Page.captureScreenshot", { format: "png" }),
+      cdp.send("Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: true,
+        clip: { x: 0, y: 0, width: 1, height: 1, scale: 1 },
+      }),
+    ]);
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /**
