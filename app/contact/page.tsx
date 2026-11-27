@@ -12,7 +12,6 @@ export default function ContactPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
       <PageHeader
-        label="Contact"
         title="Contact Us"
         lead="Let's build (and break) something great. We are currently accepting select inquiries for custom software development, QA auditing, and technical consulting. Tell us a bit about your project, and we'll get back to you within 2 business days."
       />

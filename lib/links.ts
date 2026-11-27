@@ -12,8 +12,5 @@ export const LINKEDIN = {
     "https://www.linkedin.com/in/christine-dianne-nacar-palileo-86249a64/",
 } as const;
 
-/**
- * TODO: still a placeholder — this points at Instagram's homepage, not the
- * studio's profile. Replace with the real handle URL.
- */
-export const INSTAGRAM = "https://instagram.com";
+/** The studio's GitHub organisation. */
+export const GITHUB_ORG = "https://github.com/StudioSC-dev";

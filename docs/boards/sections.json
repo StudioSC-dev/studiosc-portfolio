@@ -654,7 +654,7 @@
       "section": "header",
       "route": "/",
       "ticket": "PRV-4",
-      "built": false,
+      "built": true,
       "board": "header:not(main header)",
       "site": "[data-board-section=\"chrome/header\"]",
       "sources": {
@@ -689,7 +689,7 @@
           "ticket": "PRV-10",
           "hide": [
             {
-              "selector": "a[href=\"/seth\"], a[href=\"/christine\"]",
+              "selector": "li:has(> a[href=\"/seth\"]), li:has(> a[href=\"/christine\"])",
               "mode": "remove"
             }
           ]
@@ -701,7 +701,7 @@
       "section": "footer",
       "route": "/",
       "ticket": "PRV-4",
-      "built": false,
+      "built": true,
       "board": "footer:not(main footer)",
       "site": "[data-board-section=\"chrome/footer\"]",
       "sources": {
