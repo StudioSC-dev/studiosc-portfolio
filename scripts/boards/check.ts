@@ -344,6 +344,7 @@ interface PaintedFont {
 /** A DOM node as Chromium's DevTools protocol reports it. */
 interface CdpNode {
   nodeId: number;
+  nodeType: number;
   attributes?: string[];
   children?: CdpNode[];
   shadowRoots?: CdpNode[];
@@ -360,10 +361,11 @@ interface CoveredRow {
 const RUN_ATTR = "data-fidelity-run";
 
 /**
- * The text runs of `rows` and the fonts Chromium painted each with (the
- * run's own text, or a control's user-agent shadow tree: its value or
- * placeholder). Each of `probes` (id to URL) is painted in a face loaded from
- * that URL alone, under `probe:<id>`.
+ * The text runs of `rows` and the fonts Chromium painted each with: those
+ * of the run's own text nodes, or of the text in a control's user-agent
+ * shadow tree (its value or placeholder), never a child element's. Each of
+ * `probes` (id to URL) is painted in a face loaded from that URL alone,
+ * under `probe:<id>`.
  */
 async function paintedRuns(
   page: Page,
@@ -389,23 +391,28 @@ async function paintedRuns(
       depth: -1,
       pierce: true,
     });
-    const within = (n: CdpNode): number[] => [
-      n.nodeId,
-      ...[...(n.children ?? []), ...(n.shadowRoots ?? [])].flatMap(within),
-    ];
+    // A run's fonts are those of its own text nodes (a control's, in its
+    // user-agent shadow tree): a child element's text is its own run.
+    const TEXT = 3;
+    const texts = (n: CdpNode): number[] =>
+      n.nodeType === TEXT
+        ? [n.nodeId]
+        : [...(n.children ?? []), ...(n.shadowRoots ?? [])].flatMap(texts);
     const tagged: [string, number[]][] = [];
     const visit = (n: CdpNode) => {
       const attrs = n.attributes ?? [];
+      const shadow = (n.shadowRoots ?? []).filter(
+        (r) => r.shadowRootType === "user-agent"
+      );
       for (let i = 0; i < attrs.length; i += 2)
         if (attrs[i] === RUN_ATTR)
           tagged.push([
             attrs[i + 1],
-            [
-              n.nodeId,
-              ...(n.shadowRoots ?? [])
-                .filter((r) => r.shadowRootType === "user-agent")
-                .flatMap(within),
-            ],
+            shadow.length
+              ? shadow.flatMap(texts)
+              : (n.children ?? [])
+                  .filter((c) => c.nodeType === TEXT)
+                  .map((c) => c.nodeId),
           ]);
       for (const c of [...(n.children ?? []), ...(n.shadowRoots ?? [])])
         visit(c);

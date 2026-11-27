@@ -2716,6 +2716,20 @@ test.describe("fidelity harness", () => {
             ),
           })
         );
+        // A child element set in another family inside a run: its glyphs are
+        // its own run's, not the parent's, so the parent's text, painted by
+        // the cut, passes.
+        const manropeFace = `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(/cut/other.woff2) format("woff2"); }`;
+        const child = `const p = document.querySelector('[data-board-section="fx/opener"] p'); p.innerHTML = p.innerHTML.replace("measured", '<span style="font-family: __Manrope_8c2def02 !important">measured</span>');`;
+        const mixed = await run(
+          { css: `${inCut(rows).css}\n${manropeFace}`, js: child },
+          [row]
+        );
+        expect(
+          mixed.failures
+            .filter((f) => f.property.startsWith(`font ${PLEX} `))
+            .map(describeFailure)
+        ).toEqual([]);
       } finally {
         rmSync(dir, { recursive: true, force: true });
         await proxy.close();
