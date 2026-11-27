@@ -32,13 +32,20 @@ export const CLOUDINARY_ACCOUNT = "dg0t8ipwi";
 
 const UPLOAD = "/upload/";
 
+/**
+ * Fails the render, and so the build, on a source the site does not serve:
+ * a local path with no committed variants (run scripts/image-variants.ts), or
+ * a remote image off the studio's Cloudinary uploads. Kept short, since it
+ * ships in the client bundle.
+ */
+function unsupported(src: string): never {
+  throw new Error(`Unsupported image source ${src}`);
+}
+
 /** The committed variants of a local photo, narrowest first. */
 export function variantsOf(src: string): Variant[] {
   const entry = manifest.images[src];
-  if (!entry)
-    throw new Error(
-      `Unsupported image source ${src}: no committed variants (run scripts/image-variants.ts)`
-    );
+  if (!entry) unsupported(src);
   return [...entry.variants].sort((a, b) => a.width - b.width);
 }
 
@@ -59,9 +66,7 @@ function cloudinary(src: string, width: number): string {
     at < 0 ||
     /[?#]/.test(src.slice(0, at))
   )
-    throw new Error(
-      `Unsupported image source ${src}: only ${CLOUDINARY_HOST}/${CLOUDINARY_ACCOUNT} uploads and committed variants are served`
-    );
+    unsupported(src);
   const cut = at + UPLOAD.length;
   return `${src.slice(0, cut)}f_auto,q_auto,w_${width}/${src.slice(cut)}`;
 }
@@ -70,5 +75,5 @@ export default function imageLoader({ src, width }: ImageLoaderProps): string {
   if (src.startsWith("/") && !src.startsWith("//"))
     return nearestVariant(src, width).src;
   if (/^https?:\/\//i.test(src)) return cloudinary(src, width);
-  throw new Error(`Unsupported image source ${src}`);
+  return unsupported(src);
 }
