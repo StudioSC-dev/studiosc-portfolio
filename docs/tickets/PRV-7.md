@@ -1,4 +1,3 @@
-PRV-7
 # The lab demos
 
 **Planned:** Sonnet, M, wave 3
