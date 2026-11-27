@@ -3443,6 +3443,10 @@ test.describe("fidelity harness", () => {
 
   test("font rows are exact and signed", () => {
     chromiumOnly();
+    // The register as PRV-31 leaves it: later tickets may sign rows of their
+    // own and change D16 (PRV-32), so this runs on PRV-31's PR alone.
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV31_TICKET), PRV31_ONLY);
     const register = loadBoards(BOARDS).deviations;
     const fonts = register.filter((d) => d.property === "font");
     expect(fonts.map((d) => d.id)).toEqual(["D16"]);
@@ -3484,8 +3488,6 @@ test.describe("fidelity harness", () => {
     ])
       expect(prose, part).toContain(part);
     // Every row the PR base has is unchanged; D16 is the one row added.
-    const range = prRange();
-    test.skip(!range, "the PR base is compared on a pull request");
     const before = parseDeviations(
       git(["show", `${forkOf(range!)}:docs/boards/deviations.md`])
     );
@@ -3498,7 +3500,7 @@ test.describe("fidelity harness", () => {
       register
         .filter((d) => !before.some((b) => b.id === d.id))
         .map((d) => d.id)
-    ).toEqual(existsAt(range!.base, PRV31_TICKET) ? [] : ["D16"]);
+    ).toEqual(["D16"]);
   });
 
   test("PRV-31 changes only scoped paths", async ({ baseURL }) => {
