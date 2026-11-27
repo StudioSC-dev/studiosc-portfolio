@@ -110,6 +110,14 @@ test.describe("Navigation", () => {
         page.getByRole("heading", { level: 1, name: WRITING.heading })
       ).toBeVisible();
 
+      // About sits in the footer; its heading is the board's.
+      await footer(page)
+        .getByRole("link", { name: "About", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/about$/);
+      const about = page.getByRole("heading", { level: 1 });
+      await expect(about).toHaveText("Seth builds. Christine tests.");
+
       await nav.getByRole("link", { name: "Start a project" }).click();
       await expect(page).toHaveURL(/\/contact$/);
 

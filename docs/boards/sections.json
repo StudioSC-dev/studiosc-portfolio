@@ -1378,7 +1378,7 @@
       "section": "people",
       "route": "/preview/home",
       "ticket": "PRV-8",
-      "built": false,
+      "built": true,
       "board": "#people",
       "site": "[data-board-section=\"home/people\"]",
       "sources": {
@@ -2867,7 +2867,7 @@
       "section": "title",
       "route": "/about",
       "ticket": "PRV-8",
-      "built": false,
+      "built": true,
       "board": "[aria-labelledby=\"about-title\"]",
       "site": "[data-board-section=\"about/title\"]",
       "sources": {
@@ -2901,7 +2901,7 @@
       "section": "people",
       "route": "/about",
       "ticket": "PRV-8",
-      "built": false,
+      "built": true,
       "board": "#people",
       "site": "[data-board-section=\"about/people\"]",
       "sources": {
@@ -2946,7 +2946,7 @@
       "section": "believe",
       "route": "/about",
       "ticket": "PRV-8",
-      "built": false,
+      "built": true,
       "board": "[aria-labelledby=\"believe-title\"]",
       "site": "[data-board-section=\"about/believe\"]",
       "sources": {
@@ -2980,7 +2980,7 @@
       "section": "contact",
       "route": "/about",
       "ticket": "PRV-8",
-      "built": false,
+      "built": true,
       "board": "[aria-labelledby=\"contact-title\"]",
       "site": "[data-board-section=\"about/contact\"]",
       "sources": {

@@ -57,13 +57,24 @@ export function ChristineLine({
   );
 }
 
-/** The credit line. The names are plain text until PRV-8 links them. */
-function Credit({ className }: { className: string }) {
-  return <p className={className}>Built by Seth · Tested by Christine</p>;
-}
-
 const LINK =
   "text-ink underline decoration-1 underline-offset-[0.2em] hover:text-muted";
+
+/** The credit line: each name links to that person's panel in "The two of us". */
+function Credit({ className }: { className: string }) {
+  return (
+    <p className={className}>
+      {"Built by "}
+      <a href="#seth" className={LINK}>
+        Seth
+      </a>
+      {" · Tested by "}
+      <a href="#christine" className={LINK}>
+        Christine
+      </a>
+    </p>
+  );
+}
 
 function Facts({
   facts,
