@@ -98,6 +98,7 @@ import {
   cleanEnv,
   existsAt,
   git,
+  gitBuffer,
   prRange,
   treeFiles,
   type PrRange,
@@ -3492,10 +3493,51 @@ test.describe("fidelity harness", () => {
   test("font rows are exact and signed", () => {
     chromiumOnly();
     // The register as PRV-31 leaves it: later tickets may sign rows of their
-    // own and change D16 (PRV-32), so this runs on PRV-31's PR alone.
+    // own and change D16 (PRV-32), so this runs on PRV-31's PR, and on
+    // PRV-32's for the one cell it changes.
     const range = prRange();
-    test.skip(!range || existsAt(range.base, PRV31_TICKET), PRV31_ONLY);
+    const prv32 =
+      !!range &&
+      existsAt(range.base, PRV31_TICKET) &&
+      !existsAt(range.base, PRV32_TICKET);
+    test.skip(
+      !range || (existsAt(range.base, PRV31_TICKET) && !prv32),
+      `${PRV31_ONLY}, or PRV-32's`
+    );
     const register = loadBoards(BOARDS).deviations;
+    if (prv32) {
+      // PRV-32: D16 binds the rebuilt cut alone. Its built hash is the
+      // committed file's, not the base's, and every other cell of D16 and
+      // every other row are as at the PR base.
+      const fork = forkOf(range!);
+      const before = parseDeviations(
+        git(["show", `${fork}:docs/boards/deviations.md`])
+      );
+      const base16 = before.find((d) => d.id === "D16");
+      const head16 = register.find((d) => d.id === "D16");
+      expect(base16, "D16 at the PR base").toBeDefined();
+      const baseCut = gitBuffer(["show", `${fork}:${PLEX_CUT}`]);
+      const built = (bytes: Buffer) => `${PLEX_BUILT} sha256:${sha256(bytes)}`;
+      expect(base16!.built, "the base's D16 names the base's cut").toBe(
+        built(baseCut)
+      );
+      const cut = readFileSync(path.join(ROOT, PLEX_CUT));
+      expect(head16, "D16 at the head").toEqual({
+        ...base16!,
+        built: built(cut),
+      });
+      expect(head16!.built, "D16 no longer names the base's cut").not.toBe(
+        base16!.built
+      );
+      expect(isAccepted(head16!)).toBe(true);
+      for (const d of before.filter((x) => x.id !== "D16"))
+        expect(
+          register.find((x) => x.id === d.id),
+          d.id
+        ).toEqual(d);
+      expect(register.map((d) => d.id)).toEqual(before.map((d) => d.id));
+      return;
+    }
     const fonts = register.filter((d) => d.property === "font");
     expect(fonts.map((d) => d.id)).toEqual(["D16"]);
     expect(fonts[0]).toEqual({
@@ -3706,6 +3748,8 @@ type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
 
 /** PRV-31's ticket. */
 const PRV31_TICKET = "docs/tickets/PRV-31.md";
+/** PRV-32's ticket: it rebuilt the cut, so D16's built hash changed. */
+const PRV32_TICKET = "docs/tickets/PRV-32.md";
 /** The site's IBM Plex Sans cut (lib/fonts.ts), and the family the build serves it under. */
 const PLEX_CUT = "app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2";
 const PLEX_BUILT = "ibmPlexSans";

@@ -228,12 +228,20 @@ pairings hold in both themes because the palettes do not change.
   Font fallback). It is fetched only on a page that renders its fragment.
 - IBM Plex Sans is self-hosted with `next/font/local`, because Google's Latin
   file has no peso sign and its Latin Extended file adds about 25 KiB for that
-  one glyph. The file is a cut of the OFL release (the Google Fonts source,
-  version 3.201) made with fonttools: `varLib.instancer` pins width at 100 and
-  trims weight to 400 to 600, then `pyftsubset` keeps the Latin range plus
-  U+20B1, drops hinting and writes woff2. That is one file of 31,644 bytes. A
-  cut is a Modified Version under the OFL, which reserves the name "Plex", so the
-  file is named "SSC Fragment Sans" inside; the licence sits beside it.
+  one glyph. The file is a cut of the boards' two pinned IBM Plex Sans files
+  (`latin` and `latin-ext` in `docs/boards/fonts/google.css`, version 3.201),
+  built by `scripts/fonts/fragment-sans.py` with fonttools in a pinned Python
+  environment outside `node_modules` (`scripts/fonts/README.md`). It grafts
+  U+20B1 from the Latin Extended file into the Latin file, trims weight to 400
+  to 600 with `varLib.instancer`, and keeps the hinting (`fpgm`, `prep`, `cvt `,
+  `cvar`) along with `GDEF`, `GPOS`, `GSUB`, `fvar`, `gvar`, `HVAR`, `MVAR` and
+  `avar`. Hinted renderers round each glyph's advance, so a cut without hinting
+  set text 5 to 12px wider than the boards in Linux Chromium; with it the
+  widths match. That is one file of 35,540 bytes, and the same pins and
+  environment rebuild it byte for byte; D16 records its SHA-256. A cut is a
+  Modified Version under the OFL, which reserves the name "Plex", so every
+  name-table string is renamed "SSC Fragment Sans", except the copyright and
+  the licence URL; the licence sits beside it.
 - The boards draw inline code in a system monospace stack
   (`pages-post-work-desktop`: `font-family: ui-monospace, SFMono-Regular, Menlo,
 Consolas, monospace`). The site sets JetBrains Mono there instead, as §2 of the

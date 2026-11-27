@@ -1,4 +1,9 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  execFileSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import { createHash } from "node:crypto";
 import http from "node:http";
 import fs from "node:fs";
@@ -33,8 +38,12 @@ import {
   contrast,
   flattenSurface,
   perfRunProblems,
+  fontAxes,
+  fontCodepoints,
   fontCut,
   plexCutProblems,
+  woff2Tables,
+  type FontAxis,
   docGaps,
   liveAliases,
   expectedFontConfig,
@@ -581,6 +590,367 @@ function perfBinding(
   return range && changedByPr(range, file) ? range : null;
 }
 
+// ---------------------------------------------------------------------------
+// The fragment sans (PRV-32)
+
+const TICKET_32 = "docs/tickets/PRV-32.md";
+const SCOPE_32 = [
+  PLEX_FILE,
+  "scripts/fonts/",
+  DEVIATIONS,
+  DOC,
+  FONTS,
+  SPEC_FILE,
+  "e2e/fidelity-harness.spec.ts",
+  TICKET_32,
+] as const;
+const inScope32 = (file: string) =>
+  SCOPE_32.some((s) => (s.endsWith("/") ? file.startsWith(s) : file === s));
+
+/** The recipe that builds the cut from the board pins (scripts/fonts/README.md). */
+const RECIPE = "scripts/fonts/fragment-sans.py";
+
+/**
+ * The pinned recipe environment's interpreter: FONTS_VENV, or by default
+ * ~/.cache/studiosc-portfolio/fonts-venv (under XDG_CACHE_HOME when set).
+ */
+function recipePython(env: Env = process.env): string {
+  const cache = env.XDG_CACHE_HOME?.trim() || path.join(os.homedir(), ".cache");
+  const venv =
+    env.FONTS_VENV?.trim() ||
+    path.join(cache, "studiosc-portfolio", "fonts-venv");
+  return path.join(venv, "bin", "python");
+}
+
+/**
+ * The board's two pinned IBM Plex Sans files in docs/boards/fonts/google.css:
+ * the `latin` face (its unicode-range opens at U+0000-00FF) and the
+ * `latin-ext` face (the one whose range holds U+20B1). Read from the
+ * stylesheet, never from a file name.
+ */
+function plexPins(): { latin: string; ext: string; blocks: string[] } {
+  const css = read(`${BOARD_FONTS}/google.css`);
+  const blocks = (css.match(/@font-face\s*{[^}]*}/g) ?? []).filter((b) =>
+    /font-family:\s*['"]IBM Plex Sans['"]/.test(b)
+  );
+  const covers = (range: string, c: number) =>
+    range.split(",").some((part) => {
+      const [lo, hi] = part.trim().replace(/^U\+/, "").split("-");
+      const a = parseInt(lo, 16);
+      return c >= a && c <= (hi ? parseInt(hi, 16) : a);
+    });
+  let latin = "";
+  let ext = "";
+  for (const block of blocks) {
+    const file = path.basename(/url\(([^)]+)\)/.exec(block)?.[1] ?? "");
+    const range = /unicode-range:\s*([^;]+);/.exec(block)?.[1] ?? "";
+    if (range.startsWith("U+0000-00FF")) latin = file;
+    else if (covers(range, 0x20b1)) ext = file;
+  }
+  if (!latin || !ext) throw new Error("google.css has no IBM Plex Sans pair");
+  return {
+    latin,
+    ext,
+    blocks: blocks.filter((b) =>
+      [latin, ext].includes(path.basename(/url\(([^)]+)\)/.exec(b)![1]))
+    ),
+  };
+}
+
+interface NameRecord {
+  platform: number;
+  encoding: number;
+  language: number;
+  id: number;
+  text: string;
+}
+
+/** Every string of an OpenType `name` table, decoded. */
+function nameRecords(name: Buffer): NameRecord[] {
+  const count = name.readUInt16BE(2);
+  const strings = name.readUInt16BE(4);
+  return Array.from({ length: count }, (_, i) => {
+    const at = 6 + i * 12;
+    const platform = name.readUInt16BE(at);
+    const length = name.readUInt16BE(at + 8);
+    const offset = name.readUInt16BE(at + 10);
+    const raw = Buffer.from(
+      name.subarray(strings + offset, strings + offset + length)
+    );
+    return {
+      platform,
+      encoding: name.readUInt16BE(at + 2),
+      language: name.readUInt16BE(at + 4),
+      id: name.readUInt16BE(at + 6),
+      text:
+        platform === 1
+          ? raw.toString("latin1")
+          : raw.swap16().toString("utf16le"),
+    };
+  });
+}
+
+/** What PRV-32's checks read from a WOFF2: its tables, axes, character map and names. */
+interface FragmentSansFacts {
+  tables: string[];
+  axes: FontAxis[];
+  codepoints: Set<number>;
+  names: NameRecord[];
+}
+
+function fragmentSansFacts(font: Buffer): FragmentSansFacts {
+  const tables = woff2Tables(font);
+  const cmap = tables.get("cmap");
+  const name = tables.get("name");
+  if (!cmap || !name) throw new Error("no cmap or name table");
+  return {
+    tables: [...tables.keys()],
+    axes: fontAxes(tables.get("fvar")),
+    codepoints: fontCodepoints(cmap),
+    names: nameRecords(name),
+  };
+}
+
+/** The tables the recipe keeps: the hinting, the layout and the variations. */
+const FRAGMENT_SANS_TABLES = [
+  "fpgm",
+  "prep",
+  "cvt ",
+  "cvar",
+  "GPOS",
+  "GSUB",
+  "GDEF",
+  "fvar",
+  "gvar",
+  "HVAR",
+  "MVAR",
+  "avar",
+] as const;
+
+/**
+ * What the cut lacks against the board's pinned pair (PRV-32 AC2): every kept
+ * table, one weight axis from 400 to 600, the Latin file's character map plus
+ * U+20B1 (which the Latin Extended file has), no name-table string containing
+ * "Plex", and the Latin file's copyright (ID 0) and licence URL (ID 14).
+ */
+function fragmentSansProblems(
+  cut: FragmentSansFacts,
+  latin: FragmentSansFacts,
+  ext: FragmentSansFacts
+): string[] {
+  const problems: string[] = [];
+  const u = (c: number) => `U+${c.toString(16).toUpperCase().padStart(4, "0")}`;
+  for (const t of FRAGMENT_SANS_TABLES) {
+    if (!cut.tables.includes(t)) problems.push(`no ${JSON.stringify(t)} table`);
+  }
+  const axes = cut.axes.map((a) => `${a.tag} ${a.min} to ${a.max}`).join(", ");
+  if (axes !== "wght 400 to 600") {
+    problems.push(`axes [${axes}], not wght 400 to 600`);
+  }
+  if (!ext.codepoints.has(0x20b1)) {
+    problems.push("the Latin Extended pin has no U+20B1");
+  }
+  const want = new Set([...latin.codepoints, 0x20b1]);
+  const missing = [...want].filter((c) => !cut.codepoints.has(c));
+  const extra = [...cut.codepoints].filter((c) => !want.has(c));
+  if (missing.length) problems.push(`missing ${missing.map(u).join(" ")}`);
+  if (extra.length) problems.push(`not in the pins: ${extra.map(u).join(" ")}`);
+  for (const n of cut.names) {
+    if (/plex/i.test(n.text)) {
+      problems.push(
+        `name ID ${n.id} contains "Plex": ${JSON.stringify(n.text)}`
+      );
+    }
+  }
+  for (const id of [0, 14]) {
+    const of = (f: FragmentSansFacts) =>
+      JSON.stringify(f.names.filter((n) => n.id === id));
+    if (of(latin) === "[]" || of(cut) !== of(latin)) {
+      problems.push(`name ID ${id} is not the board's`);
+    }
+  }
+  return problems;
+}
+
+/** D16's built SHA-256 in a register's markdown. */
+function d16Sha(markdown: string): string {
+  const d16 = markdown.split("\n").find((l) => /^\|\s*D16\s*\|/.test(l));
+  const sha = new RegExp(
+    `\`${FRAGMENT_FAMILY["IBM Plex Sans"]} sha256:([0-9a-f]{64})\``
+  ).exec(d16 ?? "")?.[1];
+  if (!sha) throw new Error("no D16 built hash in the register");
+  return sha;
+}
+
+/**
+ * The cut from before PRV-32, from the PR base: on PRV-32's own PR that is
+ * the base itself; on any later build it is the parent of the commit that
+ * added PRV-32's ticket, the base PRV-32 was judged against. Its D16 there
+ * must name its bytes.
+ */
+function preCut(): { commit: string; bytes: Buffer } {
+  const range = prRange();
+  let commit: string;
+  if (range && !gitOk("cat-file", "-e", `${range.base}:${TICKET_32}`)) {
+    commit = range.base;
+  } else {
+    const head = range?.head ?? prHead();
+    const added = git(
+      "log",
+      "--diff-filter=A",
+      "--format=%H",
+      head,
+      "--",
+      TICKET_32
+    )
+      .split("\n")
+      .filter(Boolean)
+      .at(-1);
+    if (!added) throw new Error(`no commit before ${head} adds ${TICKET_32}`);
+    commit = git("rev-parse", "--verify", `${added}^1`);
+  }
+  const bytes = execFileSync("git", ["show", `${commit}:${PLEX_FILE}`], {
+    cwd: ROOT,
+    env: gitEnv(),
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  const recorded = d16Sha(git("show", `${commit}:${DEVIATIONS}`));
+  if (sha256Of(bytes) !== recorded) {
+    throw new Error(`${commit}: the cut is not the one its D16 names`);
+  }
+  return { commit, bytes };
+}
+
+/**
+ * PRV-31's width table, every sample row: the IBM Plex Sans texts and
+ * controls the boards' references hold on the AI and Finance plates, with
+ * the board pair's width and the PR base cut's difference from it as PRV-31
+ * measured them in Linux Chromium.
+ */
+const WIDTH_SAMPLES = [
+  {
+    plate: "Finance",
+    section: "home/plate-finance-interior",
+    sample: "control:4",
+    where: "range-dark-desktop dark/plate-next",
+    text: "Bill",
+    size: 13,
+    weight: 400,
+    board: 19,
+    oldDiff: -2,
+  },
+  {
+    plate: "Finance",
+    section: "home/plate-finance-interior",
+    sample: "control:5",
+    where: "range-dark-desktop dark/plate-next",
+    text: "Due",
+    size: 13,
+    weight: 600,
+    board: 24,
+    oldDiff: 1,
+  },
+  {
+    plate: "Finance",
+    section: "home/plate-finance-interior",
+    sample: "control:6",
+    where: "range-dark-desktop dark/plate-next",
+    text: "Amount",
+    size: 13,
+    weight: 400,
+    board: 45,
+    oldDiff: 1,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "control:0",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "Draft a reply",
+    size: 14,
+    weight: 600,
+    board: 81,
+    oldDiff: 5,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "text:4",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "Customer message",
+    size: 13,
+    weight: 600,
+    board: 113,
+    oldDiff: 12,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "text:5",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "Our invoices keep going out late, and tw",
+    size: 15,
+    weight: 400,
+    board: 273,
+    oldDiff: 7,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "text:6",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "Reply draft",
+    size: 13,
+    weight: 600,
+    board: 68,
+    oldDiff: 5,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "text:7",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "The draft appears here as it is written.",
+    size: 15,
+    weight: 400,
+    board: 261,
+    oldDiff: 6,
+  },
+  {
+    plate: "AI",
+    section: "home/plate-ai-interior",
+    sample: "text:8",
+    where: "range-dark-desktop dark/tab-ai",
+    text: "Nothing is sent until you say so.",
+    size: 13,
+    weight: 400,
+    board: 179,
+    oldDiff: 6,
+  },
+  {
+    plate: "Finance",
+    section: "home/plate-finance-interior",
+    sample: "text:1",
+    where: "range-phone dark/plate-next",
+    text: "Bills due, December",
+    size: 15,
+    weight: 600,
+    board: 137,
+    oldDiff: 8,
+  },
+  {
+    plate: "Finance",
+    section: "home/plate-finance-interior",
+    sample: "text:2",
+    where: "range-phone dark/plate-next",
+    text: "Available to spend ₱47,650.00",
+    size: 13,
+    weight: 400,
+    board: 183,
+    oldDiff: 0,
+  },
+] as const;
+
 // ===========================================================================
 
 test.describe("Range design system", () => {
@@ -1044,6 +1414,80 @@ test.describe("Range design system", () => {
         codepoints: new Set([...cut.codepoints, 0x0410]),
       })
     ).toEqual(["outside Latin: U+0410"]);
+    // PRV-32: the recipe's cut of the board's pinned pair. It keeps the
+    // hinting, layout and variation tables, its character map is the Latin
+    // pin's plus U+20B1 from the Latin Extended pin, and no name says "Plex"
+    // but the copyright and licence URL are the board's.
+    const pins = plexPins();
+    const latinPin = fragmentSansFacts(
+      fs.readFileSync(path.join(ROOT, BOARD_FONTS, pins.latin))
+    );
+    const extPin = fragmentSansFacts(
+      fs.readFileSync(path.join(ROOT, BOARD_FONTS, pins.ext))
+    );
+    const facts = fragmentSansFacts(
+      fs.readFileSync(path.join(ROOT, PLEX_FILE))
+    );
+    expect(
+      fragmentSansProblems(facts, latinPin, extPin),
+      "the fragment sans against the board pins"
+    ).toEqual([]);
+    // Controls: each kept table, a wider axis, a lost or an extra character,
+    // a "Plex" name, and a changed copyright or licence URL each fail.
+    for (const t of FRAGMENT_SANS_TABLES) {
+      expect(
+        fragmentSansProblems(
+          { ...facts, tables: facts.tables.filter((x) => x !== t) },
+          latinPin,
+          extPin
+        ),
+        `without ${t}`
+      ).toEqual([`no ${JSON.stringify(t)} table`]);
+    }
+    expect(
+      fragmentSansProblems(
+        { ...facts, axes: [{ ...facts.axes[0], max: 700 }] },
+        latinPin,
+        extPin
+      )
+    ).toEqual(["axes [wght 400 to 700], not wght 400 to 600"]);
+    expect(
+      fragmentSansProblems(
+        {
+          ...facts,
+          codepoints: new Set([...facts.codepoints].filter((c) => c !== 0x41)),
+        },
+        latinPin,
+        extPin
+      )
+    ).toEqual(["missing U+0041"]);
+    expect(
+      fragmentSansProblems(
+        { ...facts, codepoints: new Set([...facts.codepoints, 0x0100]) },
+        latinPin,
+        extPin
+      )
+    ).toEqual(["not in the pins: U+0100"]);
+    const renamed = (id: number, text: string) => ({
+      ...facts,
+      names: facts.names.map((n) => (n.id === id ? { ...n, text } : n)),
+    });
+    expect(
+      fragmentSansProblems(renamed(1, "IBM Plex Sans"), latinPin, extPin)
+    ).toEqual(['name ID 1 contains "Plex": "IBM Plex Sans"']);
+    for (const id of [0, 14]) {
+      expect(
+        fragmentSansProblems(renamed(id, "changed"), latinPin, extPin)
+      ).toEqual([`name ID ${id} is not the board's`]);
+    }
+    // The board's Latin file itself is not the cut.
+    expect(fragmentSansProblems(latinPin, latinPin, extPin)).toEqual(
+      expect.arrayContaining([
+        "axes [wght 100 to 700], not wght 400 to 600",
+        "missing U+20B1",
+        'name ID 1 contains "Plex": "IBM Plex Sans"',
+      ])
+    );
     const plexBytes = fs.statSync(path.join(ROOT, PLEX_FILE)).size;
     expect(plexBytes, "IBM Plex Sans file size").toBeLessThanOrEqual(40 * KIB);
     expect(
@@ -1307,12 +1751,18 @@ test.describe("Range design system", () => {
     }
     const withFragments = await fragmentWatch();
     // The fragment faces are self-hosted from PRV-26 on, so their bytes are
-    // the ones PRV-26 recorded, not the Google files PRV-2 recorded.
-    const recorded = (JSON.parse(read(PERF_26)) as PerfRecord)
-      .fragment_font_bytes;
+    // the ones PRV-26 recorded, not the Google files PRV-2 recorded. PRV-32
+    // rebuilt the IBM Plex Sans cut, so its bytes are the committed file's.
+    const recorded: Record<string, number> = {
+      ...(JSON.parse(read(PERF_26)) as PerfRecord).fragment_font_bytes,
+      "IBM Plex Sans": plexBytes,
+    };
     for (const [face, family] of Object.entries(FRAGMENT_FAMILY)) {
       const bytes = bytesOf(withFragments, new RegExp(`^${family}$`));
-      expect(recorded[face], `${PERF} records the ${face} bytes`).toBe(bytes);
+      expect(
+        recorded[face],
+        `${face === "IBM Plex Sans" ? PLEX_FILE : PERF_26} records the ${face} bytes`
+      ).toBe(bytes);
       expect(
         bytes,
         `${face} is requested where its fragment renders`
@@ -2443,6 +2893,319 @@ test.describe("Range design system", () => {
     } finally {
       await proxy.close();
     }
+
+    // PRV-32: D16 binds the rebuilt cut alone. With the PR base's cut served
+    // in its place, the same comparison fails the IBM Plex Sans font pin.
+    const before = preCut();
+    const cut = fs.readFileSync(path.join(ROOT, PLEX_FILE));
+    expect(sha256Of(before.bytes), "the PR base's cut differs").not.toBe(
+      sha256Of(cut)
+    );
+    const old = await swapFontProxy(
+      baseURL!,
+      { sha256: sha256Of(cut), body: before.bytes },
+      FRAGMENT_FIXTURES
+    );
+    try {
+      for (const row of rows) {
+        const result = await checkSite({
+          dir,
+          baseURL: old.url,
+          browser,
+          only: {
+            rows: [row.id],
+            states: [row.states[0]],
+            widths: ["1440"],
+            themes: ["light"],
+            rm: false,
+          },
+          boards: { sections, merged, deviations: boards.deviations },
+        });
+        expect(
+          result.checked,
+          `${row.id} compared with the base cut`
+        ).toHaveLength(1);
+        expect(
+          plexFailures(result.failures)
+            .filter((f) => f.property.startsWith(`font ${plex} `))
+            .map((f) => f.section),
+          `${row.id}: the base cut fails D16's pin`
+        ).toContain(row.id);
+      }
+      expect(old.swapped(), "the cut's bytes were swapped").toBeGreaterThan(0);
+    } finally {
+      await old.close();
+    }
+  });
+
+  test("the committed fragment sans matches the recorded recipe hash", () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    // PRV-32 AC1, on every build: D16's built hash is the recipe's output,
+    // and the committed file is that output.
+    const recorded = d16Sha(read(DEVIATIONS));
+    const committed = sha256Of(fs.readFileSync(path.join(ROOT, PLEX_FILE)));
+    testInfo.annotations.push({
+      type: "fragment sans",
+      description: `committed sha256:${committed}, D16 sha256:${recorded}`,
+    });
+    expect(committed, `${PLEX_FILE} against D16 in ${DEVIATIONS}`).toBe(
+      recorded
+    );
+    // Control: a register naming other bytes does not match.
+    expect(d16Sha(read(DEVIATIONS).replace(recorded, "0".repeat(64)))).not.toBe(
+      committed
+    );
+  });
+
+  test("the fragment sans rebuilds from the board pins", () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    test.setTimeout(180_000);
+    // PRV-32 AC1: the recipe, run twice in its pinned environment on the
+    // board pins, writes the committed bytes both times. Only a missing
+    // environment skips; a recipe error or a byte mismatch fails.
+    const python = recipePython();
+    test.skip(
+      !fs.existsSync(python),
+      `the pinned recipe environment is unavailable: no interpreter at ${python} (set FONTS_VENV; see scripts/fonts/README.md)`
+    );
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), "prv32-recipe-"));
+    try {
+      const hashes: string[] = [];
+      for (const n of [1, 2]) {
+        const file = path.join(out, `run-${n}.woff2`);
+        const run = spawnSync(python, ["-I", RECIPE, "--out", file], {
+          cwd: ROOT,
+          env: gitEnv(),
+          encoding: "utf8",
+          timeout: 120_000,
+        });
+        if (
+          run.status === 2 &&
+          run.stderr.startsWith("unpinned environment:")
+        ) {
+          test.skip(
+            true,
+            `the pinned recipe environment is unavailable: ${run.stderr.trim()}`
+          );
+        }
+        expect(
+          run.status,
+          `recipe run ${n}: ${run.stderr || run.error?.message}`
+        ).toBe(0);
+        hashes.push(sha256Of(fs.readFileSync(file)));
+      }
+      const committed = sha256Of(fs.readFileSync(path.join(ROOT, PLEX_FILE)));
+      testInfo.annotations.push({
+        type: "recipe runs",
+        description: `run 1 sha256:${hashes[0]}, run 2 sha256:${hashes[1]}, committed sha256:${committed}`,
+      });
+      expect(hashes[1], "two runs give the same bytes").toBe(hashes[0]);
+      expect(
+        Buffer.compare(
+          fs.readFileSync(path.join(out, "run-1.woff2")),
+          fs.readFileSync(path.join(ROOT, PLEX_FILE))
+        ),
+        "the recipe's output against the committed file, byte for byte"
+      ).toBe(0);
+      expect(hashes[0], "the recipe's output against D16").toBe(
+        d16Sha(read(DEVIATIONS))
+      );
+    } finally {
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  test("the fragment sans sets the boards' widths", async ({ page }) => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    test.skip(
+      process.platform !== "linux",
+      "the boards were drawn in Linux Chromium, where hinting rounds each advance"
+    );
+    // PRV-32 AC3: each of PRV-31's samples, set in the cut, is within 0.5px
+    // of the board's pinned Latin and Latin Extended pair. Control: the PR
+    // base's cut misses by more than 0.5px wherever PRV-31 recorded that.
+    const pins = plexPins();
+    const data = (buf: Buffer) =>
+      `data:font/woff2;base64,${buf.toString("base64")}`;
+    const board = pins.blocks.map((block) => {
+      const url = /url\(([^)]+)\)/.exec(block)![1];
+      return block
+        .replace(/font-family:\s*['"]IBM Plex Sans['"]/, "font-family: 'Board'")
+        .replace(
+          url,
+          data(
+            fs.readFileSync(path.join(ROOT, BOARD_FONTS, path.basename(url)))
+          )
+        );
+    });
+    const before = preCut();
+    const cut = fs.readFileSync(path.join(ROOT, PLEX_FILE));
+    expect(sha256Of(before.bytes), "the PR base's cut differs").not.toBe(
+      sha256Of(cut)
+    );
+    // The cut as lib/fonts.ts declares it: one face, weights 400 to 600.
+    const face = (family: string, buf: Buffer) =>
+      `@font-face { font-family: '${family}'; font-style: normal; font-weight: 400 600; src: url(${data(buf)}) format('woff2'); }`;
+    await page.setContent(
+      `<!doctype html><style>${[...board, face("Cut", cut), face("Base", before.bytes)].join("\n")}</style><div id="host"></div>`
+    );
+    const measured = await page.evaluate(async (samples) => {
+      const host = document.getElementById("host")!;
+      const out: Record<string, { width: number; faces: number }>[] = [];
+      for (const s of samples) {
+        const row: Record<string, { width: number; faces: number }> = {};
+        for (const family of ["Board", "Cut", "Base"]) {
+          const faces = await document.fonts.load(
+            `${s.weight} ${s.size}px '${family}'`,
+            s.text
+          );
+          const el = document.createElement("span");
+          el.textContent = s.text;
+          el.style.cssText = `font-family: '${family}'; font-size: ${s.size}px; font-weight: ${s.weight}; letter-spacing: 0; white-space: nowrap`;
+          host.append(el);
+          row[family] = {
+            width: el.getBoundingClientRect().width,
+            faces: faces.filter((f) => f.status === "loaded").length,
+          };
+        }
+        out.push(row);
+      }
+      return out;
+    }, WIDTH_SAMPLES);
+    type Measure = { width: number; faces: number };
+    const rows = WIDTH_SAMPLES.map((s, i) => ({
+      ...s,
+      ...(measured[i] as Record<"Board" | "Cut" | "Base", Measure>),
+    }));
+    const name = (r: (typeof rows)[number]) =>
+      `${r.plate} ${r.sample} "${r.text}" ${r.size}px/${r.weight}`;
+    testInfo.annotations.push({
+      type: "widths (board, cut, base)",
+      description: rows
+        .map(
+          (r) => `${name(r)}: ${r.Board.width}, ${r.Cut.width}, ${r.Base.width}`
+        )
+        .join("; "),
+    });
+    // Every face loaded: the board pair draws the peso sign from its Latin
+    // Extended file, and each cut is one face.
+    for (const r of rows) {
+      expect(
+        [r.Board.faces, r.Cut.faces, r.Base.faces],
+        `${name(r)}: faces loaded`
+      ).toEqual([/₱/.test(r.text) ? 2 : 1, 1, 1]);
+    }
+    expect(
+      rows
+        .filter((r) => Math.abs(r.Cut.width - r.Board.width) > 0.5)
+        .map((r) => `${name(r)}: cut ${r.Cut.width}, board ${r.Board.width}`),
+      "samples the cut sets more than 0.5px from the board pair"
+    ).toEqual([]);
+    const controls = rows.filter((r) => Math.abs(r.oldDiff) > 0.5);
+    expect(controls.length, "rows PRV-31 recorded as off").toBe(10);
+    expect(
+      controls
+        .filter((r) => Math.abs(r.Base.width - r.Board.width) <= 0.5)
+        .map((r) => `${name(r)}: base ${r.Base.width}, board ${r.Board.width}`),
+      `control: samples the PR base's cut (${before.commit}) sets within 0.5px`
+    ).toEqual([]);
+  });
+
+  test("changes stay within PRV-32 scope", async () => {
+    const testInfo = test.info();
+    chromiumOnly(testInfo);
+    // PRV-32 AC5. A pull request build must carry both SHAs.
+    if (
+      process.env.CI &&
+      process.env.GITHUB_EVENT_NAME?.startsWith("pull_request")
+    ) {
+      for (const name of ["PR_BASE_SHA", "PR_HEAD_SHA"]) {
+        expect(
+          process.env[name]?.trim(),
+          `a pull request build sets ${name}`
+        ).toBeTruthy();
+      }
+    }
+    const range = prRange();
+    test.skip(!range, `${NO_PR}: PRV-32's scope is checked on its own PR.`);
+    const { base, head } = range as PrRange;
+    test.skip(
+      gitOk("cat-file", "-e", `${base}:${TICKET_32}`),
+      `${base} already holds ${TICKET_32}: PRV-32's scope is checked on its own PR.`
+    );
+    expect(
+      gitOk("cat-file", "-e", `${head}:${TICKET_32}`),
+      "the PR introduces its ticket"
+    ).toBe(true);
+    expect(
+      gitOk("merge-base", base, head),
+      `the merge base of ${base} and ${head}`
+    ).toBe(true);
+
+    // Files: only Scope's, both paths of a rename, from the merge base.
+    const changed = execFileSync(
+      "git",
+      ["diff", "--name-only", "--no-renames", `${base}...${head}`],
+      { cwd: ROOT, encoding: "utf8", env: gitEnv() }
+    )
+      .split("\n")
+      .filter(Boolean);
+    expect(changed, "the PR's ticket is in its diff").toContain(TICKET_32);
+    expect(
+      changed.filter((f) => !inScope32(f)),
+      "files changed outside PRV-32's Scope"
+    ).toEqual([]);
+    // Control: a path outside Scope, and one beside a Scope directory, fail.
+    expect(
+      [
+        "docs/perf/prv-26.json",
+        "scripts/fontsx.py",
+        "scripts/fonts/x.py",
+      ].filter((f) => !inScope32(f))
+    ).toEqual(["docs/perf/prv-26.json", "scripts/fontsx.py"]);
+
+    // The ibmPlexSans declaration and every option as at the base.
+    const before = git("show", `${base}:${FONTS}`);
+    const after = git("show", `${head}:${FONTS}`);
+    const problems = (source: string) => {
+      const out: string[] = [];
+      const decl = declaration(source, "ibmPlexSans");
+      if (!decl) return ["no ibmPlexSans declaration"];
+      if (decl !== declaration(before, "ibmPlexSans"))
+        out.push("the declaration differs from the base");
+      if (
+        !sameOptions(
+          astOptions(source, "ibmPlexSans"),
+          astOptions(before, "ibmPlexSans")
+        )
+      )
+        out.push("the options differ from the base");
+      return out;
+    };
+    expect(problems(after), "ibmPlexSans at the head").toEqual([]);
+    // Controls: a changed option and a changed loader each fail.
+    expect(
+      problems(
+        after.replace(
+          'variable: "--font-ibm-plex-sans",\n  display: "swap",\n  preload: false,',
+          'variable: "--font-ibm-plex-sans",\n  display: "swap",\n  preload: true,'
+        )
+      )
+    ).toEqual([
+      "the declaration differs from the base",
+      "the options differ from the base",
+    ]);
+    expect(
+      problems(
+        after.replace(
+          '= localFont({\n  src: "../app/fonts/ibm',
+          '= Manrope({\n  src: "../app/fonts/ibm'
+        )
+      )
+    ).toEqual(["the declaration differs from the base"]);
   });
 
   test("changes stay within PRV-26 scope", async () => {

@@ -73,12 +73,13 @@ export const jetbrainsMono = __JetBrains_Mono_14425ba9;
 /**
   Tally & Trace ledger and the form helper: IBM Plex Sans, self-hosted. Google's
   Latin file has no peso sign, and its Latin Extended file would add about
-  25 KiB for that one glyph, so this is a cut of the OFL release (the Google
-  Fonts source, version 3.201): Latin plus U+20B1, the weight axis trimmed to
-  the board's 400 to 600, width fixed at 100, no hinting. One file, 31,644
-  bytes. A cut is a Modified Version under the OFL, which reserves the name
-  "Plex", so the file's internal name is "SSC Fragment Sans". The licence is
-  beside it; docs/design-system.md has the steps.
+  25 KiB for that one glyph, so this is a cut built from the boards' two pinned
+  files (version 3.201) by scripts/fonts/fragment-sans.py: the Latin file with
+  U+20B1 grafted from the Latin Extended file and the weight axis trimmed to
+  the board's 400 to 600. It keeps the hinting, so hinted renderers set the
+  boards' widths. One file, 35,540 bytes. A cut is a Modified Version under the
+  OFL, which reserves the name "Plex", so the file's internal name is "SSC
+  Fragment Sans". The licence is beside it; docs/design-system.md has the steps.
 */
 export const ibmPlexSans = localFont({
   src: "../app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2",
