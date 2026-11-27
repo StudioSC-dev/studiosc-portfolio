@@ -1130,6 +1130,10 @@ async function serveCommit(
   };
 }
 
+/** The site chrome, as the boards name it. */
+const CHROME =
+  '[data-board-section="chrome/header"], [data-board-section="chrome/footer"]';
+
 interface View {
   status: number;
   text: string;
@@ -1301,8 +1305,8 @@ test("changes stay within scope", async ({ browser }, testInfo) => {
     for (const route of URLS) {
       if (route === "/about") {
         // Rebuilt from the boards: only the chrome is the base's.
-        views.push([route, 1440, { only: "header, footer" }]);
-        views.push([route, 390, { only: "header, footer" }]);
+        views.push([route, 1440, { only: CHROME }]);
+        views.push([route, 390, { only: CHROME }]);
       } else if (route === HOME_ROUTE) {
         // Gains "The two of us" and the credit lines' person links.
         const opts = {
