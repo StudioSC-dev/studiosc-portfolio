@@ -3274,7 +3274,8 @@ test.describe("real-board regeneration across host speeds", () => {
     const boards = Object.keys(manifest.boards).sort();
     // One board per run, twice each: one regen can take minutes.
     test.setTimeout(boards.length * 2 * 15 * 60_000);
-    const committed = readSpec(path.join(BOARDS, "spec.json"));
+    const spec = sha256(readFileSync(path.join(BOARDS, "spec.json")));
+    const refs = snapshot(path.join(BOARDS, "ref"));
     const dir = tmp("fidelity-host-speed-");
     const preload = path.join(dir, "slow-host.cjs");
     writeFileSync(preload, SLOW_HOST);
@@ -3286,35 +3287,30 @@ test.describe("real-board regeneration across host speeds", () => {
       ],
     ];
     try {
-      for (const board of boards) {
-        const stem = board.replace(/\.dc\.html$/, "");
-        const refs = snapshot(path.join(BOARDS, "ref", stem));
-        const entry = JSON.stringify(committed.boards[board]);
-        for (const [label, extra] of conditions) {
-          const work = path.join(dir, "boards");
-          rmSync(work, { recursive: true, force: true });
-          cpSync(BOARDS, work, {
-            recursive: true,
-            filter: (f) =>
-              !["ref", "spec.json"].includes(path.relative(BOARDS, f)),
-          });
+      for (const [label, extra] of conditions) {
+        // One output tree per condition, every board regenerated into it
+        // from nothing, one board per run.
+        const work = path.join(dir, label.replace(/\W+/g, "-"));
+        cpSync(BOARDS, work, {
+          recursive: true,
+          filter: (f) =>
+            !["ref", "spec.json"].includes(path.relative(BOARDS, f)),
+        });
+        for (const board of boards) {
           const run = await regen(
             work,
             { BOARDS_CACHE: path.join(ROOT, ".cache/boards"), ...extra },
             ["--board", board]
           );
           expect(run.status, `${board}, ${label}: ${run.stderr}`).toBe(0);
-          expect(
-            snapshot(path.join(work, "ref", stem)),
-            `${board}, ${label}: references`
-          ).toEqual(refs);
-          expect(
-            JSON.stringify(
-              readSpec(path.join(work, "spec.json")).boards[board]
-            ),
-            `${board}, ${label}: spec.json`
-          ).toBe(entry);
         }
+        expect(
+          sha256(readFileSync(path.join(work, "spec.json"))),
+          `${label}: spec.json`
+        ).toBe(spec);
+        expect(snapshot(path.join(work, "ref")), `${label}: ref/`).toEqual(
+          refs
+        );
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
