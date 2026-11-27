@@ -671,23 +671,47 @@ test("changes stay within PRV-7 scope", async ({ page }, testInfo) => {
   // PRV-7 rows are added, and every other row is untouched.
   const was = parseDeviations(git(["show", `${base}:${DEVIATIONS}`]));
   const now = parseDeviations(read(DEVIATIONS));
-  const added = ["P7-1", "P7-2", "P7-3"];
+  const SIGNED = "owner, 2026-11-27";
+  const copyRows = ["P7-1", "P7-2", "P7-3"];
+  const geometry = [
+    "P7-4a",
+    "P7-4b",
+    "P7-4c",
+    "P7-4d",
+    "P7-4e",
+    "P7-4f",
+    "P7-4g",
+  ];
+  const added = [...copyRows, ...geometry];
   expect(now.map((d) => d.id)).toEqual([...was.map((d) => d.id), ...added]);
-  for (const d of was.filter((x) => x.id !== "D2"))
+  // D1 differs from the base only by the owner's signature; D2 is narrowed;
+  // every other row is untouched.
+  for (const d of was.filter((x) => x.id !== "D2" && x.id !== "D1"))
     expect(now.find((x) => x.id === d.id)).toEqual(d);
+  expect(now.find((d) => d.id === "D1")).toEqual({
+    ...was.find((d) => d.id === "D1")!,
+    accepted: SIGNED,
+  });
   const d2 = was.find((d) => d.id === "D2")!;
   expect(now.find((d) => d.id === "D2")).toEqual({
     ...d2,
     section: ["seth/photos", "christine/photos"],
     state: d2.state.filter((s) => !/^tab-/.test(s)),
   });
-  for (const id of added) {
+  for (const id of copyRows) {
     const d = now.find((x) => x.id === id)!;
-    // Only the owner signs.
-    expect(d.accepted).toBe("");
+    expect(d.accepted).toBe(SIGNED);
     expect(d.property).toBe("copy");
   }
-  expect(now.find((d) => d.id === "D1")?.accepted).toBe("");
+  // The geometry rows cover only the 3D plate's description and caption
+  // heights and y, and the frame's height.
+  for (const id of geometry) {
+    const d = now.find((x) => x.id === id)!;
+    expect(d.accepted).toBe(SIGNED);
+    expect(d.section).toEqual(["home/plate-3d-interior"]);
+    expect(d.state).toEqual(["tab-3d", "tab-3d-rm"]);
+    expect(d.property).toMatch(/^key (text:[014]|frame:0) (height|y)$/);
+  }
 
   // The public home and the non-lab plates keep their content.
   await open(page, 1440);
