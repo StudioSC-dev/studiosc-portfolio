@@ -178,7 +178,7 @@ test("habit tracker", async ({ page }, testInfo) => {
   await pick(page, 2);
   const root = demo(page, "habit-tracker");
   await expect(root).toBeVisible();
-  const count = root.locator('[aria-live="polite"]');
+  const count = root.locator('[role="status"]');
   const habit = (name: string) => root.getByRole("button", { name });
   const names = [
     "Drink water",
@@ -223,7 +223,7 @@ test("form helper", async ({ page, browser }, testInfo) => {
   const stream = root.locator("[data-draft]");
   const announce = root.locator("[data-announce]");
   await expect(draft).toHaveText("Draft a reply");
-  await expect(announce).toHaveAttribute("aria-live", "polite");
+  await expect(announce).toHaveAttribute("role", "status");
   await expect(
     root.getByText("The draft appears here as it is written.")
   ).toBeVisible();
@@ -532,7 +532,7 @@ test("demos load on pick", async ({ page, request, browser }, testInfo) => {
   await pick(page, 0);
   await pick(page, 2);
   await expect(
-    demo(page, "habit-tracker").locator('[aria-live="polite"]')
+    demo(page, "habit-tracker").locator('[role="status"]')
   ).toHaveText("3 of 4 done");
   await pick(page, 3);
   await pick(page, 4);

@@ -101,9 +101,9 @@ export default function FormHelper() {
           </p>
         )}
       </div>
-      <p aria-live="polite" className="sr-only" data-announce="">
+      <div role="status" className="sr-only" data-announce="">
         {announced}
-      </p>
+      </div>
       <p className="mt-2.5 text-[0.8125rem] leading-5 text-[var(--frag-form-muted)]">
         Nothing is sent until you say so.
       </p>

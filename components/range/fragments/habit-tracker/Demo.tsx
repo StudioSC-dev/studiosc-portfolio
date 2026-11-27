@@ -64,7 +64,7 @@ export default function HabitTracker({ variant }: LabDemoProps) {
               Today
             </p>
             <p
-              aria-live="polite"
+              role="status"
               className="mt-1 text-[0.8125rem] leading-5 text-[var(--frag-habit-muted)]"
             >
               {count} of {HABITS.length} done
