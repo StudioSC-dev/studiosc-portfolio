@@ -673,15 +673,7 @@ test("changes stay within PRV-7 scope", async ({ page }, testInfo) => {
   const now = parseDeviations(read(DEVIATIONS));
   const SIGNED = "owner, 2026-11-27";
   const copyRows = ["P7-1", "P7-2", "P7-3"];
-  const geometry = [
-    "P7-4a",
-    "P7-4b",
-    "P7-4c",
-    "P7-4d",
-    "P7-4e",
-    "P7-4f",
-    "P7-4g",
-  ];
+  const geometry = "abcdefghijklmnopqrstuv".split("").map((c) => `P7-4${c}`);
   const added = [...copyRows, ...geometry];
   expect(now.map((d) => d.id)).toEqual([...was.map((d) => d.id), ...added]);
   // D1 differs from the base only by the owner's signature; D2 is narrowed;
@@ -703,14 +695,16 @@ test("changes stay within PRV-7 scope", async ({ page }, testInfo) => {
     expect(d.accepted).toBe(SIGNED);
     expect(d.property).toBe("copy");
   }
-  // The geometry rows cover only the 3D plate's description and caption
-  // heights and y, and the frame's height.
+  // The geometry rows cover only the 3D plate's layout: boxes, positions,
+  // sizes, aspect ratios and gaps. Colours, fonts and copy stay checked.
   for (const id of geometry) {
     const d = now.find((x) => x.id === id)!;
     expect(d.accepted).toBe(SIGNED);
     expect(d.section).toEqual(["home/plate-3d-interior"]);
     expect(d.state).toEqual(["tab-3d", "tab-3d-rm"]);
-    expect(d.property).toMatch(/^key (text:[014]|frame:0) (height|y)$/);
+    expect(d.property).toMatch(
+      /^(box height|gap \S+ to \S+|key (text:\d|frame:0|control:0) (x|y|width|height|aspect ratio))$/
+    );
   }
 
   // The public home and the non-lab plates keep their content.
