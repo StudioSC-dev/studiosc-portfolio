@@ -47,14 +47,16 @@ const nextConfig: NextConfig = {
     .filter(Boolean),
   pageExtensions: ["ts", "tsx", "js", "jsx", "md", "mdx"],
   images: {
+    // Every next/image source goes through lib/image-loader.ts: committed
+    // variants for local photos, Cloudinary's own transforms for remote ones.
+    // Vercel's metered optimiser (/_next/image) is never used.
+    loader: "custom",
+    loaderFile: "./lib/image-loader.ts",
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "**", // Allow all HTTPS domains for external images
-      },
-      {
-        protocol: "http",
-        hostname: "localhost",
+        hostname: "res.cloudinary.com",
+        pathname: "/dg0t8ipwi/**",
       },
     ],
   },
