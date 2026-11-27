@@ -676,6 +676,26 @@
     return out.join(",");
   };
 
+  /**
+   * Whether an element with `display: contents`, which has no box of its
+   * own, shows its text: its nearest ancestor with a box shows, it is not
+   * hidden, and a text node of its own renders.
+   */
+  const contentsShown = (el, cs) => {
+    let box = el.parentElement;
+    while (box && getComputedStyle(box).display === "contents")
+      box = box.parentElement;
+    if (!box || !visible(box) || cs.visibility !== "visible") return false;
+    return [...el.childNodes].some((n) => {
+      if (n.nodeType !== Node.TEXT_NODE || !n.textContent.trim()) return false;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      return [...range.getClientRects()].some(
+        (r) => r.width > 0 && r.height > 0
+      );
+    });
+  };
+
   /** The probe faces and lines fontRuns added, until clearFontRuns. */
   const fontProbes = [];
   /** Input types that show no text of their own. */
@@ -1003,9 +1023,9 @@
 
     /**
      * The text runs of `spec.rows`, for a font row's check: every visible
-     * element that paints text of its own (a non-blank text node, or a
-     * control's value or, when it has none, its placeholder), tagged
-     * `spec.attr` with its id, with the innermost key element that holds it
+     * element (one with `display: contents` too) that paints text of its
+     * own (a non-blank text node, or a control's value or, when it has none,
+     * its placeholder), tagged `spec.attr` with its id, with the innermost key element that holds it
      * (keys named as measure names them), its font-family list, weight and
      * style. Each of `spec.probes` (id to URL) paints a line in a face loaded
      * from that URL alone, tagged `probe:<id>`, so the caller can name the
@@ -1050,9 +1070,13 @@
         };
         for (const root of els)
           for (const el of [root, ...root.querySelectorAll("*")]) {
-            if (el.hasAttribute(spec.attr) || !visible(el)) continue;
+            if (el.hasAttribute(spec.attr)) continue;
             if (excluded.some((x) => x === el || x.contains(el))) continue;
             const cs = getComputedStyle(el);
+            if (
+              !(cs.display === "contents" ? contentsShown(el, cs) : visible(el))
+            )
+              continue;
             if (
               el instanceof HTMLTextAreaElement ||
               (el instanceof HTMLInputElement && !NO_TEXT_INPUT.has(el.type))

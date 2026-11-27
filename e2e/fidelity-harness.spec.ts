@@ -2662,6 +2662,23 @@ test.describe("fidelity harness", () => {
           },
           "an inline run at a weight outside the face"
         );
+        // The same run in an element with display: contents, which has no
+        // box of its own: its text still renders, and is still checked.
+        const contents = bold.replace(
+          'style="font-weight: 700"',
+          'style="display: contents; font-weight: 700"'
+        );
+        expect(contents).toContain("display: contents");
+        expectFailure(
+          (await run({ ...inCut(rows), js: contents }, [row])).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 700`,
+            expected: "a loaded face of the signed file at 700 normal",
+            actual: `no loaded face: the text falls back: "measured"`,
+          },
+          "a display: contents run at a weight outside the face"
+        );
         const field = `document.querySelector('[data-board-section="fx/opener"] h1').insertAdjacentHTML("afterend", '<input placeholder="Search the work" style="font-weight: 700">');`;
         expectFailure(
           (await run({ ...inCut(rows), js: field }, [row])).failures,
