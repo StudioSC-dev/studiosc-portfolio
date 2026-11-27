@@ -3354,25 +3354,31 @@ test.describe("real-board regeneration across host speeds", () => {
         git(["rev-parse", `${base}:${f}`])
       );
 
-    // No reference file changes. A spec.json entry changes only in the
-    // recorded motion of a state of two or more steps, on a row that has
-    // the state: what running each step from rest changes (the holly root
-    // cause). Everything else in every capture equals the base.
+    // No reference file changes. In spec.json only the recorded motion of
+    // the rows and states the root-cause record lists may change; every
+    // other field, frame metadata and the spec's version included, equals
+    // the base.
     expect(
       changed.filter((f) => f.startsWith("docs/boards/ref/")),
       "reference files"
     ).toEqual([]);
-    const defs = readJson<Sections>(path.join(BOARDS, "sections.json"));
-    const unstable = (row: string | null, key: string) => {
+    const record = git(["show", `${head}:${TICKET_29}`]);
+    for (const [row, states] of Object.entries(RECORDED_CHANGES))
+      expect(record, `the root-cause record lists ${row}`).toContain(
+        `\`${row}\`: ${states.map((st) => `\`${st}\``).join(", ")}.`
+      );
+    const recorded = (row: string | null, key: string) => {
       const state = key
         .slice(key.indexOf("/") + 1)
         .replace(/-rm$/, "")
         .split("+")[0];
-      return (
-        (defs.states[state]?.steps?.length ?? 0) > 1 &&
-        defs.rows.some((r) => r.id === row && r.states.includes(state))
-      );
+      return row !== null && !!RECORDED_CHANGES[row]?.includes(state);
     };
+    const rest = (capture: Capture, key: string) =>
+      JSON.stringify({
+        ...capture,
+        motion: capture.motion.filter((m) => !recorded(m.row, key)),
+      });
     const scratch = tmp("fidelity-prv29-spec-");
     const specAt = (sha: string) => {
       const file = path.join(scratch, `${sha}.json`);
@@ -3382,39 +3388,25 @@ test.describe("real-board regeneration across host speeds", () => {
     try {
       const was = specAt(base);
       const now = specAt(head);
-      expect(Object.keys(now.boards)).toEqual(Object.keys(was.boards));
+      const { boards: wasBoards, ...wasTop } = was;
+      const { boards: nowBoards, ...nowTop } = now;
+      expect(JSON.stringify(nowTop), "the spec's top level").toBe(
+        JSON.stringify(wasTop)
+      );
+      expect(Object.keys(nowBoards)).toEqual(Object.keys(wasBoards));
       const stray: string[] = [];
-      for (const [board, b] of Object.entries(now.boards)) {
-        const a = was.boards[board];
-        const { captures: ca, ...restA } = a;
+      for (const [board, b] of Object.entries(nowBoards)) {
+        const { captures: ca, ...restA } = wasBoards[board];
         const { captures: cb, ...restB } = b;
         if (JSON.stringify(restA) !== JSON.stringify(restB)) stray.push(board);
         expect(Object.keys(cb), board).toEqual(Object.keys(ca));
-        for (const [key, capture] of Object.entries(cb)) {
-          const prior = ca[key];
-          if (JSON.stringify(capture.tokens) !== JSON.stringify(prior.tokens))
-            stray.push(`${board} ${key} tokens`);
-          const rows = new Set([
-            ...Object.keys(capture.rows),
-            ...capture.motion.map((m) => m.row),
-            ...prior.motion.map((m) => m.row),
-          ]);
-          for (const row of rows) {
-            if (
-              JSON.stringify(row === null ? null : capture.rows[row]) !==
-              JSON.stringify(row === null ? null : prior.rows[row])
-            )
-              stray.push(`${board} ${key} ${row}`);
-            if (
-              !unstable(row, key) &&
-              JSON.stringify(capture.motion.filter((m) => m.row === row)) !==
-                JSON.stringify(prior.motion.filter((m) => m.row === row))
-            )
-              stray.push(`${board} ${key} ${row} motion`);
-          }
-        }
+        for (const [key, capture] of Object.entries(cb))
+          if (rest(capture, key) !== rest(ca[key], key))
+            stray.push(`${board} ${key}`);
       }
-      expect(stray, "spec.json changes outside multi-step motion").toEqual([]);
+      expect(stray, "spec.json changes outside the recorded captures").toEqual(
+        []
+      );
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -3426,6 +3418,17 @@ const TICKET_29 = "docs/tickets/PRV-29.md";
 
 /** The capture code PRV-29 starts from: its PR base on main (PRV-4). */
 const PRE_PRV29 = "2473f216fb51a6598b5492e6dd0fdc07bc0254e8";
+
+/**
+ * The captures the PRV-29 fix changes, row by row, as the root-cause record
+ * lists them: their recorded motion is all that changes in spec.json.
+ */
+const RECORDED_CHANGES: Record<string, readonly string[]> = {
+  "home/holly": ["holly-3", "holly-4", "holly-5", "holly-6"],
+  "seth/photos": ["gallery-3", "gallery-4"],
+  "christine/photos": ["gallery-3", "gallery-4"],
+  "post-life/gallery": ["gallery-3", "gallery-4", "gallery-5", "gallery-6"],
+};
 
 /** The capture code one revision exports: what the host-speed cases run. */
 type CaptureCode = {
