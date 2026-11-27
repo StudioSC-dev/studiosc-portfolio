@@ -2893,41 +2893,58 @@ test.describe("fidelity harness", () => {
           )
         ).toEqual(fontsOf(plain));
 
-        // A font row whose built family is one the boards pin: the cut served
-        // under Manrope's name stands for IBM Plex Sans in fx/opener, while
-        // Manrope's own text in fx/list, on the same page, keeps Manrope's
-        // pins, so the cut fails them exactly as without the row.
-        const clash: Deviation = {
-          ...row,
-          built: `__Manrope_8c2def02 sha256:${sha256(own(PLEX_CUT))}`,
-        };
-        const asManrope: Drift = {
+        // A font row whose built family is one the boards pin is not
+        // applied: fx/opener set in Manrope's name keeps its family mismatch,
+        // and Manrope's own text in fx/list, on the same page, keeps
+        // Manrope's pins. Every failure is the same as without the row,
+        // whether the row signs the cut served under Manrope's name or the
+        // file the boards already pin for Manrope.
+        const inManrope = (src: string): Drift => ({
           css: [
-            `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(${CUT_URL}) format("woff2"); }`,
+            `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(${src}) format("woff2"); }`,
             `@font-face { font-family: __JetBrains_Mono_14425ba9; font-style: normal; font-weight: 400 700; src: url(/cut/mono.woff2) format("woff2"); }`,
             setIn("__Manrope_8c2def02, sans-serif", ["fx/opener", "fx/list"]),
             setIn("__JetBrains_Mono_14425ba9, monospace", ["fx/contact"]),
             inCut(["fx/footer"]).css,
           ].join("\n"),
-        };
+        });
+        const signing = (bytes: Buffer): Deviation => ({
+          ...row,
+          built: `__Manrope_8c2def02 sha256:${sha256(bytes)}`,
+        });
         const manropePins = (r: { failures: Failure[] }) =>
           r.failures
             .filter((f) => f.property.startsWith("font manrope "))
             .map(describeFailure);
-        const clashNone = await run([], [], asManrope);
-        const clashed = await run([clash], [], asManrope);
-        expect(manropePins(clashNone).length).toBeGreaterThan(0);
-        expect(manropePins(clashed)).toEqual(manropePins(clashNone));
-        expect(
-          plexFailures(clashNone.failures).filter(
-            (f) => f.section === "fx/opener"
-          ).length
-        ).toBeGreaterThan(0);
-        expect(
-          plexFailures(clashed.failures)
-            .filter((f) => f.section === "fx/opener")
-            .map(describeFailure)
-        ).toEqual([]);
+        const cutNone = await run([], [], inManrope(CUT_URL));
+        const cutSigned = await run(
+          [signing(own(PLEX_CUT))],
+          [],
+          inManrope(CUT_URL)
+        );
+        expect(manropePins(cutNone).length).toBeGreaterThan(0);
+        expect(cutSigned.failures.map(describeFailure)).toEqual(
+          cutNone.failures.map(describeFailure)
+        );
+        const pinNone = await run([], [], inManrope("/cut/manrope.woff2"));
+        const pinSigned = await run(
+          [signing(manrope)],
+          [],
+          inManrope("/cut/manrope.woff2")
+        );
+        expectFailure(
+          pinSigned.failures,
+          {
+            section: "fx/opener",
+            property: /^key \S+ font-family$/,
+            expected: PLEX,
+            actual: "manrope",
+          },
+          "a row signing Manrope's pinned file"
+        );
+        expect(pinSigned.failures.map(describeFailure)).toEqual(
+          pinNone.failures.map(describeFailure)
+        );
 
         // Red Hat Text, Manrope and JetBrains Mono: every failure that is not
         // IBM Plex Sans's is the same as without D16, served right or wrong.

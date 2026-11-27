@@ -190,13 +190,15 @@ export function fontAlias(d: Deviation): FontAlias | null {
 /**
  * The font deviations in force for a row here: each names the row, state,
  * width and theme exactly, and the selected reference draws the row's text
- * in the deviation's board family.
+ * in the deviation's board family. A row whose built family is one the
+ * boards pin (`pinned`) is never in force: that family keeps its own pins.
  */
 function rowAliases(
   active: Deviation[],
   section: string,
   where: Where,
-  ref: RowMeasure | null | undefined
+  ref: RowMeasure | null | undefined,
+  pinned: Map<string, Set<string>>
 ): FontAlias[] {
   if (!ref) return [];
   const drawn = new Set(ref.keys.map((k) => k.type?.family));
@@ -208,7 +210,7 @@ function rowAliases(
       d.theme.includes(where.theme)
         ? fontAlias(d)
         : null;
-    return a && drawn.has(a.board) ? [a] : [];
+    return a && drawn.has(a.board) && !pinned.has(a.built) ? [a] : [];
   });
 }
 
@@ -716,7 +718,7 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
             // signed file too.
             const covered: CoveredRow[] = g.rows.flatMap((r) => {
               const b = ref.rows[r.id];
-              const aliases = rowAliases(active, r.id, where, b);
+              const aliases = rowAliases(active, r.id, where, b, pinned);
               return b && aliases.length ? [{ id: r.id, aliases, ref: b }] : [];
             });
             if (g.rows.length) {
@@ -798,7 +800,7 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
                 asBoardFamily(
                   board,
                   capture.rows[row.id] ?? null,
-                  rowAliases(active, row.id, where, b)
+                  rowAliases(active, row.id, where, b, pinned)
                 )
               )
             );

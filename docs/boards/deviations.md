@@ -20,7 +20,7 @@ the board's value, within the usual tolerance, is then required.
   inline source. Every text run of those sections set in the built family (an element's own text, a control's
   value or placeholder), unless the board sets its key in another family, has the built family first rather than
   its fallback face, a loaded face of the file for its weight and style, and every glyph painted by the file. The
-  row changes no pin of a family the boards pin, so its built family must not be one of them.
+  row changes no pin of a family the boards pin: a row whose built family is one of them is not applied.
   A `font` row suppresses no failure: a width or position the face changes still fails.
 - Any other property suppresses the failure that names exactly that property, board value and built value.
 
