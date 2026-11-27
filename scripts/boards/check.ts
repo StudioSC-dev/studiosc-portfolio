@@ -19,6 +19,7 @@ import {
   stepsFor,
   webpToPng,
   type FontFaceReport,
+  type RowQuery,
 } from "./capture";
 import {
   applyToReference,
@@ -40,7 +41,9 @@ import {
   stateName,
   type BoardsDir,
   type Capture,
+  type Deviation,
   type Row,
+  type RowMeasure,
   type Theme,
   type Width,
 } from "./model";
@@ -164,6 +167,78 @@ function faceFamily(raw: string) {
   };
 }
 
+/**
+ * A `font` deviation: the family the site's face renders under (`built`, as
+ * the harness reads a family) stands for the board's family, and its faces
+ * may load the one file whose sha256 the row names. The built cell reads
+ * `<family> sha256:<hex>`.
+ */
+export interface FontAlias {
+  board: string;
+  built: string;
+  sha256: string;
+}
+
+export function fontAlias(d: Deviation): FontAlias | null {
+  if (d.property !== "font") return null;
+  const m = /^(\S.*?) sha256:([0-9a-f]{64})$/.exec(d.built.trim());
+  const board = d.board.trim().toLowerCase();
+  if (!m || !board) return null;
+  return { board, built: faceFamily(m[1]).family, sha256: m[2] };
+}
+
+/**
+ * The font deviations in force for a row here: each names the row, state,
+ * width and theme exactly, and the selected reference draws the row's text
+ * in the deviation's board family. A row whose built family is one the
+ * boards pin (`pinned`) is never in force: that family keeps its own pins.
+ */
+function rowAliases(
+  active: Deviation[],
+  section: string,
+  where: Where,
+  ref: RowMeasure | null | undefined,
+  pinned: Map<string, Set<string>>
+): FontAlias[] {
+  if (!ref) return [];
+  const drawn = new Set(ref.keys.map((k) => k.type?.family));
+  return active.flatMap((d) => {
+    const a =
+      d.section.includes(section) &&
+      d.state.includes(where.state) &&
+      d.width.includes(where.width) &&
+      d.theme.includes(where.theme)
+        ? fontAlias(d)
+        : null;
+    return a && drawn.has(a.board) && !pinned.has(a.built) ? [a] : [];
+  });
+}
+
+/**
+ * The site's row with the built family read as the board family, on each key
+ * whose board counterpart is set in that family: only that comparison of
+ * `font-family` changes.
+ */
+function asBoardFamily(
+  ref: RowMeasure | null,
+  site: RowMeasure | null,
+  aliases: FontAlias[]
+): RowMeasure | null {
+  if (!ref || !site || !aliases.length) return site;
+  const board = new Map(ref.keys.map((k) => [k.key, k.type?.family]));
+  return {
+    ...site,
+    keys: site.keys.map((k) => {
+      const a =
+        k.type &&
+        aliases.find(
+          (x) => x.built === k.type!.family && x.board === board.get(k.key)
+        );
+      return a ? { ...k, type: { ...k.type!, family: a.board } } : k;
+    }),
+  };
+}
+
 const covers = (range: string, weight: number) => {
   const named: Record<string, number> = { normal: 400, bold: 700 };
   const [a, b] = range
@@ -245,6 +320,286 @@ function fontFailures(
       );
   }
   return out;
+}
+
+/** A text run of a row a font row covers, as inpage.js fontRuns reports it. */
+interface FontRun {
+  id: string;
+  row: string;
+  /** The innermost key element that holds the run, as measure names keys. */
+  key: string | null;
+  /** The computed font-family list, first family first. */
+  families: string[];
+  weight: string;
+  style: string;
+  text: string;
+}
+
+/** A font Chromium painted a run's glyphs with. */
+interface PaintedFont {
+  familyName: string;
+  isCustomFont: boolean;
+}
+
+/** A DOM node as Chromium's DevTools protocol reports it. */
+interface CdpNode {
+  nodeId: number;
+  nodeType: number;
+  attributes?: string[];
+  children?: CdpNode[];
+  shadowRoots?: CdpNode[];
+  shadowRootType?: string;
+}
+
+/** A row a font row covers here, with the deviations in force and its reference. */
+interface CoveredRow {
+  id: string;
+  aliases: FontAlias[];
+  ref: RowMeasure;
+}
+
+const RUN_ATTR = "data-fidelity-run";
+
+/**
+ * The text runs of `rows` and the fonts Chromium painted each with: those
+ * of the run's own text nodes, or of the text in a control's user-agent
+ * shadow tree (its value or placeholder), never a child element's. Each of
+ * `probes` (id to URL) is painted in a face loaded from that URL alone,
+ * under `probe:<id>`.
+ */
+async function paintedRuns(
+  page: Page,
+  rows: RowQuery[],
+  sections: BoardsDir["sections"],
+  probes: Record<string, string>
+): Promise<{ runs: FontRun[]; painted: Map<string, PaintedFont[]> }> {
+  const runs = (await page.evaluate(
+    (spec) =>
+      (
+        window as unknown as {
+          __fidelity: { fontRuns(s: unknown): Promise<unknown> };
+        }
+      ).__fidelity.fontRuns(spec),
+    { rows, keys: sections.keys, probes, attr: RUN_ATTR }
+  )) as FontRun[];
+  const painted = new Map<string, PaintedFont[]>();
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument", {
+      depth: -1,
+      pierce: true,
+    });
+    // A run's fonts are those of its own text nodes (a control's, in its
+    // user-agent shadow tree): a child element's text is its own run.
+    const TEXT = 3;
+    const texts = (n: CdpNode): number[] =>
+      n.nodeType === TEXT
+        ? [n.nodeId]
+        : [...(n.children ?? []), ...(n.shadowRoots ?? [])].flatMap(texts);
+    const tagged: [string, number[]][] = [];
+    const visit = (n: CdpNode) => {
+      const attrs = n.attributes ?? [];
+      const shadow = (n.shadowRoots ?? []).filter(
+        (r) => r.shadowRootType === "user-agent"
+      );
+      for (let i = 0; i < attrs.length; i += 2)
+        if (attrs[i] === RUN_ATTR)
+          tagged.push([
+            attrs[i + 1],
+            shadow.length
+              ? shadow.flatMap(texts)
+              : (n.children ?? [])
+                  .filter((c) => c.nodeType === TEXT)
+                  .map((c) => c.nodeId),
+          ]);
+      for (const c of [...(n.children ?? []), ...(n.shadowRoots ?? [])])
+        visit(c);
+    };
+    visit(root);
+    for (const [id, nodes] of tagged) {
+      const fonts = new Map<string, PaintedFont>();
+      for (const nodeId of nodes) {
+        const got = await cdp
+          .send("CSS.getPlatformFontsForNode", { nodeId })
+          .catch(() => ({ fonts: [] }));
+        for (const f of got.fonts)
+          fonts.set(`${f.familyName}|${f.isCustomFont}`, {
+            familyName: f.familyName,
+            isCustomFont: f.isCustomFont,
+          });
+      }
+      painted.set(id, [...fonts.values()]);
+    }
+  } finally {
+    await cdp.detach();
+    await page.evaluate(
+      (attr) =>
+        (
+          window as unknown as {
+            __fidelity: { clearFontRuns(a: string): void };
+          }
+        ).__fidelity.clearFontRuns(attr),
+      RUN_ATTR
+    );
+  }
+  return { runs, painted };
+}
+
+/** A font URL as a failure names it. */
+const fontFile = (url: string) =>
+  url.startsWith("data:")
+    ? "an inline font"
+    : path.basename(new URL(url).pathname);
+
+/** The built family's own faces (not next/font's fallback for it). */
+const builtFaces = (faces: FontFaceReport[], a: FontAlias) =>
+  faces.filter((f) => {
+    const { family, fallback } = faceFamily(f.family);
+    return family === a.built && !fallback;
+  });
+
+/** Why a face of the built family is not the signed file alone, or null. */
+function signedProblem(
+  f: FontFaceReport,
+  a: FontAlias,
+  served: Map<string, string>
+): string | null {
+  if (f.status === "error")
+    return `failed to load ${f.urls.map(fontFile).join(", ")}`;
+  if (f.local) return "a local() source: whatever font the machine has";
+  if (f.urls.length !== 1)
+    return `${f.urls.length} sources: ${f.urls.map(fontFile).join(", ")}`;
+  const sha = served.get(f.urls[0]);
+  if (!sha) return `${fontFile(f.urls[0])}, which the site did not serve`;
+  if (sha !== a.sha256) return `${fontFile(f.urls[0])} with sha256 ${sha}`;
+  return null;
+}
+
+/**
+ * The text a font row covers is painted by its one signed file. Every face
+ * of the built family loads that file alone, from one URL the site served
+ * whose bytes match the sha256. Every run of a covered row set in the built
+ * family, unless the board sets the run's key in another family, has the
+ * built family first (not next/font's fallback), a loaded signed face for
+ * its weight and style, and every glyph painted by the signed file, as the
+ * probe of that file names it: a glyph or weight the file lacks falls back,
+ * and fails. The rows' other text keeps the regular pins (fontFailures).
+ */
+function aliasFailures(
+  faces: FontFaceReport[],
+  served: Map<string, string>,
+  covered: CoveredRow[],
+  runs: FontRun[],
+  painted: Map<string, PaintedFont[]>,
+  probed: Map<string, string>,
+  where: Where
+): Failure[] {
+  const out: Failure[] = [];
+  const seen = new Set<string>();
+  for (const c of covered)
+    for (const a of c.aliases) {
+      const id = `${a.built}|${a.sha256}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      for (const f of builtFaces(faces, a)) {
+        const problem = signedProblem(f, a, served);
+        if (problem)
+          out.push({
+            section: c.id,
+            ...where,
+            property: `font ${a.board} ${f.weight}`,
+            expected: `loaded from the signed file alone, sha256 ${a.sha256}`,
+            actual: problem,
+          });
+      }
+    }
+  for (const run of runs) {
+    const c = covered.find((x) => x.id === run.row);
+    const first = run.families[0] ?? "";
+    const { family, fallback } = faceFamily(first);
+    const a = c?.aliases.find(
+      (x) => x.built === family || `${x.built} fallback` === family
+    );
+    if (!c || !a) continue;
+    const board = run.key
+      ? c.ref.keys.find((k) => k.key === run.key)?.type?.family
+      : undefined;
+    if (board !== undefined && board !== a.board) continue;
+    const push = (expected: string, actual: string) =>
+      out.push({
+        section: run.row,
+        ...where,
+        property: `font ${a.board} ${run.weight}`,
+        expected,
+        actual: `${actual}: "${run.text}"`,
+      });
+    if (fallback || family !== a.built)
+      push(`the ${a.board} face first`, `the fallback face ${first} first`);
+    const signed = builtFaces(faces, a).filter(
+      (f) => f.status === "loaded" && !signedProblem(f, a, served)
+    );
+    if (
+      !signed.some(
+        (f) => f.style === run.style && covers(f.weight, Number(run.weight))
+      )
+    )
+      push(
+        `a loaded face of the signed file at ${run.weight} ${run.style}`,
+        "no loaded face: the text falls back"
+      );
+    const want = probed.get(a.sha256);
+    const fonts = painted.get(run.id) ?? [];
+    if (
+      !want ||
+      !fonts.length ||
+      fonts.some((f) => !f.isCustomFont || f.familyName !== want)
+    )
+      push(
+        `painted by the signed file${want ? ` (${want})` : ""}`,
+        `painted by ${fonts.map((f) => f.familyName).join(", ") || "no font"}`
+      );
+  }
+  return out;
+}
+
+/**
+ * The font failures of the rows font rows cover here: their runs, painted,
+ * against the signed files (aliasFailures). Each signed file is probed from a
+ * face of the built family that loads it alone.
+ */
+async function coveredFontFailures(
+  page: Page,
+  sections: BoardsDir["sections"],
+  faces: FontFaceReport[],
+  served: Map<string, string>,
+  covered: CoveredRow[],
+  where: Where
+): Promise<Failure[]> {
+  const probes: Record<string, string> = {};
+  for (const a of covered.flatMap((c) => c.aliases)) {
+    const f = builtFaces(faces, a).find(
+      (x) => x.status === "loaded" && !signedProblem(x, a, served)
+    );
+    if (f) probes[a.sha256] = f.urls[0];
+  }
+  const { runs, painted } = await paintedRuns(
+    page,
+    rowQueries(
+      sections.rows.filter((r) => covered.some((c) => c.id === r.id)),
+      sections.rows,
+      "site"
+    ),
+    sections,
+    probes
+  );
+  const probed = new Map<string, string>();
+  for (const sha of Object.keys(probes)) {
+    const font = painted.get(`probe:${sha}`)?.find((f) => f.isCustomFont);
+    if (font) probed.set(sha, font.familyName);
+  }
+  return aliasFailures(faces, served, covered, runs, painted, probed, where);
 }
 
 async function siteCapture(
@@ -365,24 +720,45 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
           async (page, cap, fonts) => {
             // In every state, motion on and reduced: a font a step or the
             // reduced-motion styles swap in is still the site's font. Each
-            // failure is named once, in the first state it shows.
-            if (g.rows.length)
-              for (const f of fontFailures(
-                await fontsReport(
-                  page,
-                  rowQueries(g.rows, sections.rows, "site"),
-                  sections
-                ),
+            // failure is named once, in the first state it shows. The rows a
+            // font deviation covers have their text checked against its
+            // signed file too.
+            const covered: CoveredRow[] = g.rows.flatMap((r) => {
+              const b = ref.rows[r.id];
+              const aliases = rowAliases(active, r.id, where, b, pinned);
+              return b && aliases.length ? [{ id: r.id, aliases, ref: b }] : [];
+            });
+            if (g.rows.length) {
+              const report = await fontsReport(
+                page,
+                rowQueries(g.rows, sections.rows, "site"),
+                sections
+              );
+              const found = fontFailures(
+                report,
                 pinned,
                 fonts,
                 g.rows[0].id,
                 where
-              )) {
+              );
+              if (covered.length)
+                found.push(
+                  ...(await coveredFontFailures(
+                    page,
+                    sections,
+                    report.faces,
+                    fonts,
+                    covered,
+                    where
+                  ))
+                );
+              for (const f of found) {
                 const id = `${g.route}|${g.width}|${g.theme}|${f.property}|${f.actual}`;
                 if (fontsSeen.has(id)) continue;
                 fontsSeen.add(id);
                 failures.push(f);
               }
+            }
             if (!opts.pairsDir) return;
             for (const row of rowsHere) {
               const b = ref.rows[row.id];
@@ -422,12 +798,17 @@ export async function checkSite(opts: CheckOptions): Promise<CheckResult> {
           result.checked.push(`${row.id} ${label} ${g.width} ${g.theme}`);
           if (!def?.inFlight) {
             const b = ref.rows[row.id];
+            const board = b ? applyToReference(b, row.id, where, active) : null;
             failures.push(
               ...compareRow(
                 row.id,
                 where,
-                b ? applyToReference(b, row.id, where, active) : null,
-                capture.rows[row.id] ?? null
+                board,
+                asBoardFamily(
+                  board,
+                  capture.rows[row.id] ?? null,
+                  rowAliases(active, row.id, where, b, pinned)
+                )
               )
             );
           }

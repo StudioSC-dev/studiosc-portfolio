@@ -11,6 +11,17 @@ the board's value, within the usual tolerance, is then required.
 - `later` rows hide a later ticket's elements (the board value is their selector) on the board until that
   ticket merges. Each hides only the entries of the sections it names, for the states, widths and themes it
   names; `boards:regen` renders the reference for the rows listed here and for the accepted ones.
+- `font` rows let a built family stand for a board family. The board value is the board's family; the built value
+  is the family the site's face renders under and the sha256 of the one file that face may load, as
+  `<family> sha256:<hex>`. For the sections, states, widths and themes the row names, and only where the selected
+  reference draws that section's text in the board family, the check reads the built family as the board family
+  when it compares `font-family`. The text the row covers must then be painted by that one file alone. Every face
+  of the built family loads from a single URL the site served whose bytes match the sha256, with no `local()` or
+  inline source. Every text run of those sections set in the built family (an element's own text, a control's
+  value or placeholder), unless the board sets its key in another family, has the built family first rather than
+  its fallback face, a loaded face of the file for its weight and style, and every glyph painted by the file. The
+  row changes no pin of a family the boards pin: a row whose built family is one of them is not applied.
+  A `font` row suppresses no failure: a width or position the face changes still fails.
 - Any other property suppresses the failure that names exactly that property, board value and built value.
 
 PRV-22 seeds the rows below. A row applies once the owner signs and dates it in the `accepted` column, subject to the matching and expiry rules above.
@@ -31,3 +42,4 @@ PRV-22 seeds the rows below. A row applies once the owner signs and dates it in 
 | D12 | home/plate-mobile, home/plate-ai, home/plate-3d | tab-mobile, tab-mobile-rm, tab-ai, tab-ai-rm, tab-3d, tab-3d-rm | 1440, 390 | light, dark | `later` | `[aria-roledescription="slide"] > :not(h2):not(:has(h2)), [aria-roledescription="slide"] > div:has(> h2) > :not(h2)` | `absent` | PRV-5 draws each plate's frame and title; PRV-7 fills the lab plates' interiors | owner, 2026-11-26 | PRV-7 |
 | D13 | home/range | default, default-rm, tab-finance, tab-finance-rm, tab-mobile, tab-mobile-rm, tab-ai, tab-ai-rm, tab-3d, tab-3d-rm, tab-sites, tab-sites-rm, tab-testing, tab-testing-rm, plate-next, plate-next-rm, plate-prev, plate-prev-rm | 1440 | light, dark | `later` | `div[aria-hidden] div:has(> svg > rect[stroke="#DCE3DE"]), div[aria-hidden] p:has(+ div > svg > rect[stroke="#DCE3DE"]), div[aria-hidden] div:has(> svg > rect[stroke="#D0D3D8"]), div[aria-hidden] p:has(+ div > svg > rect[stroke="#D0D3D8"])` | `absent` | the Finance, Sites and Testing peek drawings and the status lines above them are plate interiors PRV-6 draws; PRV-5 keeps each peek's frame and title | owner, 2026-11-26 | PRV-6 |
 | D14 | home/range | default, default-rm, tab-finance, tab-finance-rm, tab-mobile, tab-mobile-rm, tab-ai, tab-ai-rm, tab-3d, tab-3d-rm, tab-sites, tab-sites-rm, tab-testing, tab-testing-rm, plate-next, plate-next-rm, plate-prev, plate-prev-rm | 1440 | light, dark | `later` | `div[aria-hidden] div:has(> svg > rect[stroke="#D5E2DD"]), div[aria-hidden] div:has(> svg > rect[stroke="#E2DFD8"]), div[aria-hidden] div:has(> svg > rect[fill="#0F1113"])` | `absent` | the lab plates' peek drawings are plate interiors PRV-7 draws (the lab peeks have no status line); PRV-5 keeps each peek's frame and title | owner, 2026-11-26 | PRV-7 |
+| D16 | home/plate-finance-interior, home/plate-ai-interior | tab-finance, tab-finance-rm, plate-next, plate-next-rm, tab-ai, tab-ai-rm | 1440, 390 | light, dark | `font` | `IBM Plex Sans` | `ibmPlexSans sha256:0aa124d80149e3979585b9a206aed3dc7b245896a10995aeb4ef282dd0dace29` | the cut keeps the fragment font under the 40 KiB gate with the peso sign (owner ruling 2026-11-27) | owner, 2026-11-27 | - |

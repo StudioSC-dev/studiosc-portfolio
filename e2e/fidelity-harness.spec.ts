@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import http from "node:http";
 import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
@@ -78,7 +79,7 @@ import {
   startFixtureServer,
   type FixtureServer,
 } from "./fixtures/fidelity/server";
-import { DRIFTS } from "./fixtures/fidelity/drifts";
+import { DRIFTS, type Drift } from "./fixtures/fidelity/drifts";
 import {
   boardThemes,
   hiddenFor,
@@ -2521,6 +2522,491 @@ test.describe("fidelity harness", () => {
       const none = await failures(checkSite, NO_VIEW_TRANSITION);
       expect(none).toEqual(expect.arrayContaining(missed));
     });
+
+    test("the fragment sans stands for IBM Plex Sans", async ({ browser }) => {
+      chromiumOnly();
+      test.setTimeout(15 * 60_000);
+      const alt = readFileSync(path.join(FIXTURE_SITE, "alt-font.woff2"));
+      const proxy = await withFiles(server.url, {
+        [CUT_URL]: readFileSync(path.join(ROOT, PLEX_CUT)),
+        "/cut/other.woff2": alt,
+      });
+      const rows = ["fx/opener"];
+      const dir = await plexCanvas(
+        browser,
+        server,
+        proxy.url,
+        inCut(rows),
+        rows
+      );
+      try {
+        const run = (drift: Drift, deviations: Deviation[]) =>
+          plexRun(browser, server, proxy.url, dir, drift, rows, deviations);
+        const row = fixtureD16();
+
+        // The board draws the row in IBM Plex Sans and the site serves the cut
+        // under its built family: with D16 in force the row passes.
+        const passed = await run(inCut(rows), [row]);
+        expect(passed.checked).toEqual(["fx/opener default 1440 light"]);
+        expect(passed.failures.map(describeFailure)).toEqual([]);
+
+        // Without D16 the family is a mismatch.
+        expectFailure(
+          (await run(inCut(rows), [])).failures,
+          {
+            section: "fx/opener",
+            property: /^key \S+ font-family$/,
+            expected: PLEX,
+            actual: PLEX_BUILT.toLowerCase(),
+          },
+          "without D16"
+        );
+
+        // With D16 in force, each way a face of the built family can be other
+        // than the signed file alone fails.
+        const signed = `loaded from the signed file alone, sha256 ${sha256(readFileSync(path.join(ROOT, PLEX_CUT)))}`;
+        expectFailure(
+          (await run(inCut(rows, plexFace("/cut/other.woff2")), [row]))
+            .failures,
+          {
+            property: `font ${PLEX} 400 600`,
+            expected: signed,
+            actual: `other.woff2 with sha256 ${sha256(alt)}`,
+          },
+          "other bytes under the built family"
+        );
+        expectFailure(
+          (
+            await run(
+              inCut(
+                rows,
+                plexFace(CUT_URL, "400 600", 'local("IBM Plex Sans"), ')
+              ),
+              [row]
+            )
+          ).failures,
+          {
+            property: `font ${PLEX} 400 600`,
+            expected: signed,
+            actual: "a local() source: whatever font the machine has",
+          },
+          "a local() source"
+        );
+        expectFailure(
+          (await run(inCut(rows, plexFace("/cut/missing.woff2")), [row]))
+            .failures,
+          {
+            property: `font ${PLEX} 400 600`,
+            expected: signed,
+            actual: "failed to load missing.woff2",
+          },
+          "a failed font request"
+        );
+        // An inline font first and the cut second, with the cut fetched on
+        // its own: the face loads the inline bytes, so the cut's response
+        // does not make it the signed file.
+        const inline = `url(data:font/woff2;base64,${alt.toString("base64")}) format("woff2"), `;
+        expectFailure(
+          (
+            await run(
+              {
+                ...inCut(rows, plexFace(CUT_URL, "400 600", inline)),
+                js: `void fetch(${JSON.stringify(CUT_URL)});`,
+              },
+              [row]
+            )
+          ).failures,
+          {
+            property: `font ${PLEX} 400 600`,
+            expected: signed,
+            actual: `2 sources: an inline font, ${path.basename(CUT_URL)}`,
+          },
+          "an inline font with the cut fetched apart"
+        );
+
+        // Each run of the row: the weight it uses, its first family and the
+        // font that paints its glyphs.
+        const heading = "We build fixtures.";
+        const line = "A page made to be measured, with one of";
+        expectFailure(
+          (await run(inCut(rows, plexFace(CUT_URL, "400 500")), [row]))
+            .failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 600`,
+            expected: "a loaded face of the signed file at 600 normal",
+            actual: `no loaded face: the text falls back: "${heading}"`,
+          },
+          "a used weight outside the face"
+        );
+        expectFailure(
+          (await run(inCut(rows, ""), [row])).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 400`,
+            expected: "a loaded face of the signed file at 400 normal",
+            actual: `no loaded face: the text falls back: "${line}"`,
+          },
+          "only the fallback face"
+        );
+        // One inline run, outside the text selectors, at a weight the face
+        // lacks; and a control's placeholder at that weight.
+        const bold = `const p = document.querySelector('[data-board-section="fx/opener"] p'); p.innerHTML = p.innerHTML.replace("measured", '<span style="font-weight: 700">measured</span>');`;
+        expectFailure(
+          (await run({ ...inCut(rows), js: bold }, [row])).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 700`,
+            expected: "a loaded face of the signed file at 700 normal",
+            actual: `no loaded face: the text falls back: "measured"`,
+          },
+          "an inline run at a weight outside the face"
+        );
+        // The same run in an element with display: contents, which has no
+        // box of its own: its text still renders, and is still checked.
+        const contents = bold.replace(
+          'style="font-weight: 700"',
+          'style="display: contents; font-weight: 700"'
+        );
+        expect(contents).toContain("display: contents");
+        expectFailure(
+          (await run({ ...inCut(rows), js: contents }, [row])).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 700`,
+            expected: "a loaded face of the signed file at 700 normal",
+            actual: `no loaded face: the text falls back: "measured"`,
+          },
+          "a display: contents run at a weight outside the face"
+        );
+        const field = `document.querySelector('[data-board-section="fx/opener"] h1').insertAdjacentHTML("afterend", '<input placeholder="Search the work" style="font-weight: 700">');`;
+        expectFailure(
+          (await run({ ...inCut(rows), js: field }, [row])).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 700`,
+            expected: "a loaded face of the signed file at 700 normal",
+            actual: `no loaded face: the text falls back: "Search the work"`,
+          },
+          "a placeholder at a weight outside the face"
+        );
+        // next/font's fallback face as the computed first family: the
+        // harness reads its name as the built family, and the text fails.
+        const fallbackName = `__${PLEX_BUILT}_Fallback_abcdef`;
+        expectFailure(
+          (
+            await run(
+              {
+                css: [
+                  plexFace(CUT_URL),
+                  `@font-face { font-family: ${fallbackName}; src: local(Arial); size-adjust: 101.13%; }`,
+                  setIn(`${fallbackName}, ${PLEX_BUILT}`, rows),
+                ].join("\n"),
+              },
+              [row]
+            )
+          ).failures,
+          {
+            section: "fx/opener",
+            property: `font ${PLEX} 400`,
+            expected: `the ${PLEX} face first`,
+            actual: `the fallback face ${fallbackName} first: "${line}"`,
+          },
+          "the fallback face first"
+        );
+        // A glyph the face leaves out (its unicode-range skips W) is painted
+        // by another font, though the cut loads for the rest.
+        const noW = plexFace(CUT_URL).replace(
+          "font-display: swap;",
+          "font-display: swap; unicode-range: U+0-56, U+58-10FFFF;"
+        );
+        expect(noW).toContain("unicode-range");
+        expect((await run(inCut(rows, noW), [row])).failures).toContainEqual(
+          expect.objectContaining({
+            section: "fx/opener",
+            property: expect.stringMatching(/^font ibm plex sans \d+$/),
+            expected: `painted by the signed file (${PLEX_NAME})`,
+            actual: expect.stringMatching(
+              new RegExp(
+                `^painted by (${PLEX_NAME}, .+|.+, ${PLEX_NAME}): "${heading.replace(".", "\\.")}"$`
+              )
+            ),
+          })
+        );
+        // A child element set in another family inside a run: its glyphs are
+        // its own run's, not the parent's, so the parent's text, painted by
+        // the cut, passes.
+        const manropeFace = `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(/cut/other.woff2) format("woff2"); }`;
+        const child = `const p = document.querySelector('[data-board-section="fx/opener"] p'); p.innerHTML = p.innerHTML.replace("measured", '<span style="font-family: __Manrope_8c2def02 !important">measured</span>');`;
+        const mixed = await run(
+          { css: `${inCut(rows).css}\n${manropeFace}`, js: child },
+          [row]
+        );
+        expect(
+          mixed.failures
+            .filter((f) => f.property.startsWith(`font ${PLEX} `))
+            .map(describeFailure)
+        ).toEqual([]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+        await proxy.close();
+      }
+    });
+
+    test("font rows change only their own family", async ({ browser }) => {
+      chromiumOnly();
+      test.setTimeout(20 * 60_000);
+      const own = (file: string) => readFileSync(path.join(ROOT, file));
+      const manrope = own("app/fonts/manrope/manrope-latin.woff2");
+      const mono = own("app/fonts/jetbrains-mono/jetbrains-mono-latin.woff2");
+      const proxy = await withFiles(server.url, {
+        [CUT_URL]: own(PLEX_CUT),
+        "/cut/manrope.woff2": manrope,
+        "/cut/mono.woff2": mono,
+      });
+      // fx/opener is the row D16's fixture copy names; fx/footer, on the same
+      // page and also drawn in IBM Plex Sans, is not. fx/list is set in
+      // Manrope and fx/contact in JetBrains Mono, each pinned in the copy of
+      // the canvas, and the rest of the page in Red Hat Text.
+      const plexRows = ["fx/opener", "fx/footer"];
+      const rows = [...plexRows, "fx/list", "fx/contact"];
+      const faces = (manropeSrc: string, monoSrc: string) =>
+        [
+          `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(${manropeSrc}) format("woff2"); }`,
+          `@font-face { font-family: __JetBrains_Mono_14425ba9; font-style: normal; font-weight: 400 700; src: url(${monoSrc}) format("woff2"); }`,
+          setIn("__Manrope_8c2def02, sans-serif", ["fx/list"]),
+          setIn("__JetBrains_Mono_14425ba9, monospace", ["fx/contact"]),
+        ].join("\n");
+      // Served wrong, each other family loads another family's file: Manrope
+      // and JetBrains Mono each other's, Red Hat Text the fixture's other
+      // font, as fonts-wrong.css serves it.
+      const served = (wrong: boolean): Drift => ({
+        css: [
+          inCut(plexRows).css,
+          wrong
+            ? faces("/cut/mono.woff2", "/cut/manrope.woff2")
+            : faces("/cut/manrope.woff2", "/cut/mono.woff2"),
+          wrong
+            ? `@font-face { font-family: 'Red Hat Text'; font-style: normal; font-weight: 400 700; src: url(/alt-font.woff2) format('woff2'); }`
+            : "",
+        ].join("\n"),
+      });
+      const dir = await plexCanvas(
+        browser,
+        server,
+        proxy.url,
+        served(false),
+        rows,
+        {
+          "fixture-manrope.woff2": {
+            family: "Manrope",
+            weight: "400 800",
+            sha256: sha256(manrope),
+          },
+          "fixture-mono.woff2": {
+            family: "JetBrains Mono",
+            weight: "400 700",
+            sha256: sha256(mono),
+          },
+        }
+      );
+      try {
+        const run = (
+          deviations: Deviation[],
+          merged: string[] = [],
+          drift = served(false)
+        ) =>
+          plexRun(
+            browser,
+            server,
+            proxy.url,
+            dir,
+            drift,
+            rows,
+            deviations,
+            merged
+          );
+        const plex = (r: { failures: Failure[] }) =>
+          plexFailures(r.failures).map(describeFailure);
+        const row = fixtureD16();
+        const none = await run([]);
+        for (const id of plexRows)
+          expect(
+            plexFailures(none.failures).filter((f) => f.section === id).length,
+            `${id} without D16`
+          ).toBeGreaterThan(0);
+
+        // In force for fx/opener: its IBM Plex Sans failures go, and fx/footer
+        // on the same page keeps exactly the failures it has without D16.
+        const applied = await run([row]);
+        expect(plex(applied)).toEqual(
+          plexFailures(none.failures)
+            .filter((f) => f.section !== "fx/opener")
+            .map(describeFailure)
+        );
+
+        // One field at a time that does not match the run: nothing changes.
+        const fields: [string, Partial<Deviation>][] = [
+          ["section", { section: ["fx/gallery"] }],
+          ["state", { state: ["tab-2"] }],
+          ["width", { width: ["390"] }],
+          ["theme", { theme: ["dark"] }],
+        ];
+        for (const [field, change] of fields)
+          expect(
+            plex(await run([{ ...row, ...change }])),
+            `another ${field}`
+          ).toEqual(plex(none));
+
+        // Unsigned: the family mismatch returns.
+        const unsigned = await run([{ ...row, accepted: "" }]);
+        expect(plex(unsigned)).toEqual(plex(none));
+        expectFailure(
+          unsigned.failures,
+          {
+            section: "fx/opener",
+            property: /^key \S+ font-family$/,
+            expected: PLEX,
+            actual: PLEX_BUILT.toLowerCase(),
+          },
+          "unsigned"
+        );
+
+        // Expiry: in force until its ticket is in the merged list.
+        const expiring = { ...row, expires: "PRV-60" };
+        expect(plex(await run([expiring]))).toEqual(plex(applied));
+        const expired = await run([expiring], ["PRV-60"]);
+        expect(plex(expired)).toEqual(plex(none));
+        expectFailure(
+          expired.failures,
+          {
+            section: "fx/opener",
+            property: /^key \S+ font-family$/,
+            expected: PLEX,
+            actual: PLEX_BUILT.toLowerCase(),
+          },
+          "expired"
+        );
+
+        // The selected reference draws the row in Red Hat Text (the committed
+        // fixture canvas): D16 does not apply there, to the family or the pin,
+        // so other bytes under the built family fail no pin, as without D16.
+        const fontsOf = (r: { failures: Failure[] }) =>
+          r.failures
+            .filter((f) => /^font |font-family$/.test(f.property))
+            .map(describeFailure);
+        const opener = ["fx/opener"];
+        const otherBytes = inCut(opener, plexFace("/cut/manrope.woff2"));
+        const plain = await plexRun(
+          browser,
+          server,
+          proxy.url,
+          CANVAS,
+          otherBytes,
+          opener,
+          []
+        );
+        expect(
+          fontsOf(plain).length,
+          "the cut under Red Hat Text"
+        ).toBeGreaterThan(0);
+        expect(
+          fontsOf(
+            await plexRun(
+              browser,
+              server,
+              proxy.url,
+              CANVAS,
+              otherBytes,
+              opener,
+              [row]
+            )
+          )
+        ).toEqual(fontsOf(plain));
+
+        // A font row whose built family is one the boards pin is not
+        // applied: fx/opener set in Manrope's name keeps its family mismatch,
+        // and Manrope's own text in fx/list, on the same page, keeps
+        // Manrope's pins. Every failure is the same as without the row,
+        // whether the row signs the cut served under Manrope's name or the
+        // file the boards already pin for Manrope.
+        const inManrope = (src: string): Drift => ({
+          css: [
+            `@font-face { font-family: __Manrope_8c2def02; font-style: normal; font-weight: 400 800; src: url(${src}) format("woff2"); }`,
+            `@font-face { font-family: __JetBrains_Mono_14425ba9; font-style: normal; font-weight: 400 700; src: url(/cut/mono.woff2) format("woff2"); }`,
+            setIn("__Manrope_8c2def02, sans-serif", ["fx/opener", "fx/list"]),
+            setIn("__JetBrains_Mono_14425ba9, monospace", ["fx/contact"]),
+            inCut(["fx/footer"]).css,
+          ].join("\n"),
+        });
+        const signing = (bytes: Buffer): Deviation => ({
+          ...row,
+          built: `__Manrope_8c2def02 sha256:${sha256(bytes)}`,
+        });
+        const manropePins = (r: { failures: Failure[] }) =>
+          r.failures
+            .filter((f) => f.property.startsWith("font manrope "))
+            .map(describeFailure);
+        const cutNone = await run([], [], inManrope(CUT_URL));
+        const cutSigned = await run(
+          [signing(own(PLEX_CUT))],
+          [],
+          inManrope(CUT_URL)
+        );
+        expect(manropePins(cutNone).length).toBeGreaterThan(0);
+        expect(cutSigned.failures.map(describeFailure)).toEqual(
+          cutNone.failures.map(describeFailure)
+        );
+        const pinNone = await run([], [], inManrope("/cut/manrope.woff2"));
+        const pinSigned = await run(
+          [signing(manrope)],
+          [],
+          inManrope("/cut/manrope.woff2")
+        );
+        expectFailure(
+          pinSigned.failures,
+          {
+            section: "fx/opener",
+            property: /^key \S+ font-family$/,
+            expected: PLEX,
+            actual: "manrope",
+          },
+          "a row signing Manrope's pinned file"
+        );
+        expect(pinSigned.failures.map(describeFailure)).toEqual(
+          pinNone.failures.map(describeFailure)
+        );
+
+        // Red Hat Text, Manrope and JetBrains Mono: every failure that is not
+        // IBM Plex Sans's is the same as without D16, served right or wrong.
+        const others = (r: { failures: Failure[] }) => {
+          const p = new Set(plexFailures(r.failures));
+          return r.failures.filter((f) => !p.has(f)).map(describeFailure);
+        };
+        expect(others(applied)).toEqual(others(none));
+        expect(
+          none.failures
+            .filter((f) =>
+              /^font (red hat text|manrope|jetbrains mono) /.test(f.property)
+            )
+            .map(describeFailure),
+          "the other families served right"
+        ).toEqual([]);
+        const wrongNone = await run([], [], served(true));
+        const wrongApplied = await run([row], [], served(true));
+        expect(others(wrongApplied)).toEqual(others(wrongNone));
+        for (const family of ["red hat text", "manrope", "jetbrains mono"])
+          expect(
+            wrongNone.failures.filter((f) =>
+              f.property.startsWith(`font ${family} `)
+            ).length,
+            `${family} served wrong`
+          ).toBeGreaterThan(0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+        await proxy.close();
+      }
+    });
   });
 
   test("hidden header links leave no gap", async () => {
@@ -3002,6 +3488,145 @@ test.describe("fidelity harness", () => {
       expect(files(range!.head, board), board).toBe(files(fork, board));
     }
   });
+
+  test("font rows are exact and signed", () => {
+    chromiumOnly();
+    // The register as PRV-31 leaves it: later tickets may sign rows of their
+    // own and change D16 (PRV-32), so this runs on PRV-31's PR alone.
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV31_TICKET), PRV31_ONLY);
+    const register = loadBoards(BOARDS).deviations;
+    const fonts = register.filter((d) => d.property === "font");
+    expect(fonts.map((d) => d.id)).toEqual(["D16"]);
+    expect(fonts[0]).toEqual({
+      id: "D16",
+      section: ["home/plate-finance-interior", "home/plate-ai-interior"],
+      state: [
+        "tab-finance",
+        "tab-finance-rm",
+        "plate-next",
+        "plate-next-rm",
+        "tab-ai",
+        "tab-ai-rm",
+      ],
+      width: ["1440", "390"],
+      theme: ["light", "dark"],
+      property: "font",
+      board: "IBM Plex Sans",
+      built: `${PLEX_BUILT} sha256:${sha256(readFileSync(path.join(ROOT, PLEX_CUT)))}`,
+      from: "the cut keeps the fragment font under the 40 KiB gate with the peso sign (owner ruling 2026-11-27)",
+      accepted: "owner, 2026-11-27",
+      expires: null,
+    });
+    expect(isAccepted(fonts[0])).toBe(true);
+    // The register's prose describes the kind.
+    const prose = readFileSync(path.join(BOARDS, "deviations.md"), "utf8")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("|"))
+      .join("\n");
+    expect(prose).toMatch(
+      /^- `font` rows let a built family stand for a board family\./m
+    );
+    for (const part of [
+      "`<family> sha256:<hex>`",
+      "the selected\n  reference draws that section's text in the board family",
+      "`font-family`",
+      "`local()`",
+      "A `font` row suppresses no failure",
+    ])
+      expect(prose, part).toContain(part);
+    // Every row the PR base has is unchanged; D16 is the one row added.
+    const before = parseDeviations(
+      git(["show", `${forkOf(range!)}:docs/boards/deviations.md`])
+    );
+    for (const d of before)
+      expect(
+        register.find((x) => x.id === d.id),
+        d.id
+      ).toEqual(d);
+    expect(
+      register
+        .filter((d) => !before.some((b) => b.id === d.id))
+        .map((d) => d.id)
+    ).toEqual(["D16"]);
+  });
+
+  test("PRV-31 changes only scoped paths", async ({ baseURL }) => {
+    chromiumOnly();
+    test.setTimeout(10 * 60_000);
+    const range = prRange();
+    test.skip(!range || existsAt(range.base, PRV31_TICKET), PRV31_ONLY);
+    const fork = forkOf(range!);
+    const head = range!.head;
+    const changed = git([
+      "diff",
+      "--name-only",
+      "--no-renames",
+      `${range!.base}...${head}`,
+    ])
+      .split("\n")
+      .filter(Boolean);
+    expect(changed).toContain(PRV31_TICKET);
+    expect(changed.filter((f) => !PRV31_SCOPE.includes(f))).toEqual([]);
+    // The tolerances, spec.json, ref/, sections.json and manifest.json are
+    // as at the base.
+    const object = (sha: string, p: string) =>
+      git(["rev-parse", `${sha}:${p}`]).trim();
+    for (const p of [
+      "docs/boards/spec.json",
+      "docs/boards/ref",
+      "docs/boards/sections.json",
+      "docs/boards/manifest.json",
+    ])
+      expect(object(head, p), p).toBe(object(fork, p));
+    const tolerances = (text: string) =>
+      /export const TOLERANCE = \{[^}]*\} as const;/.exec(text)?.[0];
+    const before = tolerances(
+      git(["show", `${fork}:scripts/boards/compare.ts`])
+    );
+    expect(before, "TOLERANCE at the base").toBeDefined();
+    expect(tolerances(git(["show", `${head}:scripts/boards/compare.ts`]))).toBe(
+      before
+    );
+    // PRV-2's "one superfamily, within size", run on its own against the
+    // build under test, still passes.
+    const out = tmp("prv31-prv2-");
+    try {
+      const config = path.join(out, "playwright.config.ts");
+      writeFileSync(
+        config,
+        [
+          `import { defineConfig, devices } from ${JSON.stringify(createRequire(__filename).resolve("@playwright/test"))};`,
+          "export default defineConfig({",
+          `  testDir: ${JSON.stringify(path.join(ROOT, "e2e"))},`,
+          `  outputDir: ${JSON.stringify(path.join(out, "results"))},`,
+          '  reporter: "line",',
+          "  retries: 0,",
+          `  use: { baseURL: ${JSON.stringify(baseURL)} },`,
+          '  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],',
+          "});",
+        ].join("\n")
+      );
+      const run = spawnSync(
+        path.join(ROOT, "node_modules/.bin/playwright"),
+        [
+          "test",
+          "--config",
+          config,
+          "--workers=1",
+          "e2e/design-tokens.spec.ts",
+          "-g",
+          "one superfamily, within size",
+        ],
+        { cwd: ROOT, env: childEnv(), encoding: "utf8", timeout: 8 * 60_000 }
+      );
+      const output = `${run.stdout}${run.stderr}`;
+      expect(run.status, output).toBe(0);
+      expect(output).toMatch(/\b1 passed\b/);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
 });
 
 /** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
@@ -3078,6 +3703,218 @@ const NO_VIEW_TRANSITION =
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
+
+/** PRV-31's ticket. */
+const PRV31_TICKET = "docs/tickets/PRV-31.md";
+/** The site's IBM Plex Sans cut (lib/fonts.ts), and the family the build serves it under. */
+const PLEX_CUT = "app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2";
+const PLEX_BUILT = "ibmPlexSans";
+/** The family name inside the cut, as Chromium names the font it paints. */
+const PLEX_NAME = "SSC Fragment Sans";
+/** IBM Plex Sans as the harness reads the boards' family. */
+const PLEX = "ibm plex sans";
+const FIXTURE_SITE = path.join(ROOT, "e2e/fixtures/fidelity/site");
+/** Where the proxy in front of the fixture site serves the cut. */
+const CUT_URL = "/cut/ibm-plex-sans-latin-peso.woff2";
+
+/** A face under the built family, as next/font/local declares the cut. */
+const plexFace = (url: string, weight = "400 600", before = "") =>
+  `@font-face { font-family: ${PLEX_BUILT}; font-style: normal; font-weight: ${weight}; font-display: swap; src: ${before}url(${url}) format("woff2"); }`;
+/** next/font's size-adjusted fallback for the cut, as the build declares it. */
+const PLEX_FALLBACK = `@font-face { font-family: "${PLEX_BUILT} Fallback"; src: local(Arial); ascent-override: 101.35%; descent-override: 27.19%; line-gap-override: 0%; size-adjust: 101.13%; }`;
+/** Sets every element of the rows in `family`. */
+const setIn = (family: string, rows: string[]) =>
+  `${rows.map((r) => `[data-board-section="${r}"], [data-board-section="${r}"] *`).join(", ")} { font-family: ${family} !important; }`;
+/** The rows set in the cut, as the site sets a fragment: `faces`, then the fallback. */
+const inCut = (rows: string[], faces = plexFace(CUT_URL)): Drift => ({
+  css: [
+    faces,
+    PLEX_FALLBACK,
+    setIn(`${PLEX_BUILT}, "${PLEX_BUILT} Fallback"`, rows),
+  ].join("\n"),
+});
+
+/** D16, copied onto the fixture: fx/opener in its default state, 1440, light. */
+const fixtureD16 = (): Deviation => {
+  const d16 = loadBoards(BOARDS).deviations.find((d) => d.id === "D16");
+  expect(d16, "D16 in the committed register").toBeDefined();
+  return {
+    ...d16!,
+    section: ["fx/opener"],
+    state: ["default"],
+    width: ["1440"],
+    theme: ["light"],
+  };
+};
+
+/**
+ * A board IBM Plex Sans key the site sets in another family, and every
+ * font-pin failure for the family.
+ */
+const plexFailures = (failures: Failure[]) =>
+  failures.filter(
+    (f) =>
+      f.property.startsWith(`font ${PLEX} `) ||
+      (f.property.endsWith(" font-family") && String(f.expected) === PLEX)
+  );
+
+/**
+ * A proxy in front of the fixture site that answers each path in `files`
+ * with its bytes (as a font) and passes every other request through.
+ */
+async function withFiles(
+  target: string,
+  files: Record<string, Buffer>
+): Promise<{ url: string; close: () => Promise<void> }> {
+  const server = http.createServer((req, res) => {
+    void (async () => {
+      const own = files[req.url ?? ""];
+      if (own) {
+        res.writeHead(200, {
+          "content-type": "font/woff2",
+          "cache-control": "no-store",
+        });
+        res.end(own);
+        return;
+      }
+      const upstream = await fetch(new URL(req.url ?? "/", target));
+      const body = Buffer.from(await upstream.arrayBuffer());
+      const headers: Record<string, string> = {};
+      upstream.headers.forEach((value, key) => {
+        if (!/^(content-encoding|content-length|transfer-encoding)$/i.test(key))
+          headers[key] = value;
+      });
+      res.writeHead(upstream.status, headers);
+      res.end(body);
+    })().catch(() => {
+      res.writeHead(502);
+      res.end();
+    });
+  });
+  const port = await freePort();
+  await new Promise<void>((resolve) =>
+    server.listen(port, "127.0.0.1", resolve)
+  );
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
+}
+
+/**
+ * A copy of the fixture canvas whose 1440 light default references for
+ * `rows` are the fixture site's own capture under `drift`, with the cut's
+ * family recorded as IBM Plex Sans: the board draws those rows in IBM Plex
+ * Sans, and every other measure is the site's. `pins` adds fonts to the
+ * copy's google.css and manifest, by file name.
+ */
+async function plexCanvas(
+  browser: Browser,
+  fixture: FixtureServer,
+  url: string,
+  drift: Drift,
+  rows: string[],
+  pins: Record<string, { family: string; weight: string; sha256: string }> = {}
+): Promise<string> {
+  const dir = boardsCopy(CANVAS, "plex-canvas-");
+  const manifest = readJson<Manifest>(path.join(dir, "manifest.json"));
+  const css = path.join(dir, "fonts", manifest.fontCss);
+  for (const [file, pin] of Object.entries(pins)) {
+    manifest.fonts[file] = { sha256: pin.sha256 };
+    writeFileSync(
+      css,
+      `${readFileSync(css, "utf8")}@font-face {\n  font-family: '${pin.family}';\n  font-style: normal;\n  font-weight: ${pin.weight};\n  src: url(https://fonts.gstatic.com/s/fixture/${file}) format('woff2');\n}\n`
+    );
+  }
+  writeFileSync(path.join(dir, "manifest.json"), stableJson(manifest, 2));
+  const fx = loadBoards(dir);
+  const ref = fx.spec.boards["fx-desktop.dc.html"].captures["light/default"];
+  fixture.setDrift(drift);
+  const ctx = await siteContext(browser, fx.sections, url, {
+    width: "1440",
+    reducedMotion: false,
+  });
+  try {
+    const page = await ctx.newPage();
+    await load(page, "/", fx.sections.clock);
+    const capture = await captureState(
+      page,
+      fx.sections,
+      rowQueries(
+        fx.sections.rows.filter((r) => rows.includes(r.id)),
+        fx.sections.rows,
+        "site"
+      ),
+      { state: "default", theme: "light", toggle: false },
+      "site",
+      { tokenNames: Object.keys(ref.tokens) }
+    );
+    for (const id of rows) {
+      const site = capture.rows[id];
+      const board = ref.rows[id];
+      expect(site, `${id} on the fixture site`).toBeTruthy();
+      expect(board, `${id} on the fixture board`).toBeTruthy();
+      ref.rows[id] = {
+        ...board!,
+        box: site!.box,
+        copy: site!.copy,
+        shows: site!.shows,
+        keys: site!.keys.map((k) =>
+          k.type?.family === PLEX_BUILT.toLowerCase()
+            ? { ...k, type: { ...k.type, family: PLEX } }
+            : k
+        ),
+      };
+    }
+  } finally {
+    await ctx.close();
+    fixture.setDrift(null);
+  }
+  writeFileSync(path.join(dir, "spec.json"), packSpec(fx.spec));
+  return dir;
+}
+
+/** The fidelity check of `rows` on the fixture site, at 1440 in light, default state. */
+async function plexRun(
+  browser: Browser,
+  fixture: FixtureServer,
+  url: string,
+  dir: string,
+  drift: Drift,
+  rows: string[],
+  deviations: Deviation[],
+  merged: string[] = []
+) {
+  fixture.setDrift(drift);
+  try {
+    return await checkSite({
+      dir,
+      baseURL: url,
+      browser,
+      only: {
+        rows,
+        widths: ["1440"],
+        themes: ["light"],
+        states: ["default"],
+        rm: false,
+      },
+      boards: { deviations, merged },
+    });
+  } finally {
+    fixture.setDrift(null);
+  }
+}
+const PRV31_ONLY = "PRV-31's checks run on the PR that adds its ticket";
+/** The paths PRV-31's PR may change. */
+const PRV31_SCOPE = [
+  "scripts/boards/check.ts",
+  "scripts/boards/inpage.js",
+  "docs/boards/deviations.md",
+  "lib/fonts.ts",
+  "e2e/fidelity-harness.spec.ts",
+  "e2e/design-tokens.spec.ts",
+  PRV31_TICKET,
+];
 
 /** PRV-27's ticket: its PR-boundary checks run on the PR that adds it. */
 const PRV27_TICKET = "docs/tickets/PRV-27.md";

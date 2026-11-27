@@ -676,6 +676,39 @@
     return out.join(",");
   };
 
+  /**
+   * Whether an element with `display: contents`, which has no box of its
+   * own, shows its text: its nearest ancestor with a box shows, it is not
+   * hidden, and a text node of its own renders.
+   */
+  const contentsShown = (el, cs) => {
+    let box = el.parentElement;
+    while (box && getComputedStyle(box).display === "contents")
+      box = box.parentElement;
+    if (!box || !visible(box) || cs.visibility !== "visible") return false;
+    return [...el.childNodes].some((n) => {
+      if (n.nodeType !== Node.TEXT_NODE || !n.textContent.trim()) return false;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      return [...range.getClientRects()].some(
+        (r) => r.width > 0 && r.height > 0
+      );
+    });
+  };
+
+  /** The probe faces and lines fontRuns added, until clearFontRuns. */
+  const fontProbes = [];
+  /** Input types that show no text of their own. */
+  const NO_TEXT_INPUT = new Set([
+    "checkbox",
+    "color",
+    "file",
+    "hidden",
+    "image",
+    "radio",
+    "range",
+  ]);
+
   window.__fidelity = {
     /** Starts a fresh motion record. */
     motionStart() {
@@ -986,6 +1019,113 @@
             used.add(`${first}|${cs.fontWeight}|${cs.fontStyle}`);
           }
       return { faces, used: [...used].sort() };
+    },
+
+    /**
+     * The text runs of `spec.rows`, for a font row's check: every visible
+     * element (one with `display: contents` too) that paints text of its
+     * own (a non-blank text node, or a control's value or, when it has none,
+     * its placeholder), tagged `spec.attr` with its id, with the innermost key element that holds it
+     * (keys named as measure names them), its font-family list, weight and
+     * style. Each of `spec.probes` (id to URL) paints a line in a face loaded
+     * from that URL alone, tagged `probe:<id>`, so the caller can name the
+     * font that file paints.
+     */
+    async fontRuns(spec) {
+      const categories = Object.entries(spec.keys);
+      const families = (value) =>
+        value
+          .split(",")
+          .map((f) => f.trim().replace(/^["']|["']$/g, ""))
+          .filter(Boolean);
+      const runs = [];
+      for (const row of spec.rows) {
+        const els = rowElements(row);
+        const excluded = excludedFor(row);
+        const keyOf = new Map(
+          keysOf(els, excluded, categories, row.named || []).map((k) => [
+            k.el,
+            k.key,
+          ])
+        );
+        const keyFor = (el) => {
+          for (let n = el; n; n = n.parentElement) {
+            if (keyOf.has(n)) return keyOf.get(n);
+            if (els.includes(n)) break;
+          }
+          return null;
+        };
+        const tag = (el, cs, text) => {
+          const id = `run:${runs.length}`;
+          el.setAttribute(spec.attr, id);
+          runs.push({
+            id,
+            row: row.id,
+            key: keyFor(el),
+            families: families(cs.fontFamily),
+            weight: cs.fontWeight,
+            style: cs.fontStyle,
+            text: text.trim().replace(/\s+/g, " ").slice(0, 40).trim(),
+          });
+        };
+        for (const root of els)
+          for (const el of [root, ...root.querySelectorAll("*")]) {
+            if (el.hasAttribute(spec.attr)) continue;
+            if (excluded.some((x) => x === el || x.contains(el))) continue;
+            const cs = getComputedStyle(el);
+            if (
+              !(cs.display === "contents" ? contentsShown(el, cs) : visible(el))
+            )
+              continue;
+            if (
+              el instanceof HTMLTextAreaElement ||
+              (el instanceof HTMLInputElement && !NO_TEXT_INPUT.has(el.type))
+            ) {
+              if (el.value.trim()) tag(el, cs, el.value);
+              else if (el.placeholder.trim())
+                tag(el, getComputedStyle(el, "::placeholder"), el.placeholder);
+              continue;
+            }
+            if (el instanceof HTMLInputElement) continue;
+            if (el instanceof HTMLSelectElement) {
+              const option = el.selectedOptions[0];
+              if (option && option.text.trim()) tag(el, cs, option.text);
+              continue;
+            }
+            const own = [...el.childNodes]
+              .filter((n) => n.nodeType === Node.TEXT_NODE)
+              .map((n) => n.textContent)
+              .join("");
+            if (own.trim()) tag(el, cs, own);
+          }
+      }
+      for (const [id, url] of Object.entries(spec.probes || {})) {
+        const family = `__fidelity_probe_${fontProbes.length}`;
+        const face = new FontFace(family, `url("${url}")`);
+        try {
+          await face.load();
+        } catch {
+          continue;
+        }
+        document.fonts.add(face);
+        const el = document.createElement("span");
+        el.textContent = "Probe";
+        el.style.cssText = `position: fixed; left: 0; top: 0; white-space: nowrap; pointer-events: none; font-family: "${family}";`;
+        el.setAttribute(spec.attr, `probe:${id}`);
+        document.body.append(el);
+        fontProbes.push({ face, el });
+      }
+      return runs;
+    },
+
+    /** Removes fontRuns' tags, probe lines and probe faces. */
+    clearFontRuns(attr) {
+      for (const el of document.querySelectorAll(`[${attr}]`))
+        el.removeAttribute(attr);
+      for (const { face, el } of fontProbes.splice(0)) {
+        el.remove();
+        document.fonts.delete(face);
+      }
     },
   };
 })();
