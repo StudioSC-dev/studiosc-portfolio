@@ -15,9 +15,13 @@ the board's value, within the usual tolerance, is then required.
   is the family the site's face renders under and the sha256 of the one file that face may load, as
   `<family> sha256:<hex>`. For the sections, states, widths and themes the row names, and only where the selected
   reference draws that section's text in the board family, the check reads the built family as the board family
-  when it compares `font-family`, and accepts that one file, matched by its sha256, as the family's pin. The face
-  must still load from a file the site served, cover every weight the text uses, and not be a `local()` or
-  fallback face. A `font` row suppresses no failure: a width or position the face changes still fails.
+  when it compares `font-family`. The text the row covers must then be painted by that one file alone. Every face
+  of the built family loads from a single URL the site served whose bytes match the sha256, with no `local()` or
+  inline source. Every text run of those sections set in the built family (an element's own text, a control's
+  value or placeholder), unless the board sets its key in another family, has the built family first rather than
+  its fallback face, a loaded face of the file for its weight and style, and every glyph painted by the file. The
+  row changes no pin of a family the boards pin, so its built family must not be one of them.
+  A `font` row suppresses no failure: a width or position the face changes still fails.
 - Any other property suppresses the failure that names exactly that property, board value and built value.
 
 PRV-22 seeds the rows below. A row applies once the owner signs and dates it in the `accepted` column, subject to the matching and expiry rules above.
