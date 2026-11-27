@@ -16,7 +16,13 @@ import {
 } from "@playwright/test";
 
 import { checkSite } from "../scripts/boards/check";
-import { loadBoards } from "../scripts/boards/model";
+import { describe, type Failure } from "../scripts/boards/compare";
+import {
+  WIDTHS,
+  loadBoards,
+  stateName,
+  type Deviation,
+} from "../scripts/boards/model";
 import * as ts from "typescript";
 import { scanText } from "./support/denylist";
 import { changedByPr } from "./support/git";
@@ -2271,6 +2277,172 @@ test.describe("Range design system", () => {
       fontFailures(manropeSwapped.result.failures, "Manrope"),
       "Manrope control failures"
     ).not.toHaveLength(0);
+  });
+
+  test("the fragment sans matches both production board rows", async ({
+    page,
+    browser,
+    baseURL,
+  }, testInfo) => {
+    chromiumOnly(testInfo);
+    test.setTimeout(600_000);
+    // PRV-31: D16 lets the IBM Plex Sans cut stand for the boards' IBM Plex
+    // Sans. The test proxy appends the ledger and form-helper fixtures to the
+    // production `/`, and each is the in-memory built row of its real board
+    // section. On the site the sections' tab and plate steps are dropped (the
+    // fixtures are already in view), and PRV-6 and PRV-7 join the merged list,
+    // so the full references, which draw these interiors in IBM Plex Sans, are
+    // the ones compared rather than the partial captures.
+    const dir = path.resolve("docs/boards");
+    const boards = loadBoards(dir);
+    const d16 = boards.deviations.find((d) => d.id === "D16");
+    expect(d16, "D16 in the committed register").toBeDefined();
+    const plex = "ibm plex sans";
+    // The family D16 binds, as the harness reads a family.
+    const built = d16!.built.split(" sha256:")[0].toLowerCase();
+    const fixtureOf: Record<string, string> = {
+      "home/plate-finance-interior": "tallyandtrace",
+      "home/plate-ai-interior": "form-helper",
+    };
+    const ids = Object.keys(fixtureOf);
+    const rows = boards.sections.rows.filter((r) => ids.includes(r.id));
+    expect(rows.map((r) => r.id)).toEqual(ids);
+    const states = [...new Set(rows.flatMap((r) => r.states))];
+    const sections = {
+      ...boards.sections,
+      rows: boards.sections.rows.map((r) =>
+        r.id in fixtureOf
+          ? {
+              ...r,
+              built: true,
+              route: "/",
+              site: `[data-fixture="${fixtureOf[r.id]}"]`,
+            }
+          : r
+      ),
+      states: Object.fromEntries(
+        Object.entries(boards.sections.states).map(([name, def]) => [
+          name,
+          states.includes(name) ? { ...def, site: [] } : def,
+        ])
+      ),
+    };
+    const merged = [...boards.merged, "PRV-6", "PRV-7"];
+    // A board IBM Plex Sans key the site sets in another family, and every
+    // font-pin failure for the family.
+    const plexFailures = (failures: Failure[]) =>
+      failures.filter(
+        (f) =>
+          f.property.startsWith(`font ${plex} `) ||
+          (f.property.endsWith(" font-family") && String(f.expected) === plex)
+      );
+    const proxy = await swapFontProxy(baseURL!, null, FRAGMENT_FIXTURES);
+    try {
+      const run = (deviations: Deviation[]) =>
+        checkSite({
+          dir,
+          baseURL: proxy.url,
+          browser,
+          only: { rows: ids, states },
+          boards: { sections, merged, deviations },
+        });
+      const signed = await run(boards.deviations);
+      const unsigned = await run(
+        boards.deviations.filter((d) => d.id !== "D16")
+      );
+
+      // Each row is drawn and compared in each of its states, at both widths,
+      // in both themes, with motion on and reduced.
+      for (const row of rows) {
+        for (const width of WIDTHS)
+          for (const theme of THEMES)
+            for (const state of row.states)
+              for (const rm of [false, true])
+                expect(signed.checked, `${row.id} compared`).toContain(
+                  `${row.id} ${stateName(state, { rm })} ${width} ${theme}`
+                );
+        expect(
+          signed.failures.filter(
+            (f) =>
+              f.section === row.id && /^(drawn|reference)$/.test(f.property)
+          ),
+          `${row.id} drawn against its reference`
+        ).toEqual([]);
+      }
+      expect(
+        plexFailures(signed.failures).map(describe),
+        "IBM Plex Sans font-family and font-pin failures with D16"
+      ).toEqual([]);
+
+      // The comparison ran: each fixture pairs keys the reference sets in IBM
+      // Plex Sans with rendered keys. Without D16 each is a font-family
+      // mismatch with the built family; with D16 it matches.
+      for (const row of rows) {
+        const paired = unsigned.failures.filter(
+          (f) =>
+            f.section === row.id &&
+            f.property.endsWith(" font-family") &&
+            String(f.expected) === plex
+        );
+        expect(
+          paired.length,
+          `${row.id}: IBM Plex Sans keys paired`
+        ).toBeGreaterThan(0);
+        for (const f of paired) {
+          const key = f.property.split(" ")[1];
+          const board =
+            row.sources[f.width as "1440"]![f.theme as "light"].board;
+          const ref =
+            boards.spec.boards[board].captures[`${f.theme}/${f.state}`];
+          expect(
+            ref.rows[row.id]!.keys.find((k) => k.key === key)?.type?.family,
+            `${describe(f)}: the reference key`
+          ).toBe(plex);
+          expect(String(f.actual), describe(f)).toBe(built);
+          expect(
+            signed.failures.filter(
+              (s) =>
+                s.section === f.section &&
+                s.state === f.state &&
+                s.width === f.width &&
+                s.theme === f.theme &&
+                s.property === f.property
+            ),
+            `${describe(f)} with D16`
+          ).toEqual([]);
+        }
+      }
+
+      // The peso sign in the ledger renders from the cut, through the proxy.
+      const peso = await page.context().newPage();
+      try {
+        await peso.goto(`${proxy.url}/`);
+        await peso.evaluate(() => document.fonts.ready);
+        const cdp = await peso.context().newCDPSession(peso);
+        await cdp.send("DOM.enable");
+        await cdp.send("CSS.enable");
+        const { root } = await cdp.send("DOM.getDocument", { depth: -1 });
+        const { nodeId } = await cdp.send("DOM.querySelector", {
+          nodeId: root.nodeId,
+          selector: '[data-fixture="tallyandtrace"] [data-glyph="peso"]',
+        });
+        expect(nodeId, "the peso sign in the ledger fixture").toBeGreaterThan(
+          0
+        );
+        const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", {
+          nodeId,
+        });
+        expect(
+          fonts.map((f) => ({ family: f.familyName, custom: f.isCustomFont })),
+          "fonts that draw the peso sign"
+        ).toEqual([{ family: PLEX_INTERNAL_NAME, custom: true }]);
+        await cdp.detach();
+      } finally {
+        await peso.close();
+      }
+    } finally {
+      await proxy.close();
+    }
   });
 
   test("changes stay within PRV-26 scope", async () => {
