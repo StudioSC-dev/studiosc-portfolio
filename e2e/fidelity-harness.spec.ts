@@ -3002,6 +3002,66 @@ test.describe("fidelity harness", () => {
       expect(files(range!.head, board), board).toBe(files(fork, board));
     }
   });
+
+  test("font rows are exact and signed", () => {
+    chromiumOnly();
+    const register = loadBoards(BOARDS).deviations;
+    const fonts = register.filter((d) => d.property === "font");
+    expect(fonts.map((d) => d.id)).toEqual(["D16"]);
+    expect(fonts[0]).toEqual({
+      id: "D16",
+      section: ["home/plate-finance-interior", "home/plate-ai-interior"],
+      state: [
+        "tab-finance",
+        "tab-finance-rm",
+        "plate-next",
+        "plate-next-rm",
+        "tab-ai",
+        "tab-ai-rm",
+      ],
+      width: ["1440", "390"],
+      theme: ["light", "dark"],
+      property: "font",
+      board: "IBM Plex Sans",
+      built: `${PLEX_BUILT} sha256:${sha256(readFileSync(path.join(ROOT, PLEX_CUT)))}`,
+      from: "the cut keeps the fragment font under the 40 KiB gate with the peso sign (owner ruling 2026-11-27)",
+      accepted: "owner, 2026-11-27",
+      expires: null,
+    });
+    expect(isAccepted(fonts[0])).toBe(true);
+    // The register's prose describes the kind.
+    const prose = readFileSync(path.join(BOARDS, "deviations.md"), "utf8")
+      .split("\n")
+      .filter((l) => !l.trim().startsWith("|"))
+      .join("\n");
+    expect(prose).toMatch(
+      /^- `font` rows let a built family stand for a board family\./m
+    );
+    for (const part of [
+      "`<family> sha256:<hex>`",
+      "the selected\n  reference draws that section's text in the board family",
+      "`font-family`",
+      "`local()`",
+      "A `font` row suppresses no failure",
+    ])
+      expect(prose, part).toContain(part);
+    // Every row the PR base has is unchanged; D16 is the one row added.
+    const range = prRange();
+    test.skip(!range, "the PR base is compared on a pull request");
+    const before = parseDeviations(
+      git(["show", `${forkOf(range!)}:docs/boards/deviations.md`])
+    );
+    for (const d of before)
+      expect(
+        register.find((x) => x.id === d.id),
+        d.id
+      ).toEqual(d);
+    expect(
+      register
+        .filter((d) => !before.some((b) => b.id === d.id))
+        .map((d) => d.id)
+    ).toEqual(existsAt(range!.base, PRV31_TICKET) ? [] : ["D16"]);
+  });
 });
 
 /** The fidelity harness before PRV-25: PRV-22's merge commit on main. */
@@ -3078,6 +3138,12 @@ const NO_VIEW_TRANSITION =
 
 type Want = Partial<Omit<Failure, "property">> & { property: string | RegExp };
 type CheckOptionsBoards = Parameters<typeof checkSite>[0]["boards"];
+
+/** PRV-31's ticket. */
+const PRV31_TICKET = "docs/tickets/PRV-31.md";
+/** The site's IBM Plex Sans cut (lib/fonts.ts), and the family the build serves it under. */
+const PLEX_CUT = "app/fonts/ibm-plex-sans/ibm-plex-sans-latin-peso.woff2";
+const PLEX_BUILT = "ibmPlexSans";
 
 /** PRV-27's ticket: its PR-boundary checks run on the PR that adds it. */
 const PRV27_TICKET = "docs/tickets/PRV-27.md";
